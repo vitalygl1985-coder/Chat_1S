@@ -115,9 +115,7 @@ const start = async () => {
         await pool.query('SELECT NOW()');
         console.log('Успешное подключение к базе данных Railway!');
 
-        // Запуск прослушивания порта. На Railway обязательно хост '0.0.0.0'
-        await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
-        
+        // ИСПРАВЛЕНО: Создаем экземпляр Socket.IO ДО вызова fastify.listen
         const io = new Server(fastify.server, { 
             cors: { origin: "*" },
             maxHttpBufferSize: 1e8 // 100 МБ
@@ -193,6 +191,10 @@ const start = async () => {
                 }
             });
         });
+
+        // ИСПРАВЛЕНО: Запуск прослушивания порта вызываем в самом конце, когда роуты сокетов уже готовы
+        await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
+        console.log(`Сервер чата запущен на порту ${PORT}`);
 
     } catch (err) {
         fastify.log.error(err);
