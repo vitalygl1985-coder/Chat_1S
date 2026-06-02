@@ -524,6 +524,37 @@
             }
         }
 
+        // Чтение параметров из хэша (совместимо со всеми версиями IE и 1С)
+        window.onload = function() {
+            var hash = window.location.hash;
+            
+            if (hash && hash.length > 1) {
+                // Убираем символ # и декодируем строку силами самого браузера
+                var cleanHash = decodeURIComponent(hash.substring(1));
+                var params = cleanHash.split("---");
+                
+                if (params.length >= 3) {
+                    var url_id_user = params[0].trim();
+                    var url_id_org = params[1].trim();
+                    var url_username = params[2].trim();
+                    
+                    if (url_id_user && url_id_org && url_username) {
+                        apply1CAuth(url_id_user, url_id_org, url_username);
+                        return;
+                    }
+                }
+            }
+            
+            // Резервный старый вариант на случай обычного входа
+            var url_id_user = getQueryParam('id_user');
+            var url_id_org = getQueryParam('id_org');
+            var url_username = getQueryParam('username');
+
+            if (url_id_user && url_id_org && url_username) {
+                apply1CAuth(url_id_user, url_id_org, url_username);
+            }
+        };
+
         function getQueryParam(param) {
             var search = window.location.search.substring(1);
             var vars = search.split("&");
@@ -535,17 +566,6 @@
             }
             return null;
         }
-
-        // Чтение параметров из ссылки, полностью совместимое с IE11 в 1С 8.3.5
-        window.onload = function() {
-            var url_id_user = getQueryParam('id_user');
-            var url_id_org = getQueryParam('id_org');
-            var url_username = getQueryParam('username');
-
-            if (url_id_user && url_id_org && url_username) {
-                apply1CAuth(url_id_user, url_id_org, url_username);
-            }
-        };
     </script>
 </body>
 </html>
