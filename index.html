@@ -46,7 +46,7 @@
         .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-right: 8px; font-size: 14px; }
         .btn-file:hover { background-color: #d1d5db; }
         
-        /* Имитация поля ввода через DIV */
+        /* Поле ввода */
         .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none; background-color: white; min-height: 36px; max-height: 100px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
         .input-msg-div:focus { border-color: #2563eb; }
         .input-msg-div:empty:before { content: "Введите сообщение (Ctrl+V для скриншота)..."; color: #9ca3af; }
@@ -115,6 +115,12 @@
     </div>
 
     <script>
+        // ИСПРАВЛЕНО: Полное подавление любых ошибок скриптов для движка 1С
+        window.onerror = function(message, url, line) {
+            console.log("Подавление ошибки JS для 1С:", message, "в строке:", line);
+            return true; 
+        };
+
         var socket;
         var currentRoomId = 1; 
         var isSecretMode = false;
@@ -129,8 +135,6 @@
             document.getElementById('user-info').innerText = username;
             document.getElementById('rooms-list').innerHTML = '<div style="font-size: 11px; color: #9ca3af;">Загрузка комнат из БД...</div>';
             
-            // ИЗМЕНЕНО: window.location.origin автоматически подставит нужный домен (локальный или облачный Railway)
-            //socket = io(window.location.origin, {
             socket = io('/', {
                 transports: ['polling', 'websocket'],
                 query: { id_user: id_user, id_org: id_org, username: username }
@@ -160,21 +164,26 @@
                 return;
             }
 
-            rooms.forEach(function(room) {
+            // ИСПРАВЛЕНО: Заменили .forEach на классический цикл for, совместимый со старым движком IE внутри 1С
+            for (var i = 0; i < rooms.length; i++) {
+                var room = rooms[i];
                 var roomDiv = document.createElement('div');
                 var isActive = room.id_room === currentRoomId;
                 
                 roomDiv.className = 'room-item' + (isActive ? ' active' : '');
                 roomDiv.innerText = room.name;
                 
-                roomDiv.onclick = function() {
-                    currentRoomId = room.id_room;
-                    document.getElementById('messages-container').innerHTML = ""; 
-                    socket.emit('get_rooms_again'); 
-                };
+                // Используем замыкание, чтобы сохранить правильный id_room в цикле
+                (function(roomId) {
+                    roomDiv.onclick = function() {
+                        currentRoomId = roomId;
+                        document.getElementById('messages-container').innerHTML = ""; 
+                        socket.emit('get_rooms_again'); 
+                    };
+                })(room.id_room);
 
                 roomsContainer.appendChild(roomDiv);
-            });
+            }
         }
 
         document.getElementById('btn-file').onclick = function() {
@@ -201,8 +210,6 @@
             container.scrollTop = container.scrollHeight;
 
             var xhr = new XMLHttpRequest();
-            // ИЗМЕНЕНО: Шлем запрос на относительный или динамический URL текущего хоста
-            //xhr.open('POST', window.location.origin + '/upload', true);
             xhr.open('POST', '/upload', true);
             xhr.onload = function() {
                 var statusEl = document.getElementById('file-loading-status');
@@ -240,12 +247,12 @@
             xhr.send(formData);
         }
 
-        // Железный перехват вставки скриншотов "в воздухе" для IE внутри 1С и Chrome
         inputMsg.onpaste = function(event) {
             if (event && event.clipboardData && event.clipboardData.items) {
                 var items = event.clipboardData.items;
-                for (var index in items) {
-                    var item = items[index];
+                // ИСПРАВЛЕНО: Перебор коллекции через стандартный индекс вместо конструкции for...in
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
                     if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
                         var blob = item.getAsFile();
                         uploadAndSendFile(blob, 'screenshot_' + Date.now() + '.png');
@@ -402,7 +409,7 @@
                 alert("Ошибка расшифровки!");
             }
         }
-        // Функция для безопасного чтения URL (совместима со старым IE11 внутри 1С)
+
         function getQueryParam(param) {
             var search = window.location.search.substring(1);
             var vars = search.split("&");
@@ -415,7 +422,6 @@
             return null;
         }
 
-        // Автоматически логиним пользователя при загрузке страницы
         window.onload = function() {
             var url_id_user = getQueryParam('id_user');
             var url_id_org = getQueryParam('id_org');
