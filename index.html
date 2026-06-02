@@ -536,15 +536,13 @@
             return null;
         }
 
+        // Чтение параметров из ссылки, полностью совместимое с IE11 в 1С 8.3.5
         window.onload = function() {
-            // ИСПРАВЛЕНО: Читаем параметры напрямую из window.location, защищаясь от сбоев кодировки IE
-            var urlParams = new URLSearchParams(window.location.search);
-            var url_id_user = urlParams.get('id_user') || getQueryParam('id_user');
-            var url_id_org = urlParams.get('id_org') || getQueryParam('id_org');
-            var url_username = urlParams.get('username') || getQueryParam('username');
+            var url_id_user = getQueryParam('id_user');
+            var url_id_org = getQueryParam('id_org');
+            var url_username = getQueryParam('username');
 
             if (url_id_user && url_id_org && url_username) {
-                // Если имя пришло в сыром виде, JS сам поймет его без ошибки 400
                 apply1CAuth(url_id_user, url_id_org, url_username);
             }
         };
