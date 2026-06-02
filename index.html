@@ -52,9 +52,22 @@
         .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-right: 8px; font-size: 14px; }
         .btn-file:hover { background-color: #d1d5db; }
         
-        .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none; background-color: white; min-height: 36px; max-height: 100px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-        .input-msg-div:focus { border-color: #2563eb; }
-        .input-msg-div:empty:before { content: "Введите сообщение (Ctrl+V для скриншота)..."; color: #9ca3af; }
+        /* ИСПРАВЛЕНО: textarea вместо contenteditable */
+        .input-msg-textarea { 
+            flex: 1; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            padding: 8px 12px; 
+            font-size: 13px; 
+            outline: none; 
+            background-color: white; 
+            font-family: Arial, sans-serif;
+            resize: vertical;
+            min-height: 36px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .input-msg-textarea:focus { border-color: #2563eb; }
         
         .btn-send { background-color: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; margin-left: 8px; cursor: pointer; font-weight: bold; font-size: 13px; height: 36px; }
         .btn-send:hover { background-color: #1d4ed8; }
@@ -63,7 +76,7 @@
         .drop-box { background-color: white; padding: 16px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: bold; color: #2563eb; }
         img { max-width: 100%; max-height: 180px; border-radius: 4px; margin-top: 4px; }
 
-        /* ИСПРАВЛЕНО: Единое безопасное HTML модальное окно для всех типов ввода */
+        /* Модальное окно */
         .custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
         .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .modal-content h3 { font-size: 14px; margin-bottom: 12px; color: #1f2937; font-weight: bold; }
@@ -73,9 +86,15 @@
         .btn-modal { padding: 6px 14px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 8px; }
         .btn-modal.confirm { background-color: #2563eb; color: white; }
         .btn-modal.cancel { background-color: #e5e7eb; color: #374151; }
+        
+        /* Стили для файлов */
+        .file-box { display: flex; align-items: center; padding: 8px; background-color: #f3f4f6; border-radius: 6px; margin-top: 4px; }
+        .file-icon { font-size: 20px; margin-right: 8px; }
+        .file-name { font-size: 11px; color: #374151; }
+        .file-link { font-size: 11px; color: #2563eb; text-decoration: none; margin-left: 8px; }
     </style>
 </head>
-<body id="chat-body">
+<body>
 
     <div id="universal-modal" class="custom-modal">
         <div class="modal-content">
@@ -132,7 +151,8 @@
                 <div class="controls-row">
                     <input type="file" id="file-input" style="display: none;">
                     <button id="btn-file" class="btn-file" title="Прикрепить файл">📎</button>
-                    <div id="input-msg" contenteditable="true" class="input-msg-div"></div>
+                    <!-- ИСПРАВЛЕНО: textarea вместо div с contenteditable -->
+                    <textarea id="input-msg" class="input-msg-textarea" placeholder="Введите сообщение (Ctrl+V для скриншота)..."></textarea>
                     <button id="btn-send" class="btn-send">Отправить</button>
                 </div>
             </div>
@@ -142,8 +162,8 @@
     <script>
         // Глушители ошибок для движка 1С 8.3.5
         window.onerror = function() { return true; };
-        document.attachEvent ? document.attachEvent('onclick', function() { return true; }) : document.onclick = function() { return true; };
         
+        // Полифилл classList для IE
         if (!("classList" in document.documentElement)) {
             Object.defineProperty(HTMLElement.prototype, 'classList', {
                 get: function() {
@@ -171,8 +191,8 @@
         var userSecretKey = "";
         var inputMsg = document.getElementById('input-msg');
 
-        // Переменные состояния для универсального HTML модального окна
-        var activeModalType = ""; // "group", "encrypt", "decrypt"
+        // Модальное окно
+        var activeModalType = "";
         var decryptTargetCipher = "";
         var decryptTargetElementId = "";
 
@@ -186,7 +206,7 @@
             uInput.value = "";
             uInput.placeholder = placeholder;
             uModal.style.display = 'flex';
-            uInput.focus();
+            setTimeout(function() { uInput.focus(); }, 10);
         }
 
         document.getElementById('btn-modal-cancel').onclick = function() {
@@ -204,7 +224,7 @@
             else if (activeModalType === "encrypt") {
                 userSecretKey = value;
                 isSecretMode = true;
-                document.getElementById('secret-status').style.style.display = 'inline';
+                document.getElementById('secret-status').style.display = 'inline';
                 document.getElementById('btn-secret').className = 'btn-secret active';
             } 
             else if (activeModalType === "decrypt") {
@@ -212,8 +232,10 @@
                     var decryptedText = CryptoJS.AES.decrypt(decryptTargetCipher, value).toString(CryptoJS.enc.Utf8);
                     if (decryptedText) {
                         var txtElement = document.getElementById(decryptTargetElementId + '_text');
-                        txtElement.innerHTML = decryptedText;
-                        txtElement.style.cssText = "color:#1f2937;font-weight:bold;font-size:13px;font-style:normal;";
+                        if (txtElement) {
+                            txtElement.innerHTML = decryptedText;
+                            txtElement.style.cssText = "color:#1f2937;font-weight:bold;font-size:13px;font-style:normal;";
+                        }
                     } else {
                         alert("Неверный код!");
                     }
@@ -222,10 +244,6 @@
                 }
             }
         };
-
-        function initChat(id_user, id_org, username) {
-            apply1CAuth(id_user, id_org, username);
-        }
 
         function apply1CAuth(id_user, id_org, username) {
             document.getElementById('user-info').innerText = username;
@@ -275,7 +293,7 @@
                     roomDiv.onclick = function() {
                         currentRoomId = roomId;
                         socket.emit('join_room_pool', { room_id: roomId });
-                        document.getElementById('messages-container').innerHTML = ""; 
+                        document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка сообщений...</div></div>"; 
                         socket.emit('get_rooms_again'); 
                     };
                 })(room.id_room);
@@ -287,6 +305,10 @@
         function renderUsersList(users) {
             var container = document.getElementById('users-list');
             container.innerHTML = "";
+            if (!users || users.length === 0) {
+                container.innerHTML = '<div style="font-size:11px;color:#9ca3af;padding:4px;">Нет других сотрудников</div>';
+                return;
+            }
             for (var i = 0; i < users.length; i++) {
                 var u = users[i];
                 var div = document.createElement('div');
@@ -302,12 +324,10 @@
             }
         }
 
-        // Вызов HTML окна для создания группы
         document.getElementById('btn-create-group').onclick = function() {
             openUniversalModal("Создание новой группы", "Название группы...", "group");
         };
 
-        // Вызов HTML окна для шифрования
         document.getElementById('btn-secret').onclick = function() {
             if (!isSecretMode) {
                 openUniversalModal("Режим шифрования", "Введите секретный ключ...", "encrypt");
@@ -319,7 +339,10 @@
             }
         };
 
-        document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
+        document.getElementById('btn-file').onclick = function() { 
+            document.getElementById('file-input').click(); 
+        };
+        
         document.getElementById('file-input').onchange = function(e) {
             var file = e.target.files[0];
             if (file) uploadAndSendFile(file, file.name);
@@ -345,14 +368,25 @@
                 if (xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     if (data.url) {
-                        var content = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName) ? '<img src="' + data.url + '" onclick="window.open(\'' + data.url + '\')" style="cursor:pointer;" />' : '<div class="file-box"><span class="file-icon">📄</span><div><div class="file-name">' + fileName + '</div><a href="' + data.url + '" target="_blank" download class="file-link">Скачать</a></div></div>';
+                        var isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                        var content = isImage ? 
+                            '<img src="' + data.url + '" onclick="window.open(\'' + data.url + '\')" style="cursor:pointer; max-width:100%;" />' : 
+                            '<div class="file-box"><span class="file-icon">📄</span><div><div class="file-name">' + fileName + '</div><a href="' + data.url + '" target="_blank" class="file-link">Скачать</a></div></div>';
                         socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
-                } else { alert('Ошибка отправки файла.'); }
+                } else { 
+                    alert('Ошибка отправки файла.'); 
+                }
+            };
+            xhr.onerror = function() {
+                var statusEl = document.getElementById('file-loading-status');
+                if (statusEl) statusEl.parentNode.removeChild(statusEl);
+                alert('Сетевая ошибка при отправке файла.');
             };
             xhr.send(formData);
         }
 
+        // Обработка вставки скриншотов
         inputMsg.onpaste = function(event) {
             if (event && event.clipboardData && event.clipboardData.items) {
                 var items = event.clipboardData.items;
@@ -360,68 +394,92 @@
                     var item = items[i];
                     if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
                         uploadAndSendFile(item.getAsFile(), 'screenshot_' + Date.now() + '.png');
-                        event.preventDefault(); return;
+                        event.preventDefault(); 
+                        return;
                     }
                 }
             }
-            var tempDiv = document.createElement('div');
-            tempDiv.contentEditable = true;
-            tempDiv.style.cssText = "position:absolute; left:-9999px; top:0; width:1px; height:1px; overflow:hidden;";
-            document.body.appendChild(tempDiv);
-            if (tempDiv.focus) tempDiv.focus(); 
-            setTimeout(function() {
-                var img = tempDiv.querySelector('img');
-                if (img && img.src && img.src.indexOf('data:image/') === 0) {
-                    uploadAndSendFile(base64ToBlob(img.src), 'screenshot_' + Date.now() + '.png');
-                }
-                if (tempDiv.parentNode) tempDiv.parentNode.removeChild(tempDiv); 
-                inputMsg.focus();
-            }, 5);
         };
 
-        function base64ToBlob(base64Data) {
-            var parts = base64Data.split(';base64,'), contentType = parts[0].split(':')[1], raw = window.atob(parts[1]), len = raw.length, uInt8Array = new Uint8Array(len);
-            for (var i = 0; i < len; ++i) uInt8Array[i] = raw.charCodeAt(i);
-            return new Blob([uInt8Array], { type: contentType });
-        }
-
-        var chatWindow = document.getElementById('chat-window'), dropZone = document.getElementById('drop-zone');
-        window.ondragenter = window.ondragover = window.ondragleave = window.ondrop = function(e) { e.preventDefault(); e.stopPropagation(); };
-        chatWindow.ondragenter = chatWindow.ondragover = function() { dropZone.style.display = 'flex'; };
-        dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
+        // Drag & drop
+        var chatWindow = document.getElementById('chat-window');
+        var dropZone = document.getElementById('drop-zone');
+        
+        window.ondragenter = window.ondragover = window.ondragleave = window.ondrop = function(e) { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+        };
+        
+        chatWindow.ondragenter = chatWindow.ondragover = function() { 
+            dropZone.style.display = 'flex'; 
+        };
+        
+        dropZone.ondragleave = function() { 
+            dropZone.style.display = 'none'; 
+        };
+        
         chatWindow.ondrop = function(e) {
             dropZone.style.display = 'none';
             var files = e.dataTransfer.files;
             if (files.length > 0) {
-                for (var i = 0; i < files.length; i++) uploadAndSendFile(files[i], files[i].name);
+                for (var i = 0; i < files.length; i++) {
+                    uploadAndSendFile(files[i], files[i].name);
+                }
             }
         };
 
         document.getElementById('btn-send').onclick = sendMessage;
-        inputMsg.onkeydown = function(e) { if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); sendMessage(); } };
+        
+        // Отправка по Enter (Shift+Enter для новой строки)
+        inputMsg.onkeydown = function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); 
+                sendMessage();
+            }
+        };
 
         function sendMessage() {
-            var text = inputMsg.innerText.trim(); if (!text) return;
-            if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
-            socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
-            inputMsg.innerHTML = ""; 
-            if (isSecretMode) document.getElementById('btn-secret').click();
+            var text = inputMsg.value.trim();
+            if (!text) return;
+
+            if (isSecretMode) {
+                text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
+            }
+
+            socket.emit('send_message', {
+                room_id: currentRoomId,
+                text: text,
+                is_secret: isSecretMode
+            });
+
+            inputMsg.value = "";
+            if (isSecretMode) {
+                isSecretMode = false;
+                userSecretKey = "";
+                document.getElementById('secret-status').style.display = 'none';
+                document.getElementById('btn-secret').className = 'btn-secret';
+            }
         }
 
         function displayMessage(msg) {
-            var container = document.getElementById('messages-container'), msgDiv = document.createElement('div');
+            var container = document.getElementById('messages-container');
+            var msgDiv = document.createElement('div');
             msgDiv.className = "msg-block";
             var displayText = msg.text;
             
             if (msg.is_secret || (msg.text && msg.text.indexOf("SECRET:") === 0)) {
-                var cleanCipher = msg.text.replace("SECRET:", ""), uniqueId = 'cipher_' + Math.random().toString(36).substr(2, 9);
-                displayText = '<div style="color:#eab308;font-weight:bold;">🔒 Зашифровано</div><div id="' + uniqueId + '_text" style="font-size:11px;color:#9ca3af;font-style:italic;margin-bottom:4px;">[Текст скрыт]</div><button onclick="triggerHTMLDecryption(\'' + cleanCipher + '\', \'' + uniqueId + '\')" style="padding:2px 6px;font-size:11px;border:none;background-color:#fef08a;color:#854d0e;border-radius:4px;cursor:pointer;">Ввести код</button>';
+                var cleanCipher = msg.text.replace("SECRET:", "");
+                var uniqueId = 'cipher_' + Math.random().toString(36).substr(2, 9);
+                displayText = '<div style="color:#eab308;font-weight:bold;">🔒 Зашифровано</div>' +
+                             '<div id="' + uniqueId + '_text" style="font-size:11px;color:#9ca3af;font-style:italic;margin-bottom:4px;">[Текст скрыт]</div>' +
+                             '<button onclick="triggerHTMLDecryption(\'' + cleanCipher + '\', \'' + uniqueId + '\')" style="padding:2px 6px;font-size:11px;border:none;background-color:#fef08a;color:#854d0e;border-radius:4px;cursor:pointer;">Ввести код</button>';
             }
+            
             msgDiv.innerHTML = '<span class="msg-author">' + msg.username + '</span><div class="msg-text">' + displayText + '</div>';
-            container.appendChild(msgDiv); container.scrollTop = container.scrollHeight;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
         }
 
-        // Вызов HTML окна для расшифровки сообщения (Взамен prompt)
         function triggerHTMLDecryption(cipherText, elementId) {
             decryptTargetCipher = cipherText;
             decryptTargetElementId = elementId;
@@ -429,10 +487,13 @@
         }
 
         function getQueryParam(param) {
-            var search = window.location.search.substring(1), vars = search.split("&");
+            var search = window.location.search.substring(1);
+            var vars = search.split("&");
             for (var i = 0; i < vars.length; i++) {
                 var pair = vars[i].split("=");
-                if (decodeURIComponent(pair[0]) === param) return decodeURIComponent(pair[1] || "");
+                if (decodeURIComponent(pair[0]) === param) {
+                    return decodeURIComponent(pair[1] || "");
+                }
             }
             return null;
         }
@@ -440,12 +501,16 @@
         window.onload = function() {
             var hash = window.location.hash;
             if (hash && hash.length > 1) {
-                var cleanHash = decodeURIComponent(hash.substring(1)), params = cleanHash.split("---");
+                var cleanHash = decodeURIComponent(hash.substring(1));
+                var params = cleanHash.split("---");
                 if (params.length >= 3) {
-                    apply1CAuth(params[0].trim(), params[1].trim(), params[2].trim()); return;
+                    apply1CAuth(params[0].trim(), params[1].trim(), params[2].trim());
+                    return;
                 }
             }
-            var u = getQueryParam('id_user'), o = getQueryParam('id_org'), n = getQueryParam('username');
+            var u = getQueryParam('id_user');
+            var o = getQueryParam('id_org');
+            var n = getQueryParam('username');
             if (u && o && n) apply1CAuth(u, o, n);
         };
     </script>
