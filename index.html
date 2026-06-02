@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta charset="UTF-8">
+    <title>1C Chat Client</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
+        
+        /* Шапка */
+        .header { background-color: #2563eb; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 16px; font-weight: bold; }
+        .user-info { font-size: 13px; font-weight: bold; }
+        
+        /* Главная область */
+        .main-container { flex: 1; display: flex; overflow: hidden; }
+        
+        /* Боковая панель */
+        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; padding: 16px; overflow-y: auto; }
+        .sidebar h2 { font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 12px; }
+        .room-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 13px; color: #4b5563; border-radius: 4px; }
+        .room-item:hover { background-color: #f3f4f6; }
+        .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
+        
+        /* Чат */
+        .chat-window { width: 75%; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
+        .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        /* Сообщения */
+        .msg-block { background-color: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); max-width: 70%; margin-bottom: 12px; align-self: flex-start; }
+        .msg-author { font-size: 11px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
+        .msg-text { font-size: 13px; color: #1f2937; }
+        
+        /* Зона ввода */
+        .input-panel { padding: 16px; background-color: white; border-top: 1px solid #e5e7eb; }
+        .secret-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .btn-secret { padding: 4px 12px; font-size: 11px; background-color: #e5e7eb; color: #374151; border: none; border-radius: 9999px; cursor: pointer; font-weight: bold; }
+        .btn-secret.active { background-color: #eab308; color: white; }
+        .secret-status { font-size: 11px; color: #16a34a; font-weight: bold; margin-left: 8px; display: none; }
+        
+        .controls-row { display: flex; align-items: center; }
+        .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-right: 8px; font-size: 14px; }
+        .btn-file:hover { background-color: #d1d5db; }
+        
+        /* Имитация поля ввода через DIV */
+        .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none; background-color: white; min-height: 36px; max-height: 100px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .input-msg-div:focus { border-color: #2563eb; }
+        .input-msg-div:empty:before { content: "Введите сообщение (Ctrl+V для скриншота)..."; color: #9ca3af; }
+        
+        .btn-send { background-color: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; margin-left: 8px; cursor: pointer; font-weight: bold; font-size: 13px; height: 36px; }
+        .btn-send:hover { background-color: #1d4ed8; }
+        
+        /* Оверлей Drag-and-Drop */
+        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(37, 99, 235, 0.1); border: 4px dashed #2563eb; z-index: 50; align-items: center; justify-content: center; display: none; }
+        .drop-box { background-color: white; padding: 16px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: bold; color: #2563eb; }
+        
+        /* Стили для файлов */
+        .file-box { display: flex; align-items: center; padding: 8px; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; margin-top: 4px; max-width: 250px; }
+        .file-icon { font-size: 24px; margin-right: 8px; }
+        .file-name { font-size: 12px; font-weight: bold; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-link { font-size: 11px; color: #2563eb; text-decoration: none; font-weight: bold; }
+        .file-link:hover { text-decoration: underline; }
+        img { max-width: 100%; max-height: 180px; border-radius: 4px; margin-top: 4px; }
+    </style>
+</head>
+<body id="chat-body">
+
+    <div class="header">
+        <h1>Corporate 1C Chat</h1>
+        <div style="display: flex; align-items: center;">
+            <button onclick="apply1CAuth('Админ_Кейсер', '00001', 'Админ_Кейсер(Тест)')" style="margin-right: 12px; padding: 2px 8px; font-size: 11px; background: #eab308; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Войти вручную</button>
+            <div id="user-info" class="user-info">Авторизация в 1С...</div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <h2>Чаты и группы</h2>
+            <div id="rooms-list">
+                <div style="font-size: 11px; color: #9ca3af;">Ожидание параметров 1С...</div>
+            </div>
+        </div>
+
+        <div class="chat-window" id="chat-window"> 
+            <div id="drop-zone" class="drop-zone">
+                <div class="drop-box">📎 Перетащите файлы сюда для отправки</div>
+            </div>
+
+            <div id="messages-container" class="messages-container">
+                <div class="msg-block">
+                    <span class="msg-author">Система</span>
+                    <div class="msg-text">Добро пожаловать в мессенджер!</div>
+                </div>
+            </div>              
+
+            <div class="input-panel">
+                <div class="secret-row">
+                    <button id="btn-secret" class="btn-secret">🔒 Зашифровать сообщение</button>
+                    <span id="secret-status" class="secret-status">Режим шифрования активен</span>
+                </div>
+                <div class="controls-row">
+                    <input type="file" id="file-input" style="display: none;">
+                    <button id="btn-file" class="btn-file" title="Прикрепить файл">📎</button>
+                    
+                    <div id="input-msg" contenteditable="true" class="input-msg-div"></div>
+                    
+                    <button id="btn-send" class="btn-send">Отправить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var socket;
+        var currentRoomId = 1; 
+        var isSecretMode = false;
+        var userSecretKey = "";
+        var inputMsg = document.getElementById('input-msg');
+
+        function initChat(id_user, id_org, username) {
+            apply1CAuth(id_user, id_org, username);
+        }
+
+        function apply1CAuth(id_user, id_org, username) {
+            document.getElementById('user-info').innerText = username;
+            document.getElementById('rooms-list').innerHTML = '<div style="font-size: 11px; color: #9ca3af;">Загрузка комнат из БД...</div>';
+            
+            // ИЗМЕНЕНО: window.location.origin автоматически подставит нужный домен (локальный или облачный Railway)
+            socket = io(window.location.origin, {
+                transports: ['polling', 'websocket'],
+                query: { id_user: id_user, id_org: id_org, username: username }
+            });
+
+            socket.on('rooms_list', function(rooms) {
+                renderRoomsList(rooms);
+            });
+
+            socket.on('new_message', function(msg) {
+                if (msg.id_room === currentRoomId) {
+                    displayMessage(msg);
+                }
+            });
+            
+            socket.on('connect_error', function(err) {
+                console.log('Ошибка сокета:', err);
+            });
+        }
+
+        function renderRoomsList(rooms) {
+            var roomsContainer = document.getElementById('rooms-list');
+            roomsContainer.innerHTML = ""; 
+
+            if (!rooms || rooms.length === 0) {
+                roomsContainer.innerHTML = '<div style="font-size:11px;color:#9ca3af;">Нет доступных комнат</div>';
+                return;
+            }
+
+            rooms.forEach(function(room) {
+                var roomDiv = document.createElement('div');
+                var isActive = room.id_room === currentRoomId;
+                
+                roomDiv.className = 'room-item' + (isActive ? ' active' : '');
+                roomDiv.innerText = room.name;
+                
+                roomDiv.onclick = function() {
+                    currentRoomId = room.id_room;
+                    document.getElementById('messages-container').innerHTML = ""; 
+                    socket.emit('get_rooms_again'); 
+                };
+
+                roomsContainer.appendChild(roomDiv);
+            });
+        }
+
+        document.getElementById('btn-file').onclick = function() {
+            document.getElementById('file-input').click();
+        };
+
+        document.getElementById('file-input').onchange = function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            uploadAndSendFile(file, file.name);
+            e.target.value = ""; 
+        };
+
+        function uploadAndSendFile(fileBlob, fileName) {
+            var formData = new FormData();
+            formData.append('file', fileBlob, fileName);
+
+            var container = document.getElementById('messages-container');
+            var loadingDiv = document.createElement('div');
+            loadingDiv.id = "file-loading-status";
+            loadingDiv.style.cssText = "font-size:11px;color:#9ca3af;font-style:italic;margin-bottom:8px;";
+            loadingDiv.innerText = "Загрузка файла " + fileName + "...";
+            container.appendChild(loadingDiv);
+            container.scrollTop = container.scrollHeight;
+
+            var xhr = new XMLHttpRequest();
+            // ИЗМЕНЕНО: Шлем запрос на относительный или динамический URL текущего хоста
+            xhr.open('POST', window.location.origin + '/upload', true);
+            
+            xhr.onload = function() {
+                var statusEl = document.getElementById('file-loading-status');
+                if (statusEl) statusEl.parentNode.removeChild(statusEl);
+
+                if (xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.url) {
+                        var messageContent = "";
+                        var isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+
+                        if (isImage) {
+                            messageContent = '<img src="' + data.url + '" onclick="window.open(\'' + data.url + '\')" style="cursor:pointer;" />';
+                        } else {
+                            messageContent = '<div class="file-box"><span class="file-icon">📄</span><div><div class="file-name">' + fileName + '</div><a href="' + data.url + '" target="_blank" download class="file-link">Скачать</a></div></div>';
+                        }
+
+                        socket.emit('send_message', {
+                            room_id: currentRoomId,
+                            text: messageContent,
+                            is_secret: false
+                        });
+                    }
+                } else {
+                    alert('Ошибка отправки файла.');
+                }
+            };
+
+            xhr.onerror = function() {
+                var statusEl = document.getElementById('file-loading-status');
+                if (statusEl) statusEl.parentNode.removeChild(statusEl);
+                alert('Сетевая ошибка при отправке файла.');
+            };
+
+            xhr.send(formData);
+        }
+
+        // Железный перехват вставки скриншотов "в воздухе" для IE внутри 1С и Chrome
+        inputMsg.onpaste = function(event) {
+            if (event && event.clipboardData && event.clipboardData.items) {
+                var items = event.clipboardData.items;
+                for (var index in items) {
+                    var item = items[index];
+                    if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
+                        var blob = item.getAsFile();
+                        uploadAndSendFile(blob, 'screenshot_' + Date.now() + '.png');
+                        event.preventDefault();
+                        return;
+                    }
+                }
+            }
+
+            var tempDiv = document.createElement('div');
+            tempDiv.contentEditable = true;
+            tempDiv.style.cssText = "position:absolute; left:-9999px; top:0; width:1px; height:1px; overflow:hidden;";
+            document.body.appendChild(tempDiv);
+            
+            if (tempDiv.focus) { 
+                tempDiv.focus(); 
+            }
+
+            setTimeout(function() {
+                var img = tempDiv.querySelector('img');
+                if (img && img.src) {
+                    var srcData = img.src;
+                    if (srcData.indexOf('data:image/') === 0) {
+                        var blob = base64ToBlob(srcData);
+                        uploadAndSendFile(blob, 'screenshot_' + Date.now() + '.png');
+                    }
+                }
+                
+                if (tempDiv.parentNode) { 
+                    tempDiv.parentNode.removeChild(tempDiv); 
+                }
+                inputMsg.focus();
+            }, 5);
+        };
+
+        function base64ToBlob(base64Data) {
+            var parts = base64Data.split(';base64,');
+            var contentType = parts[0].split(':')[1];
+            var raw = window.atob(parts[1]);
+            var rawLength = raw.length;
+            var uInt8Array = new Uint8Array(rawLength);
+
+            for (var i = 0; i < rawLength; ++i) {
+                uInt8Array[i] = raw.charCodeAt(i);
+            }
+
+            return new Blob([uInt8Array], { type: contentType });
+        }
+
+        var chatWindow = document.getElementById('chat-window');
+        var dropZone = document.getElementById('drop-zone');
+
+        window.ondragenter = window.ondragover = window.ondragleave = window.ondrop = function(e) {
+            e.preventDefault(); e.stopPropagation();
+        };
+
+        chatWindow.ondragenter = chatWindow.ondragover = function() {
+            dropZone.style.display = 'flex';
+        };
+
+        dropZone.ondragleave = function() {
+            dropZone.style.display = 'none';
+        };
+
+        chatWindow.ondrop = function(e) {
+            dropZone.style.display = 'none';
+            var files = e.dataTransfer.files;
+            if (files.length > 0) {
+                for (var i = 0; i < files.length; i++) {
+                    uploadAndSendFile(files[i], files[i].name);
+                }
+            }
+        };
+
+        document.getElementById('btn-secret').onclick = function() {
+            if (!isSecretMode) {
+                var password = prompt("Введите секретный код:");
+                if (password) {
+                    userSecretKey = password;
+                    isSecretMode = true;
+                    document.getElementById('secret-status').style.display = 'inline';
+                    document.getElementById('btn-secret').className = 'btn-secret active';
+                }
+            } else {
+                isSecretMode = false;
+                userSecretKey = "";
+                document.getElementById('secret-status').style.display = 'none';
+                document.getElementById('btn-secret').className = 'btn-secret';
+            }
+        };
+
+        document.getElementById('btn-send').onclick = sendMessage;
+        
+        inputMsg.onkeydown = function(e) {
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                e.preventDefault(); 
+                sendMessage();
+            }
+        };
+
+        function sendMessage() {
+            var text = inputMsg.innerText.trim();
+            if (!text) return;
+
+            if (isSecretMode) {
+                text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
+            }
+
+            socket.emit('send_message', {
+                room_id: currentRoomId,
+                text: text,
+                is_secret: isSecretMode
+            });
+
+            inputMsg.innerHTML = ""; 
+            if (isSecretMode) document.getElementById('btn-secret').click();
+        }
+
+        function displayMessage(msg) {
+            var container = document.getElementById('messages-container');
+            var msgDiv = document.createElement('div');
+            msgDiv.className = "msg-block";
+
+            var displayText = msg.text;
+            
+            if (msg.is_secret || (msg.text && msg.text.indexOf("SECRET:") === 0)) {
+                var cleanCipher = msg.text.replace("SECRET:", "");
+                var uniqueId = 'cipher_' + Math.random().toString(36).substr(2, 9);
+                
+                displayText = '<div style="color:#eab308;font-weight:bold;">🔒 Зашифровано</div><div id="' + uniqueId + '_text" style="font-size:11px;color:#9ca3af;font-style:italic;margin-bottom:4px;">[Текст скрыт]</div><button onclick="decryptUserMessage(\'' + cleanCipher + '\', \'' + uniqueId + '\')" style="padding:2px 6px;font-size:11px;border:none;background-color:#fef08a;color:#854d0e;border-radius:4px;cursor:pointer;">Ввести код</button>';
+            }
+
+            msgDiv.innerHTML = '<span class="msg-author">' + msg.username + '</span><div class="msg-text">' + displayText + '</div>';
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function decryptUserMessage(cipherText, elementId) {
+            var code = prompt("Введите кодовое слово:");
+            if (!code) return;
+
+            try {
+                var bytes = CryptoJS.AES.decrypt(cipherText, code);
+                var decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+
+                if (decryptedText) {
+                    var txtElement = document.getElementById(elementId + '_text');
+                    txtElement.innerHTML = decryptedText;
+                    txtElement.style.cssText = "color:#1f2937;font-weight:bold;font-size:13px;font-style:normal;";
+                } else {
+                    alert("Неверный код!");
+                }
+            } catch (e) {
+                alert("Ошибка расшифровки!");
+            }
+        }
+    </script>
+</body>
+</html>
