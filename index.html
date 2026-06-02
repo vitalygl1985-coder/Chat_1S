@@ -130,7 +130,8 @@
             document.getElementById('rooms-list').innerHTML = '<div style="font-size: 11px; color: #9ca3af;">Загрузка комнат из БД...</div>';
             
             // ИЗМЕНЕНО: window.location.origin автоматически подставит нужный домен (локальный или облачный Railway)
-            socket = io(window.location.origin, {
+            //socket = io(window.location.origin, {
+            socket = io('/', {
                 transports: ['polling', 'websocket'],
                 query: { id_user: id_user, id_org: id_org, username: username }
             });
@@ -201,8 +202,8 @@
 
             var xhr = new XMLHttpRequest();
             // ИЗМЕНЕНО: Шлем запрос на относительный или динамический URL текущего хоста
-            xhr.open('POST', window.location.origin + '/upload', true);
-            
+            //xhr.open('POST', window.location.origin + '/upload', true);
+            xhr.open('POST', '/upload', true);
             xhr.onload = function() {
                 var statusEl = document.getElementById('file-loading-status');
                 if (statusEl) statusEl.parentNode.removeChild(statusEl);
@@ -401,6 +402,29 @@
                 alert("Ошибка расшифровки!");
             }
         }
+        // Функция для безопасного чтения URL (совместима со старым IE11 внутри 1С)
+        function getQueryParam(param) {
+            var search = window.location.search.substring(1);
+            var vars = search.split("&");
+            for (var i = 0; i < vars.length; i++) {
+                var pair = vars[i].split("=");
+                if (decodeURIComponent(pair[0]) === param) {
+                    return decodeURIComponent(pair[1] || "");
+                }
+            }
+            return null;
+        }
+
+        // Автоматически логиним пользователя при загрузке страницы
+        window.onload = function() {
+            var url_id_user = getQueryParam('id_user');
+            var url_id_org = getQueryParam('id_org');
+            var url_username = getQueryParam('username');
+
+            if (url_id_user && url_id_org && url_username) {
+                apply1CAuth(url_id_user, url_id_org, url_username);
+            }
+        };
     </script>
 </body>
 </html>
