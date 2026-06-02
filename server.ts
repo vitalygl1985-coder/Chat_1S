@@ -9,6 +9,8 @@ import fastifyStatic from '@fastify/static';
 import fastifyCors from '@fastify/cors';
 import 'dotenv/config';
 
+console.log("=== Инициализация Fastify сервера ===");
+
 const fastify = Fastify({ 
     logger: true,
     bodyLimit: 100 * 1024 * 1024
@@ -112,10 +114,11 @@ fastify.get('/favicon.ico', async (request, reply) => {
 
 const start = async () => {
     try {
+        // Проверяем подключение к базе данных
         await pool.query('SELECT NOW()');
-        console.log('Успешное подключение к базе данных Railway!');
+        console.log('=== Успешное подключение к базе данных Railway! ===');
 
-        // ИСПРАВЛЕНО: Создаем экземпляр Socket.IO ДО вызова fastify.listen
+        // Инициализируем Socket.IO строго до бинда порта
         const io = new Server(fastify.server, { 
             cors: { origin: "*" },
             maxHttpBufferSize: 1e8 // 100 МБ
@@ -123,28 +126,22 @@ const start = async () => {
 
         io.use(async (socket, next) => {
             let { id_user, id_org, username } = socket.handshake.query;
-
             if (!id_user || !id_org || !username) {
                 return next(new Error("Ошибка: 1С не передала параметры авторизации"));
             }
-
             let cleanOrgId = String(id_org).toLowerCase().trim();
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
             if (!uuidRegex.test(cleanOrgId)) {
                 const hash = crypto.createHash('md5').update(cleanOrgId).digest('hex');
                 cleanOrgId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
             }
-
             const cleanUserId = String(id_user).trim();
-
             socket.data = { id_user: cleanUserId, id_org: cleanOrgId, username };
             next();
         });
 
         io.on('connection', async (socket) => {
             const { id_org, id_user, username } = socket.data;
-
             try {
                 await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', [id_org, 'Организация из 1С']);
                 await pool.query('INSERT INTO users (id_user, id_org, username) VALUES ($1, $2, $3) ON CONFLICT (id_user) DO NOTHING', [id_user, id_org, username]);
@@ -158,7 +155,6 @@ const start = async () => {
 
             try {
                 const roomsResult = await pool.query('SELECT id_room, name, type FROM rooms WHERE id_room = 1 OR id_org = $1', [id_org]);
-                console.log(`[БД] Отправляем список комнат для ${username}:`, roomsResult.rows);
                 socket.emit('rooms_list', roomsResult.rows);
             } catch (err) {
                 console.error('Ошибка получения списка комнат:', err);
@@ -192,12 +188,17 @@ const start = async () => {
             });
         });
 
-        // ИСПРАВЛЕНО: Запуск прослушивания порта вызываем в самом конце, когда роуты сокетов уже готовы
-        await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
-        console.log(`Сервер чата запущен на порту ${PORT}`);
+        // ПРАВИЛЬНЫЙ ЗАПУСК ДЛЯ FASTIFY V5 НА RAILWAY:
+        // Ждем выполнения listen и выводим лог в консоль контейнера
+        const listenAddress = await fastify.listen({ 
+            port: Number(PORT), 
+            host: '0.0.0.0' 
+        });
+        
+        console.log(`=== МЕССЕНДЖЕР УСПЕШНО ЗАПУЩЕН НА: ${listenAddress} ===`);
 
     } catch (err) {
-        fastify.log.error(err);
+        console.error('Критическая ошибка при старте Fastify:', err);
         process.exit(1);
     }
 };
