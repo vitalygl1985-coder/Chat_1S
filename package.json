@@ -2,10 +2,10 @@
   "name": "chat_1s",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/server/server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server/server.js"
+    "build": "node -e \"const ts = require('typescript'); const program = ts.createProgram(['server.ts'], { outDir: './dist', module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, moduleResolution: ts.ModuleResolutionKind.NodeJs, esModuleInterop: true }); const emitResult = program.emit(); const allDiagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics); allDiagnostics.forEach(d => { if (d.file) { const { line, character } = ts.getLineAndCharacterOfPosition(d.file, d.start); console.log(\`\${d.file.fileName} (\${line + 1},\${character + 1}): \${ts.flattenDiagnosticMessageText(d.messageText, '\\n')}\`); } else { console.log(ts.flattenDiagnosticMessageText(d.messageText, '\\n')); } }); process.exit(emitResult.emitSkipped ? 1 : 0);\"",
+    "start": "node -e \"const fs = require('fs'); if (!fs.existsSync('dist')) fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync('index.html', 'dist/index.html');\" && node dist/server.js"
   },
   "keywords": [],
   "author": "",
