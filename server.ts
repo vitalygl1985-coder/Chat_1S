@@ -16,7 +16,6 @@ const fastify = Fastify({
     bodyLimit: 100 * 1024 * 1024
 });
 
-// Разрешаем CORS для всех HTTP запросов
 fastify.register(fastifyCors, {
     origin: true,
     methods: ["GET", "POST", "PUT", "DELETE"]
@@ -50,6 +49,57 @@ const pool = new Pool({
     }
 });
 
+// Функция инициализации всех таблиц
+async function initializeDatabase() {
+    console.log("Проверка и создание таблиц БД...");
+    
+    const queries = [
+        `CREATE TABLE IF NOT EXISTS organizations (
+            id_org VARCHAR(36) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS users (
+            id_user VARCHAR(36) PRIMARY KEY,
+            id_org VARCHAR(36) REFERENCES organizations(id_org) ON DELETE CASCADE,
+            username VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS rooms (
+            id_room SERIAL PRIMARY KEY,
+            id_org VARCHAR(36) REFERENCES organizations(id_org) ON DELETE CASCADE,
+            type VARCHAR(50) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS room_participants (
+            id_room INTEGER REFERENCES rooms(id_room) ON DELETE CASCADE,
+            id_user VARCHAR(36) REFERENCES users(id_user) ON DELETE CASCADE,
+            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id_room, id_user)
+        )`,
+        `CREATE TABLE IF NOT EXISTS messages (
+            id_message SERIAL PRIMARY KEY,
+            id_room INTEGER REFERENCES rooms(id_room) ON DELETE CASCADE,
+            id_user_from VARCHAR(36) REFERENCES users(id_user) ON DELETE CASCADE,
+            encrypted_text TEXT NOT NULL,
+            is_user_encrypted BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`
+    ];
+    
+    for (const query of queries) {
+        try {
+            await pool.query(query);
+        } catch (err) {
+            console.error("Ошибка создания таблицы:", err);
+            throw err;
+        }
+    }
+    
+    console.log("✅ Все таблицы БД готовы");
+}
+
 function encryptForDB(text: string): string {
     const iv = crypto.randomBytes(16);
     const key = crypto.scryptSync(SERVER_SECRET, 'salt', 32);
@@ -59,7 +109,6 @@ function encryptForDB(text: string): string {
     return `${iv.toString('hex')}:${encrypted}`;
 }
 
-// HTTP эндпоинт для загрузки тяжелых файлов и скриншотов
 fastify.post('/upload', async (request, reply) => {
     try {
         const data = await request.file();
@@ -105,10 +154,13 @@ const start = async () => {
     try {
         await pool.query('SELECT NOW()');
         console.log('=== Успешное подключение к базе данных Railway! ===');
+        
+        // Инициализируем таблицы
+        await initializeDatabase();
 
         const io = new Server(fastify.server, { 
             cors: { origin: "*" },
-            maxHttpBufferSize: 1e8 // 100 МБ
+            maxHttpBufferSize: 1e8
         });
 
         io.use(async (socket, next) => {
@@ -138,11 +190,9 @@ const start = async () => {
                 console.error('Ошибка синхронизации данных с БД:', err);
             }
 
-            // Обязательно подписываем сокет на комнату организации и текущую комнату чата
             socket.join(`org_${id_org}`);
             socket.join(`room_1`);
 
-            // ВЫБОРКА КОМНАТ: Отдаем Общий чат (id=1) + те комнаты, где пользователь состоит участником
             const sendRoomsList = async () => {
                 try {
                     const roomsResult = await pool.query(`
@@ -163,7 +213,6 @@ const start = async () => {
 
             await sendRoomsList();
 
-            // НОВОЕ: Запрос списка всех остальных сотрудников вашей организации
             socket.on('get_users_list', async () => {
                 try {
                     const usersResult = await pool.query('SELECT id_user, username FROM users WHERE id_org = $1 AND id_user != $2', [id_org, id_user]);
@@ -171,7 +220,6 @@ const start = async () => {
                 } catch (err) { console.error(err); }
             });
 
-            // НОВОЕ: Создание или получение существующего личного чата (1-на-1)
             socket.on('create_private_chat', async (data: { target_user_id: string, target_username: string }) => {
                 try {
                     const checkChat = await pool.query(`
@@ -192,12 +240,10 @@ const start = async () => {
 
                     await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2), ($1, $3)', [newRoomId, id_user, data.target_user_id]);
                     
-                    // Даем сигнал всем клиентам организации обновить списки чатов
                     io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
                 } catch (err) { console.error(err); }
             });
 
-            // НОВОЕ: Создание группового чата
             socket.on('create_group_chat', async (data: { group_name: string, user_ids: string[] }) => {
                 try {
                     const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'group', data.group_name]);
@@ -212,7 +258,6 @@ const start = async () => {
                 } catch (err) { console.error(err); }
             });
 
-            // НОВОЕ: Вход в конкретный пул комнаты при переключении в интерфейсе
             socket.on('join_room_pool', (data: { room_id: number }) => {
                 socket.join(`room_${data.room_id}`);
             });
