@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "npx tsx server.ts"
+    "start": "npx tsx server/server.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,12 +18,12 @@
     "dotenv": "^17.4.2",
     "fastify": "^5.8.5",
     "pg": "^8.21.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "tsx": "^4.22.4"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@types/pg": "^8.20.0",
-    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }
