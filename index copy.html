@@ -19,19 +19,13 @@
         /* Главная область */
         .main-container { flex: 1; display: flex; overflow: hidden; }
         
-        /* Боковая панель (Разделена на две аккуратные секции) */
-        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
-        .sidebar-section { flex: 1; padding: 12px 16px; overflow-y: auto; }
-        .sidebar-section.users-zone { border-top: 1px solid #e5e7eb; background-color: #fafafa; }
-        
-        .sidebar h2 { font-size: 13px; font-weight: bold; color: #374151; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .room-item, .user-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 12px; color: #4b5563; border-radius: 4px; }
-        .room-item:hover, .user-item:hover { background-color: #f3f4f6; }
+        /* Боковая панель */
+        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; padding: 16px; overflow-y: auto; }
+        .sidebar h2 { font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 12px; }
+        .room-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 13px; color: #4b5563; border-radius: 4px; }
+        .room-item:hover { background-color: #f3f4f6; }
         .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
         
-        .btn-action-small { padding: 2px 6px; font-size: 11px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-action-small:hover { background-color: #059669; }
-
         /* Чат */
         .chat-window { width: 75%; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
         .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -52,6 +46,7 @@
         .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-right: 8px; font-size: 14px; }
         .btn-file:hover { background-color: #d1d5db; }
         
+        /* Поле ввода */
         .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none; background-color: white; min-height: 36px; max-height: 100px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
         .input-msg-div:focus { border-color: #2563eb; }
         .input-msg-div:empty:before { content: "Введите сообщение (Ctrl+V для скриншота)..."; color: #9ca3af; }
@@ -84,17 +79,9 @@
 
     <div class="main-container">
         <div class="sidebar">
-            <div class="sidebar-section">
-                <h2>Чаты и группы <button class="btn-action-small" id="btn-create-group">+ Группа</button></h2>
-                <div id="rooms-list">
-                    <div style="font-size: 11px; color: #9ca3af;">Ожидание параметров 1С...</div>
-                </div>
-            </div>
-            <div class="sidebar-section users-zone">
-                <h2>Сотрудники (Личные чаты)</h2>
-                <div id="users-list">
-                    <div style="font-size: 11px; color: #9ca3af;">Загрузка пользователей...</div>
-                </div>
+            <h2>Чаты и группы</h2>
+            <div id="rooms-list">
+                <div style="font-size: 11px; color: #9ca3af;">Ожидание параметров 1С...</div>
             </div>
         </div>
 
@@ -118,7 +105,9 @@
                 <div class="controls-row">
                     <input type="file" id="file-input" style="display: none;">
                     <button id="btn-file" class="btn-file" title="Прикрепить файл">📎</button>
+                    
                     <div id="input-msg" contenteditable="true" class="input-msg-div"></div>
+                    
                     <button id="btn-send" class="btn-send">Отправить</button>
                 </div>
             </div>
@@ -127,36 +116,36 @@
 
     <script>
         // 1. Железный глушитель вообще всех ошибок JS в интерфейсе 1С
-        window.onerror = function(message, url, line) {
-            console.log("Подавлена ошибка:", message);
-            return true; 
-        };
+    window.onerror = function(message, url, line) {
+        console.log("Подавлена ошибка:", message);
+        return true; 
+    };
 
-        // 2. Глушим специфические ошибки мыши и фокуса, которые вызывают панику у IE
-        document.attachEvent ? document.attachEvent('onclick', function() { return true; }) : document.onclick = function() { return true; };
-        
-        // 3. Полифилл безопасности для classList (IE11 ломается при кликах на динамические классы)
-        if (!("classList" in document.documentElement)) {
-            Object.defineProperty(HTMLElement.prototype, 'classList', {
-                get: function() {
-                    var self = this;
-                    function update(fn) {
-                        return function(value) {
-                            var classes = self.className.split(/\s+/),
-                                index = classes.indexOf(value);
-                            fn(classes, index, value);
-                            self.className = classes.join(" ");
-                        }
+    // 2. Глушим специфические ошибки мыши и фокуса, которые вызывают панику у IE
+    document.attachEvent ? document.attachEvent('onclick', function() { return true; }) : document.onclick = function() { return true; };
+    
+    // 3. Полифилл безопасности для classList (IE11 ломается при кликах на динамические классы)
+    if (!("classList" in document.documentElement)) {
+        Object.defineProperty(HTMLElement.prototype, 'classList', {
+            get: function() {
+                var self = this;
+                function update(fn) {
+                    return function(value) {
+                        var classes = self.className.split(/\s+/),
+                            index = classes.indexOf(value);
+                        fn(classes, index, value);
+                        self.className = classes.join(" ");
                     }
-                    return {
-                        add: update(function(classes, index, value) { if (!~index) classes.push(value); }),
-                        remove: update(function(classes, index, value) { if (~index) classes.splice(index, 1); }),
-                        toggle: update(function(classes, index, value) { if (~index) classes.splice(index, 1); else classes.push(value); }),
-                        contains: function(value) { return !!~self.className.split(/\s+/).indexOf(value); }
-                    };
                 }
-            });
-        }
+                return {
+                    add: update(function(classes, index, value) { if (!~index) classes.push(value); }),
+                    remove: update(function(classes, index, value) { if (~index) classes.splice(index, 1); }),
+                    toggle: update(function(classes, index, value) { if (~index) classes.splice(index, 1); else classes.push(value); }),
+                    contains: function(value) { return !!~self.className.split(/\s+/).indexOf(value); }
+                };
+            }
+        });
+    }
 
         var socket;
         var currentRoomId = 1; 
@@ -177,17 +166,8 @@
                 query: { id_user: id_user, id_org: id_org, username: username }
             });
 
-            socket.on('connect', function() {
-                socket.emit('join_room_pool', { room_id: currentRoomId });
-                socket.emit('get_users_list');
-            });
-
             socket.on('rooms_list', function(rooms) {
                 renderRoomsList(rooms);
-            });
-
-            socket.on('users_list', function(users) {
-                renderUsersList(users);
             });
 
             socket.on('new_message', function(msg) {
@@ -196,10 +176,6 @@
                 }
             });
             
-            socket.on('refresh_rooms_trigger', function() {
-                socket.emit('get_rooms_again');
-            });
-
             socket.on('connect_error', function(err) {
                 console.log('Ошибка сокета:', err);
             });
@@ -214,18 +190,19 @@
                 return;
             }
 
+            // ИСПРАВЛЕНО: Заменили .forEach на классический цикл for, совместимый со старым движком IE внутри 1С
             for (var i = 0; i < rooms.length; i++) {
                 var room = rooms[i];
                 var roomDiv = document.createElement('div');
                 var isActive = room.id_room === currentRoomId;
                 
                 roomDiv.className = 'room-item' + (isActive ? ' active' : '');
-                roomDiv.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
+                roomDiv.innerText = room.name;
                 
+                // Используем замыкание, чтобы сохранить правильный id_room в цикле
                 (function(roomId) {
                     roomDiv.onclick = function() {
                         currentRoomId = roomId;
-                        socket.emit('join_room_pool', { room_id: roomId });
                         document.getElementById('messages-container').innerHTML = ""; 
                         socket.emit('get_rooms_again'); 
                     };
@@ -234,35 +211,6 @@
                 roomsContainer.appendChild(roomDiv);
             }
         }
-
-        function renderUsersList(users) {
-            var container = document.getElementById('users-list');
-            container.innerHTML = "";
-            if (!users || users.length === 0) {
-                container.innerHTML = '<div style="font-size:11px;color:#9ca3af;padding:4px;">Нет других сотрудников</div>';
-                return;
-            }
-            for (var i = 0; i < users.length; i++) {
-                var u = users[i];
-                var div = document.createElement('div');
-                div.className = 'user-item';
-                div.innerText = "👤 " + u.username;
-                
-                (function(targetId, targetName) {
-                    div.onclick = function() {
-                        socket.emit('create_private_chat', { target_user_id: targetId, target_username: targetName });
-                    };
-                })(u.id_user, u.username);
-                container.appendChild(div);
-            }
-        }
-
-        // Кнопка создания группы
-        document.getElementById('btn-create-group').onclick = function() {
-            var groupName = prompt("Введите название новой группы:");
-            if (!groupName) return;
-            socket.emit('create_group_chat', { group_name: groupName, user_ids: [] });
-        };
 
         document.getElementById('btn-file').onclick = function() {
             document.getElementById('file-input').click();
@@ -328,6 +276,7 @@
         inputMsg.onpaste = function(event) {
             if (event && event.clipboardData && event.clipboardData.items) {
                 var items = event.clipboardData.items;
+                // ИСПРАВЛЕНО: Перебор коллекции через стандартный индекс вместо конструкции for...in
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
                     if (item.kind === 'file' && item.type.indexOf('image/') === 0) {

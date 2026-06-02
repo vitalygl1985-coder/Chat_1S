@@ -22,34 +22,41 @@ fastify.register(fastifyCors, {
     methods: ["GET", "POST", "PUT", "DELETE"]
 });
 
+// Railway автоматически передает правильный порт через переменную окружения PORT
 const PORT = process.env.PORT || 3000;
 const SERVER_SECRET = process.env.BACKEND_SECRET_KEY || 'default_secret_key_32_chars_long!!';
 
+// Создаем локальную директорию для хранения файлов, если её нет
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR);
 }
 
+// Регистрируем плагин для работы с файлами (лимит 100 МБ)
 fastify.register(multipart, {
     limits: { fileSize: 100 * 1024 * 1024 }
 });
 
+// Открываем статический доступ к папке uploads для файлов
 fastify.register(fastifyStatic, {
     root: UPLOADS_DIR,
     prefix: '/uploads/'
 });
 
+// Настройка подключения к PostgreSQL в Railway с поддержкой SSL
 const pool = new Pool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
     database: process.env.DB_NAME,
+    // Включаем SSL, чтобы Railway не сбрасывал соединение с БД из облака
     ssl: {
         rejectUnauthorized: false
     }
 });
 
+// Функция шифрования текста для базы данных (AES-256-CBC)
 function encryptForDB(text: string): string {
     const iv = crypto.randomBytes(16);
     const key = crypto.scryptSync(SERVER_SECRET, 'salt', 32);
@@ -59,7 +66,7 @@ function encryptForDB(text: string): string {
     return `${iv.toString('hex')}:${encrypted}`;
 }
 
-// HTTP эндпоинт для загрузки тяжелых файлов и скриншотов
+// HTTP эндпоинт для безопасной загрузки тяжелых файлов и скриншотов
 fastify.post('/upload', async (request, reply) => {
     try {
         const data = await request.file();
@@ -78,6 +85,8 @@ fastify.post('/upload', async (request, reply) => {
             out.on('error', reject);
         });
 
+        // ИЗМЕНЕНО: Динамически определяем домен (например, https://your-subdomain.up.railway.app)
+        // вместо жесткой привязки к localhost
         const domain = `${request.protocol}://${request.hostname}`;
         const fileUrl = `${domain}/uploads/${uniqueFileName}`;
         
@@ -87,6 +96,7 @@ fastify.post('/upload', async (request, reply) => {
     }
 });
 
+// Прямой роут для главной страницы (Считывает index.html через файловую систему)
 fastify.get('/', async (request, reply) => {
     try {
         const indexPath = path.join(__dirname, 'index.html');
@@ -97,15 +107,18 @@ fastify.get('/', async (request, reply) => {
     }
 });
 
+// Заглушка для иконки favicon, чтобы логи были чистыми
 fastify.get('/favicon.ico', async (request, reply) => {
     return reply.status(204).send();
 });
 
 const start = async () => {
     try {
+        // Проверяем подключение к базе данных
         await pool.query('SELECT NOW()');
         console.log('=== Успешное подключение к базе данных Railway! ===');
 
+        // Инициализируем Socket.IO строго до бинда порта
         const io = new Server(fastify.server, { 
             cors: { origin: "*" },
             maxHttpBufferSize: 1e8 // 100 МБ
@@ -129,7 +142,6 @@ const start = async () => {
 
         io.on('connection', async (socket) => {
             const { id_org, id_user, username } = socket.data;
-            
             try {
                 await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', [id_org, 'Организация из 1С']);
                 await pool.query('INSERT INTO users (id_user, id_org, username) VALUES ($1, $2, $3) ON CONFLICT (id_user) DO NOTHING', [id_user, id_org, username]);
@@ -138,87 +150,23 @@ const start = async () => {
                 console.error('Ошибка синхронизации данных с БД:', err);
             }
 
-            // Обязательно подписываем сокет на комнату организации и текущую комнату чата
             socket.join(`org_${id_org}`);
             socket.join(`room_1`);
 
-            // ВЫБОРКА КОМНАТ: Отдаем Общий чат (id=1) + те комнаты, где пользователь состоит участником
-            const sendRoomsList = async () => {
-                try {
-                    const roomsResult = await pool.query(`
-                        SELECT r.id_room, r.name, r.type 
-                        FROM rooms r
-                        WHERE r.id_room = 1 AND r.id_org = $1
-                        UNION
-                        SELECT r.id_room, r.name, r.type 
-                        FROM rooms r
-                        JOIN room_participants rp ON r.id_room = rp.id_room
-                        WHERE r.id_org = $1 AND rp.id_user = $2
-                    `, [id_org, id_user]);
-                    socket.emit('rooms_list', roomsResult.rows);
-                } catch (err) {
-                    console.error('Ошибка получения списка комнат:', err);
-                }
-            };
-
-            await sendRoomsList();
-
-            // НОВОЕ: Запрос списка всех остальных сотрудников вашей организации
-            socket.on('get_users_list', async () => {
-                try {
-                    const usersResult = await pool.query('SELECT id_user, username FROM users WHERE id_org = $1 AND id_user != $2', [id_org, id_user]);
-                    socket.emit('users_list', usersResult.rows);
-                } catch (err) { console.error(err); }
-            });
-
-            // НОВОЕ: Создание или получение существующего личного чата (1-на-1)
-            socket.on('create_private_chat', async (data: { target_user_id: string, target_username: string }) => {
-                try {
-                    const checkChat = await pool.query(`
-                        SELECT rp1.id_room FROM room_participants rp1
-                        JOIN room_participants rp2 ON rp1.id_room = rp2.id_room
-                        JOIN rooms r ON r.id_room = rp1.id_room
-                        WHERE r.type = 'private' AND r.id_org = $1 AND rp1.id_user = $2 AND rp2.id_user = $3
-                    `, [id_org, id_user, data.target_user_id]);
-
-                    if (checkChat.rows.length > 0) {
-                        socket.emit('private_chat_created', { id_room: checkChat.rows[0].id_room });
-                        return;
-                    }
-
-                    const roomName = `${username} ⇄ ${data.target_username}`;
-                    const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'private', roomName]);
-                    const newRoomId = newRoom.rows[0].id_room;
-
-                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2), ($1, $3)', [newRoomId, id_user, data.target_user_id]);
-                    
-                    // Даем сигнал всем клиентам организации обновить списки чатов
-                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err); }
-            });
-
-            // НОВОЕ: Создание группового чата
-            socket.on('create_group_chat', async (data: { group_name: string, user_ids: string[] }) => {
-                try {
-                    const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'group', data.group_name]);
-                    const newRoomId = newRoom.rows[0].id_room;
-
-                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2)', [newRoomId, id_user]);
-                    for (const targetId of data.user_ids) {
-                        await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2) ON CONFLICT DO NOTHING', [newRoomId, targetId]);
-                    }
-
-                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err); }
-            });
-
-            // НОВОЕ: Вход в конкретный пул комнаты при переключении в интерфейсе
-            socket.on('join_room_pool', (data: { room_id: number }) => {
-                socket.join(`room_${data.room_id}`);
-            });
+            try {
+                const roomsResult = await pool.query('SELECT id_room, name, type FROM rooms WHERE id_room = 1 OR id_org = $1', [id_org]);
+                socket.emit('rooms_list', roomsResult.rows);
+            } catch (err) {
+                console.error('Ошибка получения списка комнат:', err);
+            }
 
             socket.on('get_rooms_again', async () => {
-                await sendRoomsList();
+                try {
+                    const roomsResult = await pool.query('SELECT id_room, name, type FROM rooms WHERE id_room = 1 OR id_org = $1', [id_org]);
+                    socket.emit('rooms_list', roomsResult.rows);
+                } catch (err) {
+                    console.error('Ошибка обновления списка комнат:', err);
+                }
             });
 
             socket.on('send_message', async (data: { room_id: number, text: string, is_secret: boolean }) => {
@@ -240,6 +188,8 @@ const start = async () => {
             });
         });
 
+        // ПРАВИЛЬНЫЙ ЗАПУСК ДЛЯ FASTIFY V5 НА RAILWAY:
+        // Ждем выполнения listen и выводим лог в консоль контейнера
         const listenAddress = await fastify.listen({ 
             port: Number(PORT), 
             host: '0.0.0.0' 
