@@ -9,7 +9,7 @@ import fastifyStatic from '@fastify/static';
 import fastifyCors from '@fastify/cors';
 import 'dotenv/config';
 // Установите sharp: npm install sharp
-import sharp from 'sharp';
+//import sharp from 'sharp';
 
 console.log("=== Инициализация Fastify сервера ===");
 
@@ -635,6 +635,7 @@ fastify.post('/upload', async (request, reply) => {
         }
         // Сжимаем изображения
         const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileExt);
+        /*
         if (isImage) {
             await sharp(saveTo)
                 .resize(1920, 1080, { fit: 'inside' })
@@ -644,6 +645,7 @@ fastify.post('/upload', async (request, reply) => {
             fs.renameSync(saveTo + '.tmp', saveTo);
             console.log(`Изображение сжато: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
         }
+        */
         const fileExt = path.extname(data.filename);
         const uniqueFileName = `${crypto.randomUUID()}${fileExt}`;
         const saveTo = path.join(UPLOADS_DIR, uniqueFileName);
