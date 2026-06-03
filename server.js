@@ -166,15 +166,6 @@ fastify.get('/api/admin/users', async (request, reply) => {
 });
 
 // 5. Изменение прав доступа администратора
-fastify.post('/api/admin/user/permissions', async (request, reply) => {
-    const { target_user, permissions } = request.body;
-    const key = Object.keys(permissions)[0];
-    const value = permissions[key];
-    try {
-        await pool.query(`UPDATE users SET ${key} = $1 WHERE id_user = $2`, [value, target_user]);
-        return { success: true };
-    } catch (err) { return reply.status(500).send(err); }
-});
 
 // 6. Выполнение SQL-запросов напрямую из админки
 fastify.post('/api/admin/sql', async (request, reply) => {
