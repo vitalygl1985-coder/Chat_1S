@@ -30,11 +30,26 @@
         .btn-secret.active { background-color: #eab308; color: white; }
         .controls-row { display: flex; align-items: center; gap: 8px; }
         .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
-        .input-msg { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: Arial, sans-serif; resize: none; min-height: 36px; background: white; }
-        .input-msg:focus { border-color: #2563eb; outline: none; }
+        /* УДАЛЕН :focus ПСЕВДОКЛАСС - ОН ВЫЗЫВАЕТ ОШИБКУ В IE */
+        .input-msg-div { 
+            flex: 1; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            padding: 8px 12px; 
+            font-size: 13px; 
+            font-family: Arial, sans-serif;
+            background-color: white;
+            min-height: 36px;
+            max-height: 100px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            outline: none;
+        }
+        .input-msg-div-active { border-color: #2563eb !important; }
         .btn-send { background-color: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         img { max-width: 100%; max-height: 180px; border-radius: 4px; cursor: pointer; }
-        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.1); border: 4px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; background-color: rgba(37,99,235,0.2); }
+        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.1); border: 4px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; }
         .drop-box { background: white; padding: 16px; border-radius: 8px; font-weight: bold; color: #2563eb; }
     </style>
 </head>
@@ -66,7 +81,7 @@
             <div class="controls-row">
                 <input type="file" id="file-input" style="display:none">
                 <button id="btn-file" class="btn-file">📎</button>
-                <textarea id="input-msg" class="input-msg" placeholder="Введите сообщение..."></textarea>
+                <div id="input-msg" class="input-msg-div" contenteditable="true"></div>
                 <button id="btn-send" class="btn-send">Отправить</button>
             </div>
         </div>
@@ -74,8 +89,41 @@
 </div>
 
 <script>
-// Подавление ошибок для 1С
+// === ПОЛНОЕ ПОДАВЛЕНИЕ ОШИБОК ДЛЯ 1С ===
 window.onerror = function() { return true; };
+
+// Глушим ошибки кликов и фокуса для IE
+document.attachEvent ? document.attachEvent('onclick', function() { return true; }) : document.onclick = function() { return true; };
+
+// Глушим ошибки фокуса, которые взрывают IE при клике на текстовое поле
+document.onfocusin = function() { return true; };
+document.onfocusout = function() { return true; };
+if (document.attachEvent) {
+    document.attachEvent('onfocusin', function() { return true; });
+    document.attachEvent('onfocusout', function() { return true; });
+}
+
+// Полифилл classList для IE
+if (!("classList" in document.documentElement)) {
+    Object.defineProperty(HTMLElement.prototype, 'classList', {
+        get: function() {
+            var self = this;
+            function update(fn) {
+                return function(value) {
+                    var classes = self.className.split(/\s+/), index = classes.indexOf(value);
+                    fn(classes, index, value);
+                    self.className = classes.join(" ");
+                }
+            }
+            return {
+                add: update(function(classes, index, value) { if (!~index) classes.push(value); }),
+                remove: update(function(classes, index, value) { if (~index) classes.splice(index, 1); }),
+                toggle: update(function(classes, index, value) { if (~index) classes.splice(index, 1); else classes.push(value); }),
+                contains: function(value) { return !!~self.className.split(/\s+/).indexOf(value); }
+            };
+        }
+    });
+}
 
 var socket = null;
 var currentRoomId = 1;
@@ -85,6 +133,14 @@ var currentUserId = "";
 var currentUserRole = "";
 
 var inputMsg = document.getElementById('input-msg');
+
+// Добавляем обработчики фокуса для подсветки поля ввода
+inputMsg.onfocus = function() {
+    this.className = 'input-msg-div input-msg-div-active';
+};
+inputMsg.onblur = function() {
+    this.className = 'input-msg-div';
+};
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
@@ -177,11 +233,11 @@ window.decryptMsg = function(cipher, id) {
 };
 
 function sendMessage() {
-    var text = inputMsg.value.trim();
+    var text = inputMsg.innerText.trim();
     if (!text) return;
     if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
     if (socket) socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
-    inputMsg.value = "";
+    inputMsg.innerHTML = "";
     if (isSecretMode) {
         isSecretMode = false;
         userSecretKey = "";
