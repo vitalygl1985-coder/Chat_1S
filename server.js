@@ -77,8 +77,7 @@ fastify.get('/admin', async (request, reply) => {
         const adminPath = path.join(__dirname, 'admin.html');
         const htmlContent = fs.readFileSync(adminPath, 'utf8');
         reply.type('text/html').send(htmlContent);
-    }
-    catch (err) {
+    } catch (err) {
         reply.status(500).send('Ошибка загрузки админ-панели');
     }
 });
@@ -335,17 +334,7 @@ fastify.get('/api/admin/theme', async (request, reply) => {
         return reply.status(500).send({ error: 'Ошибка получения темы' });
     }
 });
-// Админ-панель
-fastify.get('/admin', async (request, reply) => {
-    try {
-        const adminPath = path.join(__dirname, 'admin.html');
-        const htmlContent = fs.readFileSync(adminPath, 'utf8');
-        reply.type('text/html').send(htmlContent);
-    }
-    catch (err) {
-        reply.status(500).send('Ошибка загрузки админ-панели');
-    }
-});
+
 // API: Получить все настройки
 fastify.get('/api/admin/settings', async (request, reply) => {
     try {
