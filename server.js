@@ -103,7 +103,7 @@ fastify.post('/api/admin/upload-logo', async (request, reply) => {
         });
         await pool.query(`INSERT INTO settings (key, value) VALUES ('logo_url', '/uploads/custom_logo.png') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
         return { success: true };
-    } catch (err) { return reply.status(500).send({ error: 'Ошибка сохранения логотипа' }); }
+    } catch (err) { return reply.status(500).send({ error: 'Ошибка保存логотипа' }); }
 });
 
 // Роуты статических страниц
@@ -120,22 +120,18 @@ fastify.get('/favicon.ico', async (req, res) => { res.status(204).send(); });
 // === API ДЛЯ АДМИН-ПАНЕЛИ ===
 
 // 1. Авторизация в админке
-// Safe Permissions Update
-fastify.post('/api/admin/user/permissions', async (request, reply) => {
-    const { target_user, permissions } = request.body;
+fastify.post('/api/admin/auth', async (request, reply) => {
+    const { id_user, id_org } = request.body;
     try {
-        // Явно проверяем и обновляем только разрешенные колонки
-        if ('can_manage_themes' in permissions) {
-            await pool.query('UPDATE users SET can_manage_themes = $1 WHERE id_user = $2', [permissions.can_manage_themes, target_user]);
+        const res = await pool.query('SELECT * FROM users WHERE id_user = $1 AND id_org = $2', [id_user, id_org]);
+        if (res.rows.length > 0) {
+            const user = res.rows[0];
+            if (user.role === 'admin') {
+                return { success: true, admin: user };
+            }
         }
-        if ('can_manage_users' in permissions) {
-            await pool.query('UPDATE users SET can_manage_users = $1 WHERE id_user = $2', [permissions.can_manage_users, target_user]);
-        }
-        if ('can_view_logs' in permissions) {
-            await pool.query('UPDATE users SET can_view_logs = $1 WHERE id_user = $2', [permissions.can_view_logs, target_user]);
-        }
-        return { success: true };
-    } catch (err) { return reply.status(500).send({ error: err.message }); }
+        return { success: false, error: 'Недостаточно прав' };
+    } catch (err) { return reply.status(500).send({ success: false, error: err.message }); }
 });
 
 // 2. Получение текущих настроек внешнего вида и ссылок
@@ -166,6 +162,21 @@ fastify.get('/api/admin/users', async (request, reply) => {
 });
 
 // 5. Изменение прав доступа администратора
+fastify.post('/api/admin/user/permissions', async (request, reply) => {
+    const { target_user, permissions } = request.body;
+    try {
+        if ('can_manage_themes' in permissions) {
+            await pool.query('UPDATE users SET can_manage_themes = $1 WHERE id_user = $2', [permissions.can_manage_themes, target_user]);
+        }
+        if ('can_manage_users' in permissions) {
+            await pool.query('UPDATE users SET can_manage_users = $1 WHERE id_user = $2', [permissions.can_manage_users, target_user]);
+        }
+        if ('can_view_logs' in permissions) {
+            await pool.query('UPDATE users SET can_view_logs = $1 WHERE id_user = $2', [permissions.can_view_logs, target_user]);
+        }
+        return { success: true };
+    } catch (err) { return reply.status(500).send({ error: err.message }); }
+});
 
 // 6. Выполнение SQL-запросов напрямую из админки
 fastify.post('/api/admin/sql', async (request, reply) => {
@@ -197,7 +208,6 @@ fastify.get('/api/admin/logs', async (request, reply) => {
 
 const start = async () => {
     try {
-        // Обертываем подключение к БД в try/catch, чтобы сервер не падал при старте
         try {
             console.log("Пробуем подключиться к PostgreSQL...");
             await initDB();
