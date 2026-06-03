@@ -1,6 +1,28 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <style id="dynamic-styles"></style>
+    <script>
+    async function loadTheme() {
+        try {
+            const response = await fetch('/api/admin/theme');
+            const theme = await response.json();
+            const styles = `
+                :root {
+                    --primary-color: ${theme.theme_primary_color || '#2563eb'};
+                    --bg-color: ${theme.theme_background_color || '#f3f4f6'};
+                    --text-color: ${theme.theme_text_color || '#1f2937'};
+                }
+                body { background: var(--bg-color); color: var(--text-color); }
+                .header, .btn-send, .btn-secret.active { background: var(--primary-color); }
+                .btn-send:hover { filter: brightness(0.9); }
+                ${theme.custom_css || ''}
+            `;
+            document.getElementById('dynamic-styles').textContent = styles;
+        } catch(e) { console.log('Theme load error:', e); }
+    }
+    loadTheme();
+    </script>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta charset="UTF-8">
     <title>1C Chat Client</title>

@@ -38,6 +38,161 @@ fastify.register(fastifyStatic, {
     prefix: '/uploads/'
 });
 
+// Админ-панель
+fastify.get('/admin', async (request, reply) => {
+    try {
+        const adminPath = path.join(__dirname, 'admin.html');
+        const htmlContent = fs.readFileSync(adminPath, 'utf8');
+        reply.type('text/html').send(htmlContent);
+    } catch (err) {
+        reply.status(500).send('Ошибка загрузки админ-панели');
+    }
+});
+
+// API: Получить все настройки
+fastify.get('/api/admin/settings', async (request, reply) => {
+    try {
+        const result = await pool.query('SELECT setting_key, setting_value, setting_type FROM admin_settings');
+        const settings = {};
+        result.rows.forEach(row => {
+            settings[row.setting_key] = {
+                value: row.setting_value,
+                type: row.setting_type
+            };
+        });
+        return settings;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения настроек' });
+    }
+});
+
+// API: Обновить настройку
+fastify.post('/api/admin/settings', async (request, reply) => {
+    try {
+        const { key, value, admin_user } = request.body;
+        
+        // Проверка прав
+        const adminCheck = await pool.query(
+            'SELECT can_manage_themes FROM admin_users WHERE id_user = $1',
+            [admin_user]
+        );
+        
+        if (adminCheck.rows.length === 0 || !adminCheck.rows[0].can_manage_themes) {
+            return reply.status(403).send({ error: 'Недостаточно прав' });
+        }
+        
+        await pool.query(
+            `INSERT INTO admin_settings (setting_key, setting_value, updated_by, updated_at) 
+             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+             ON CONFLICT (setting_key) 
+             DO UPDATE SET setting_value = $2, updated_by = $3, updated_at = CURRENT_TIMESTAMP`,
+            [key, value, admin_user]
+        );
+        
+        return { success: true };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка обновления' });
+    }
+});
+
+// API: Получить список пользователей для админки
+fastify.get('/api/admin/users', async (request, reply) => {
+    try {
+        const result = await pool.query(`
+            SELECT u.id_user, u.username, u.role, 
+                   COALESCE(au.can_manage_themes, false) as can_manage_themes,
+                   COALESCE(au.can_manage_users, false) as can_manage_users,
+                   COALESCE(au.can_manage_roles, false) as can_manage_roles
+            FROM users u
+            LEFT JOIN admin_users au ON u.id_user = au.id_user
+            WHERE u.role = 'admin'
+            ORDER BY u.username
+        `);
+        return result.rows;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения пользователей' });
+    }
+});
+
+// API: Обновить права пользователя
+fastify.post('/api/admin/user/permissions', async (request, reply) => {
+    try {
+        const { target_user, permissions, admin_user } = request.body;
+        
+        // Проверка прав текущего админа
+        const adminCheck = await pool.query(
+            'SELECT can_manage_users, can_manage_roles FROM admin_users WHERE id_user = $1',
+            [admin_user]
+        );
+        
+        if (adminCheck.rows.length === 0) {
+            return reply.status(403).send({ error: 'Недостаточно прав' });
+        }
+        
+        await pool.query(
+            `INSERT INTO admin_users (id_user, can_manage_themes, can_manage_users, can_manage_roles, can_view_logs)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (id_user)
+             DO UPDATE SET 
+                can_manage_themes = $2,
+                can_manage_users = $3,
+                can_manage_roles = $4,
+                can_view_logs = $5`,
+            [target_user, permissions.can_manage_themes, permissions.can_manage_users, 
+             permissions.can_manage_roles, permissions.can_view_logs]
+        );
+        
+        return { success: true };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка обновления прав' });
+    }
+});
+
+// API: Получить логи (только для админов)
+fastify.get('/api/admin/logs', async (request, reply) => {
+    try {
+        const { admin_user } = request.query;
+        
+        const adminCheck = await pool.query(
+            'SELECT can_view_logs FROM admin_users WHERE id_user = $1',
+            [admin_user]
+        );
+        
+        if (adminCheck.rows.length === 0 || !adminCheck.rows[0].can_view_logs) {
+            return reply.status(403).send({ error: 'Недостаточно прав' });
+        }
+        
+        // Читаем последние 100 строк лога
+        const logPath = path.join(__dirname, 'logs', 'app.log');
+        if (fs.existsSync(logPath)) {
+            const logs = fs.readFileSync(logPath, 'utf8').split('\n').slice(-100);
+            return { logs };
+        }
+        return { logs: [] };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения логов' });
+    }
+});
+
+// API: Применить стили к index.html
+fastify.get('/api/admin/theme', async (request, reply) => {
+    try {
+        const settings = await pool.query(
+            'SELECT setting_key, setting_value FROM admin_settings WHERE setting_type IN ($1, $2, $3)',
+            ['color', 'css', 'url']
+        );
+        
+        const theme = {};
+        settings.rows.forEach(row => {
+            theme[row.setting_key] = row.setting_value;
+        });
+        
+        return theme;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения темы' });
+    }
+});
+
 const pool = new Pool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
