@@ -11,44 +11,32 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
         .header { background-color: #2563eb; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { font-size: 16px; font-weight: bold; }
-        .user-info { font-size: 13px; font-weight: bold; }
+        .header h1 { font-size: 16px; }
+        .user-info { font-size: 13px; }
         .main-container { flex: 1; display: flex; overflow: hidden; }
-        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; padding: 16px; overflow-y: auto; }
-        .sidebar h2 { font-size: 13px; font-weight: bold; color: #374151; margin-bottom: 12px; }
-        .room-item, .user-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 12px; color: #4b5563; border-radius: 4px; }
+        .sidebar { width: 260px; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+        .sidebar-section { flex: 1; padding: 12px; overflow-y: auto; }
+        .sidebar-section.users-zone { border-top: 1px solid #e5e7eb; background-color: #fafafa; }
+        .sidebar h3 { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 10px; }
+        .room-item, .user-item { padding: 6px 8px; margin-bottom: 4px; cursor: pointer; font-size: 12px; border-radius: 4px; }
         .room-item:hover, .user-item:hover { background-color: #f3f4f6; }
         .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
-        .chat-window { width: 75%; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
+        .btn-small { padding: 2px 6px; font-size: 10px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; float: right; }
+        .chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
         .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
-        .msg-block { background-color: white; padding: 10px; border-radius: 8px; max-width: 70%; margin-bottom: 12px; align-self: flex-start; }
-        .msg-author { font-size: 11px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
-        .msg-text { font-size: 13px; color: #1f2937; word-break: break-word; }
-        .input-panel { padding: 16px; background-color: white; border-top: 1px solid #e5e7eb; }
-        .secret-row { margin-bottom: 8px; }
-        .btn-secret { padding: 4px 12px; font-size: 11px; background-color: #e5e7eb; border: none; border-radius: 9999px; cursor: pointer; }
+        .msg-block { background-color: white; padding: 8px 12px; border-radius: 8px; max-width: 70%; margin-bottom: 8px; align-self: flex-start; }
+        .msg-author { font-size: 10px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
+        .msg-text { font-size: 12px; color: #1f2937; word-break: break-word; }
+        .input-panel { padding: 12px; background-color: white; border-top: 1px solid #e5e7eb; }
+        .secret-row { margin-bottom: 6px; }
+        .btn-secret { padding: 3px 10px; font-size: 11px; background-color: #e5e7eb; border: none; border-radius: 9999px; cursor: pointer; }
         .btn-secret.active { background-color: #eab308; color: white; }
-        .controls-row { display: flex; align-items: center; gap: 8px; }
-        .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
-        /* УДАЛЕН :focus ПСЕВДОКЛАСС - ОН ВЫЗЫВАЕТ ОШИБКУ В IE */
-        .input-msg-div { 
-            flex: 1; 
-            border: 1px solid #d1d5db; 
-            border-radius: 6px; 
-            padding: 8px 12px; 
-            font-size: 13px; 
-            font-family: Arial, sans-serif;
-            background-color: white;
-            min-height: 36px;
-            max-height: 100px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-            outline: none;
-        }
+        .controls-row { display: flex; gap: 8px; align-items: center; }
+        .btn-file { background-color: #e5e7eb; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+        .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 12px; min-height: 34px; max-height: 80px; overflow-y: auto; background: white; outline: none; }
         .input-msg-div-active { border-color: #2563eb !important; }
-        .btn-send { background-color: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        img { max-width: 100%; max-height: 180px; border-radius: 4px; cursor: pointer; }
+        .btn-send { background-color: #2563eb; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; }
+        img { max-width: 100%; max-height: 150px; border-radius: 4px; cursor: pointer; }
         .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.1); border: 4px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; }
         .drop-box { background: white; padding: 16px; border-radius: 8px; font-weight: bold; color: #2563eb; }
     </style>
@@ -65,12 +53,18 @@
 
 <div class="main-container">
     <div class="sidebar">
-        <h2>Чаты</h2>
-        <div id="rooms-list">Загрузка...</div>
+        <div class="sidebar-section">
+            <h3>Чаты <button id="btn-create-group" class="btn-small">+ Группа</button></h3>
+            <div id="rooms-list">Загрузка...</div>
+        </div>
+        <div class="sidebar-section users-zone">
+            <h3>Сотрудники</h3>
+            <div id="users-list">Загрузка...</div>
+        </div>
     </div>
 
     <div class="chat-window" id="chat-window">
-        <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы сюда</div></div>
+        <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы</div></div>
         <div id="messages-container" class="messages-container">
             <div class="msg-block"><span class="msg-author">Система</span><div class="msg-text">Добро пожаловать!</div></div>
         </div>
@@ -93,15 +87,9 @@
 window.onerror = function() { return true; };
 
 // Глушим ошибки кликов и фокуса для IE
-document.attachEvent ? document.attachEvent('onclick', function() { return true; }) : document.onclick = function() { return true; };
-
-// Глушим ошибки фокуса, которые взрывают IE при клике на текстовое поле
+document.onclick = function() { return true; };
 document.onfocusin = function() { return true; };
 document.onfocusout = function() { return true; };
-if (document.attachEvent) {
-    document.attachEvent('onfocusin', function() { return true; });
-    document.attachEvent('onfocusout', function() { return true; });
-}
 
 // Полифилл classList для IE
 if (!("classList" in document.documentElement)) {
@@ -109,17 +97,16 @@ if (!("classList" in document.documentElement)) {
         get: function() {
             var self = this;
             function update(fn) {
-                return function(value) {
-                    var classes = self.className.split(/\s+/), index = classes.indexOf(value);
-                    fn(classes, index, value);
-                    self.className = classes.join(" ");
-                }
+                return function(v) {
+                    var c = self.className.split(/\s+/), i = c.indexOf(v);
+                    fn(c, i, v);
+                    self.className = c.join(" ");
+                };
             }
             return {
-                add: update(function(classes, index, value) { if (!~index) classes.push(value); }),
-                remove: update(function(classes, index, value) { if (~index) classes.splice(index, 1); }),
-                toggle: update(function(classes, index, value) { if (~index) classes.splice(index, 1); else classes.push(value); }),
-                contains: function(value) { return !!~self.className.split(/\s+/).indexOf(value); }
+                add: update(function(c,i,v){ if(i===-1)c.push(v); }),
+                remove: update(function(c,i,v){ if(i!==-1)c.splice(i,1); }),
+                contains: function(v){ return self.className.split(/\s+/).indexOf(v) !== -1; }
             };
         }
     });
@@ -134,18 +121,14 @@ var currentUserRole = "";
 
 var inputMsg = document.getElementById('input-msg');
 
-// Добавляем обработчики фокуса для подсветки поля ввода
-inputMsg.onfocus = function() {
-    this.className = 'input-msg-div input-msg-div-active';
-};
-inputMsg.onblur = function() {
-    this.className = 'input-msg-div';
-};
+// Подсветка поля ввода
+inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
+inputMsg.onblur = function() { this.className = 'input-msg-div'; };
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
     currentUserRole = user_role || 'user';
-    document.getElementById('user-info').innerHTML = username + (currentUserRole === 'admin' ? ' (Админ)' : '');
+    document.getElementById('user-info').innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
     
     if (socket) socket.disconnect();
     
@@ -155,15 +138,16 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     });
 
     socket.on('connect', function() {
+        console.log('Socket connected');
         socket.emit('join_room_pool', { room_id: currentRoomId });
+        socket.emit('get_users_list');
         socket.emit('get_rooms_again');
     });
 
     socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
     socket.on('users_list', function(users) { renderUsersList(users); });
     socket.on('new_message', function(msg) { if (msg.id_room == currentRoomId) displayMessage(msg); });
-    socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
-    socket.on('private_chat_created', function() { if (socket) socket.emit('get_rooms_again'); });
+    socket.on('refresh_rooms_trigger', function() { socket.emit('get_rooms_again'); });
 }
 
 function renderRoomsList(rooms) {
@@ -178,9 +162,9 @@ function renderRoomsList(rooms) {
         (function(rid) {
             div.onclick = function() {
                 currentRoomId = rid;
-                document.getElementById('messages-container').innerHTML = "";
-                if (socket) socket.emit('join_room_pool', { room_id: rid });
-                if (socket) socket.emit('get_rooms_again');
+                document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка...</div></div>";
+                socket.emit('join_room_pool', { room_id: rid });
+                socket.emit('get_rooms_again');
             };
         })(room.id_room);
         container.appendChild(div);
@@ -189,9 +173,8 @@ function renderRoomsList(rooms) {
 
 function renderUsersList(users) {
     var container = document.getElementById('users-list');
-    if (!container) return;
     container.innerHTML = "";
-    if (!users || users.length === 0) return;
+    if (!users || users.length === 0) { container.innerHTML = "<div>Нет пользователей</div>"; return; }
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
         if (u.id_user == currentUserId) continue;
@@ -199,7 +182,7 @@ function renderUsersList(users) {
         div.className = 'user-item';
         div.innerText = "👤 " + u.username;
         (function(uid, uname) {
-            div.onclick = function() { if (socket) socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); };
+            div.onclick = function() { socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); };
         })(u.id_user, u.username);
         container.appendChild(div);
     }
@@ -221,7 +204,7 @@ function displayMessage(msg) {
 }
 
 window.decryptMsg = function(cipher, id) {
-    var code = prompt("Введите секретный код:");
+    var code = prompt("Введите код:");
     if (!code) return;
     try {
         var dec = CryptoJS.AES.decrypt(cipher, code).toString(CryptoJS.enc.Utf8);
@@ -229,14 +212,14 @@ window.decryptMsg = function(cipher, id) {
             document.getElementById(id).innerHTML = dec;
             document.getElementById(id).style.cssText = "color:#1f2937;font-weight:bold;";
         } else { alert("Неверный код!"); }
-    } catch(e) { alert("Ошибка расшифровки!"); }
+    } catch(e) { alert("Ошибка!"); }
 };
 
 function sendMessage() {
     var text = inputMsg.innerText.trim();
     if (!text) return;
     if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
-    if (socket) socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
+    socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
     inputMsg.innerHTML = "";
     if (isSecretMode) {
         isSecretMode = false;
@@ -255,18 +238,22 @@ function uploadFile(file) {
             var data = JSON.parse(xhr.responseText);
             if (data.url) {
                 var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<div><a href="'+data.url+'" target="_blank">📄 '+file.name+'</a></div>';
-                if (socket) socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
+                var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<a href="'+data.url+'" target="_blank">📄 '+file.name+'</a>';
+                socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
-        } else { alert('Ошибка загрузки'); }
+        } else { alert('Ошибка'); }
     };
     xhr.send(fd);
 }
 
 // Обработчики
+document.getElementById('btn-create-group').onclick = function() {
+    var name = prompt("Название группы:");
+    if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [] });
+};
 document.getElementById('btn-secret').onclick = function() {
     if (!isSecretMode) {
-        var key = prompt("Введите секретный ключ:");
+        var key = prompt("Ключ шифрования:");
         if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
     } else {
         isSecretMode = false;
@@ -274,20 +261,16 @@ document.getElementById('btn-secret').onclick = function() {
         this.className = 'btn-secret';
     }
 };
-
 document.getElementById('btn-send').onclick = sendMessage;
 document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
 document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); e.target.value = ""; };
 inputMsg.onkeydown = function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
 
 // Drag & drop
-var chatWindow = document.getElementById('chat-window');
 var dropZone = document.getElementById('drop-zone');
-window.ondragenter = window.ondragover = function(e) { e.preventDefault(); };
-window.ondragleave = window.ondrop = function(e) { e.preventDefault(); };
-chatWindow.ondragenter = chatWindow.ondragover = function() { dropZone.style.display = 'flex'; };
+document.getElementById('chat-window').ondragover = function(e) { e.preventDefault(); dropZone.style.display = 'flex'; };
 dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
-chatWindow.ondrop = function(e) {
+document.getElementById('chat-window').ondrop = function(e) {
     e.preventDefault();
     dropZone.style.display = 'none';
     if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
@@ -311,16 +294,8 @@ inputMsg.onpaste = function(e) {
 window.onload = function() {
     var hash = window.location.hash;
     if (hash && hash.length > 1) {
-        var clean = decodeURIComponent(hash.substring(1));
-        var p = clean.split("---");
+        var p = decodeURIComponent(hash.substring(1)).split("---");
         if (p.length >= 3) apply1CAuth(p[0], p[1], p[2], p.length >= 4 ? p[3] : 'user');
-    } else {
-        var urlParams = new URLSearchParams(window.location.search);
-        var u = urlParams.get('id_user');
-        var o = urlParams.get('id_org');
-        var n = urlParams.get('username');
-        var r = urlParams.get('user_role') || 'user';
-        if (u && o && n) apply1CAuth(u, o, n, r);
     }
 };
 </script>
