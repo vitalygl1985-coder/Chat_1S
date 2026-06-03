@@ -409,7 +409,29 @@ fastify.get('/api/admin/theme', async (request, reply) => {
         return reply.status(500).send({ error: 'Ошибка получения темы' });
     }
 });
+// ===== HEALTH CHECK ENDPOINT =====
+fastify.get('/health', async (request, reply) => {
+    try {
+        // Проверяем подключение к БД
+        await pool.query('SELECT 1');
+        return { 
+            status: 'ok', 
+            timestamp: new Date().toISOString(),
+            database: 'connected',
+            uptime: process.uptime()
+        };
+    } catch (err) {
+        return reply.status(503).send({ 
+            status: 'error', 
+            database: 'disconnected',
+            error: err.message 
+        });
+    }
+});
 
+fastify.get('/ping', async (request, reply) => {
+    return { pong: Date.now() };
+});
 // ===== ОСНОВНЫЕ МАРШРУТЫ =====
 
 fastify.post('/upload', async (request, reply) => {
@@ -463,6 +485,11 @@ fastify.get('/favicon.ico', async (request, reply) => {
 
 const start = async () => {
     try {
+        // Небольшая задержка для Railway
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        await pool.query('SELECT NOW()');
+        console.log('=== Успешное подключение к базе данных Railway! ===');
         await pool.query('SELECT NOW()');
         console.log('=== Успешное подключение к базе данных Railway! ===');
         

@@ -4,8 +4,10 @@
     "buildCommand": "npm install"
   },
   "deploy": {
-    "startCommand": "npx ts-node server.ts",
-    "healthcheckPath": "/",
-    "restartPolicyType": "ON_FAILURE"
+    "startCommand": "node server.js",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "numReplicas": 1
   }
 }
