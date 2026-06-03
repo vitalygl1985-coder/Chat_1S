@@ -165,6 +165,14 @@
                     <button onclick="executeSQL()" style="margin-top: 10px;">▶️ Выполнить</button>
                     <div id="sql-result" class="sql-result"></div>
                 </div>
+                <div class="card" style="border: 1px solid #fca5a5; background: #fff5f5;">
+                    <h3 style="color: #dc2626;">⚠️ Инструменты быстрой очистки (Редактирование БД)</h3>
+                    <p style="font-size: 13px; color: #4b5563; margin-bottom: 15px;">Удаление истории сообщений или очистка комнат в один клик:</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="quickDbAction('clear_messages')" style="background: #dc2626;">🗑️ Очистить всю историю сообщений</button>
+                        <button onclick="quickDbAction('clear_chats')" style="background: #7f1d1d;">❌ Удалить все созданные группы и приватные чаты</button>
+                    </div>
+                </div>
                 <div class="card">
                     <h3>📊 Таблицы базы данных</h3>
                     <div id="tables-list"></div>
@@ -314,19 +322,43 @@
         }
         
         async function loadUsers() {
-            const response = await fetch('/api/admin/users');
-            const users = await response.json();
-            const tbody = document.querySelector('#users-table tbody');
-            tbody.innerHTML = '';
-            users.forEach(user => {
-                const row = tbody.insertRow();
-                row.insertCell(0).textContent = user.id_user.substring(0, 20) + '...';
-                row.insertCell(1).textContent = user.username;
-                row.insertCell(2).textContent = user.role === 'admin' ? '👑 Админ' : '👤 Пользователь';
-                row.insertCell(3).textContent = user.can_manage_themes ? '✅' : '❌';
-            });
-        }
+    const response = await fetch('/api/admin/users');
+    const users = await response.json();
+    const tbody = document.querySelector('#users-table tbody');
+    tbody.innerHTML = '';
+    users.forEach(user => {
+        const row = tbody.insertRow();
+        row.insertCell(0).textContent = user.id_user;
+        row.insertCell(1).textContent = user.username;
         
+        // Клетка роли с кнопкой быстрой смены роли
+        const roleCell = row.insertCell(2);
+        roleCell.innerHTML = `
+            <span>${user.role === 'admin' ? '👑 Админ' : '👤 Юзер'}</span>
+            <button style="padding:2px 5px; font-size:10px; margin-left:10px; background:#6b7280;" 
+                    onclick="toggleUserRole('${user.id_user}', '${user.role}')">🔄 Изменить</button>
+        `;
+        
+        row.insertCell(3).textContent = user.can_manage_themes ? '✅' : '❌';
+    });
+}
+
+        // Новая функция прямого апдейта роли из таблицы
+        async function toggleUserRole(userId, currentRole) {
+            const newRole = currentRole === 'admin' ? 'user' : 'admin';
+            const sql = `UPDATE users SET role = '${newRole}' WHERE id_user = '${userId}'`;
+            
+            await fetch('/api/admin/sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql, admin_user: currentAdmin.id_user })
+            });
+            
+            showToast('Роль пользователя изменена успешно');
+            loadUsers();
+            loadPermissions(); // Перерендерим вкладку прав
+        }
+                
         async function loadPermissions() {
             const response = await fetch('/api/admin/users');
             const users = await response.json();
@@ -442,6 +474,31 @@
             document.getElementById(`${tabName}-tab`).classList.add('active');
             event.target.classList.add('active');
         }
+        async function quickDbAction(action) {
+            let sql = "";
+            if (action === 'clear_messages') {
+                if (!confirm("Вы уверены, что хотите БЕЗВОЗВРАТНО удалить все сообщения во всех чатах?")) return;
+                sql = "TRUNCATE TABLE messages RESTART IDENTITY;";
+            } else if (action === 'clear_chats') {
+                if (!confirm("Вы уверены, что хотите удалить все приватные и групповые чаты? Общий чат будет сохранен.")) return;
+                sql = "DELETE FROM room_participants WHERE id_room != 1; DELETE FROM rooms WHERE id_room != 1; DELETE FROM messages WHERE id_room != 1;";
+            }
+            
+            if (!sql) return;
+            
+            const response = await fetch('/api/admin/sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql, admin_user: currentAdmin.id_user })
+            });
+            const result = await response.json();
+            if (result.error) {
+                showToast('Ошибка БД: ' + result.error, true);
+            } else {
+                showToast('Таблицы успешно модифицированы!');
+                if(typeof loadTables === 'function') loadTables();
+            }
+        }        
     </script>
 </body>
 </html>
