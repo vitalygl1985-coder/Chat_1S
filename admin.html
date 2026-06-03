@@ -83,12 +83,12 @@
         <div class="sidebar">
             <h2>⚙️ Админ-панель</h2>
             <nav>
-                <a onclick="showTab('theme')" class="active">🎨 Внешний вид</a>
-                <a onclick="showTab('users')">👥 Пользователи</a>
-                <a onclick="showTab('permissions')">🔐 Права доступа</a>
-                <a onclick="showTab('database')">🗄️ База данных</a>
-                <a onclick="showTab('links')">🔗 Ссылки</a>
-                <a onclick="showTab('logs')">📋 Логи</a>
+                <a id="nav-theme" onclick="showTab('theme')" class="active">🎨 Внешний вид</a>
+                <a id="nav-users" onclick="showTab('users')">👥 Пользователи</a>
+                <a id="nav-permissions" onclick="showTab('permissions')">🔐 Права доступа</a>
+                <a id="nav-database" onclick="showTab('database')">🗄️ База данных</a>
+                <a id="nav-links" onclick="showTab('links')">🔗 Ссылки</a>
+                <a id="nav-logs" onclick="showTab('logs')">📋 Логи</a>
             </nav>
         </div>
         
@@ -280,16 +280,15 @@
             if (settings.link2_name) document.getElementById('link2-name').value = settings.link2_name.value;
             if (settings.link2_url) document.getElementById('link2-url').value = settings.link2_url.value;
             
-            // Обновляем превью цветов
-            document.getElementById('primary-color').addEventListener('input', (e) => {
+            document.getElementById('primary-color').oninput = function(e) {
                 document.getElementById('primary-color-value').textContent = e.target.value;
-            });
-            document.getElementById('bg-color').addEventListener('input', (e) => {
+            };
+            document.getElementById('bg-color').oninput = function(e) {
                 document.getElementById('bg-color-value').textContent = e.target.value;
-            });
-            document.getElementById('text-color').addEventListener('input', (e) => {
+            };
+            document.getElementById('text-color').oninput = function(e) {
                 document.getElementById('text-color-value').textContent = e.target.value;
-            });
+            };
         }
         
         async function saveTheme() {
@@ -309,7 +308,6 @@
                 });
             }
             
-            // Загрузка логотипа
             const logoFile = document.getElementById('logo-file').files[0];
             if (logoFile) {
                 const formData = new FormData();
@@ -322,28 +320,26 @@
         }
         
         async function loadUsers() {
-    const response = await fetch('/api/admin/users');
-    const users = await response.json();
-    const tbody = document.querySelector('#users-table tbody');
-    tbody.innerHTML = '';
-    users.forEach(user => {
-        const row = tbody.insertRow();
-        row.insertCell(0).textContent = user.id_user;
-        row.insertCell(1).textContent = user.username;
-        
-        // Клетка роли с кнопкой быстрой смены роли
-        const roleCell = row.insertCell(2);
-        roleCell.innerHTML = `
-            <span>${user.role === 'admin' ? '👑 Админ' : '👤 Юзер'}</span>
-            <button style="padding:2px 5px; font-size:10px; margin-left:10px; background:#6b7280;" 
-                    onclick="toggleUserRole('${user.id_user}', '${user.role}')">🔄 Изменить</button>
-        `;
-        
-        row.insertCell(3).textContent = user.can_manage_themes ? '✅' : '❌';
-    });
-}
+            const response = await fetch('/api/admin/users');
+            const users = await response.json();
+            const tbody = document.querySelector('#users-table tbody');
+            tbody.innerHTML = '';
+            users.forEach(user => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = user.id_user;
+                row.insertCell(1).textContent = user.username;
+                
+                const roleCell = row.insertCell(2);
+                roleCell.innerHTML = `
+                    <span>${user.role === 'admin' ? '👑 Админ' : '👤 Юзер'}</span>
+                    <button style="padding:2px 5px; font-size:10px; margin-left:10px; background:#6b7280;" 
+                            onclick="toggleUserRole('${user.id_user}', '${user.role}')">🔄 Изменить</button>
+                `;
+                
+                row.insertCell(3).textContent = user.can_manage_themes ? '✅' : '❌';
+            });
+        }
 
-        // Новая функция прямого апдейта роли из таблицы
         async function toggleUserRole(userId, currentRole) {
             const newRole = currentRole === 'admin' ? 'user' : 'admin';
             const sql = `UPDATE users SET role = '${newRole}' WHERE id_user = '${userId}'`;
@@ -356,9 +352,9 @@
             
             showToast('Роль пользователя изменена успешно');
             loadUsers();
-            loadPermissions(); // Перерендерим вкладку прав
+            loadPermissions();
         }
-                
+                        
         async function loadPermissions() {
             const response = await fetch('/api/admin/users');
             const users = await response.json();
@@ -373,21 +369,21 @@
                 const cb1 = document.createElement('input');
                 cb1.type = 'checkbox';
                 cb1.checked = admin.can_manage_themes;
-                cb1.onchange = () => updatePermissions(admin.id_user, 'can_manage_themes', cb1.checked);
+                cb1.onclick = function() { updatePermissions(admin.id_user, 'can_manage_themes', cb1.checked); };
                 cell1.appendChild(cb1);
                 
                 const cell2 = row.insertCell(2);
                 const cb2 = document.createElement('input');
                 cb2.type = 'checkbox';
                 cb2.checked = admin.can_manage_users;
-                cb2.onchange = () => updatePermissions(admin.id_user, 'can_manage_users', cb2.checked);
+                cb2.onclick = function() { updatePermissions(admin.id_user, 'can_manage_users', cb2.checked); };
                 cell2.appendChild(cb2);
                 
                 const cell3 = row.insertCell(3);
                 const cb3 = document.createElement('input');
                 cb3.type = 'checkbox';
                 cb3.checked = admin.can_view_logs;
-                cb3.onchange = () => updatePermissions(admin.id_user, 'can_view_logs', cb3.checked);
+                cb3.onclick = function() { updatePermissions(admin.id_user, 'can_view_logs', cb3.checked); };
                 cell3.appendChild(cb3);
             });
         }
@@ -468,12 +464,19 @@
             document.getElementById('logs-content').textContent = data.logs.join('\n');
         }
         
+        // Исправленное безопасное переключение вкладок
         function showTab(tabName) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.sidebar nav a').forEach(link => link.classList.remove('active'));
-            document.getElementById(`${tabName}-tab`).classList.add('active');
-            event.target.classList.add('active');
+            document.querySelectorAll('.tab').forEach(function(tab) { tab.classList.remove('active'); });
+            document.querySelectorAll('.sidebar nav a').forEach(function(link) { link.classList.remove('active'); });
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            var activeLink = document.getElementById('nav-' + tabName);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
         }
+        
         async function quickDbAction(action) {
             let sql = "";
             if (action === 'clear_messages') {

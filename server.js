@@ -42,7 +42,7 @@ const pool = new Pool({
     ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
 });
 
-// Инициализация структуры таблиц при старте (если они отсутствуют)
+// Инициализация структуры таблиц при старте и автоматическая накатка недостающих колонок
 async function initDB() {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS organizations (id_org VARCHAR(50) PRIMARY KEY, name VARCHAR(100));
@@ -56,6 +56,14 @@ async function initDB() {
         CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, id_room INT, id_user_from VARCHAR(50), encrypted_text TEXT, is_user_encrypted BOOLEAN, created_at TIMESTAMP DEFAULT NOW());
         CREATE TABLE IF NOT EXISTS settings (key VARCHAR(50) PRIMARY KEY, value TEXT);
     `);
+
+    // Принудительно добавляем колонки админки, если таблица users была создана в старых версиях билда
+    await pool.query(`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_themes BOOLEAN DEFAULT false;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_users BOOLEAN DEFAULT false;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_logs BOOLEAN DEFAULT false;
+    `);
+
     // Делаем первого пользователя или дефолтного админа 1С полноценным администратором в БД
     await pool.query(`INSERT INTO users (id_user, id_org, username, role, can_manage_themes, can_manage_users, can_view_logs) 
                       VALUES ('Admin', '00001', 'Администратор', 'admin', true, true, true) ON CONFLICT DO NOTHING`);
@@ -103,7 +111,7 @@ fastify.post('/api/admin/upload-logo', async (request, reply) => {
         });
         await pool.query(`INSERT INTO settings (key, value) VALUES ('logo_url', '/uploads/custom_logo.png') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
         return { success: true };
-    } catch (err) { return reply.status(500).send({ error: 'Ошибка保存логотипа' }); }
+    } catch (err) { return reply.status(500).send({ error: 'Ошибка сохранения логотипа' }); }
 });
 
 // Роуты статических страниц
@@ -116,6 +124,7 @@ fastify.get('/admin', async (request, reply) => {
 });
 
 fastify.get('/favicon.ico', async (req, res) => { res.status(204).send(); });
+
 
 // === API ДЛЯ АДМИН-ПАНЕЛИ ===
 
@@ -161,7 +170,7 @@ fastify.get('/api/admin/users', async (request, reply) => {
     } catch (err) { return reply.status(500).send(err); }
 });
 
-// 5. Изменение прав доступа администратора
+// 5. Изменение прав доступа администратора (Безопасный роут)
 fastify.post('/api/admin/user/permissions', async (request, reply) => {
     const { target_user, permissions } = request.body;
     try {

@@ -90,7 +90,6 @@
 // === ПОЛНОЕ ПОДАВЛЕНИЕ ОШИБОК ДЛЯ 1С ===
 window.onerror = function() { return true; };
 
-// Глушим ошибки кликов и фокуса для IE
 document.onclick = function() { return true; };
 document.onfocusin = function() { return true; };
 document.onfocusout = function() { return true; };
@@ -125,12 +124,9 @@ var currentUserRole = "";
 
 var inputMsg = document.getElementById('input-msg');
 
-// Подсветка поля ввода
 if (inputMsg) {
     inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
     inputMsg.onblur = function() { this.className = 'input-msg-div'; };
-} else {
-    console.error("Input message element not found");
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
@@ -142,7 +138,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         userInfoEl.innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
     }
     
-    // Глубокий сброс старого сокета перед созданием нового
     if (socket) {
         try {
             socket.removeAllListeners();
@@ -169,6 +164,15 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         socket.on('users_list', function(users) { renderUsersList(users); });
         socket.on('new_message', function(msg) { if (msg && msg.id_room == currentRoomId) displayMessage(msg); });
         socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
+        
+        // Исправление №1: Авто-переключение на созданный приватный чат
+        socket.on('private_chat_created', function(data) {
+            if (data && data.id_room) {
+                currentRoomId = data.id_room;
+                socket.emit('join_room_pool', { room_id: data.id_room });
+                socket.emit('get_rooms_again');
+            }
+        });
     } catch(err) {
         console.log("Socket init error masked for 1C");
     }
@@ -270,7 +274,6 @@ function uploadFile(file) {
     xhr.send(fd);
 }
 
-// Обработчики
 document.getElementById('btn-create-group').onclick = function() {
     var name = prompt("Название группы:");
     if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [] });
@@ -290,7 +293,6 @@ document.getElementById('btn-file').onclick = function() { document.getElementBy
 document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); e.target.value = ""; };
 inputMsg.onkeydown = function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
 
-// Drag & drop
 var dropZone = document.getElementById('drop-zone');
 document.getElementById('chat-window').ondragover = function(e) { e.preventDefault(); dropZone.style.display = 'flex'; };
 dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
@@ -300,7 +302,6 @@ document.getElementById('chat-window').ondrop = function(e) {
     if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
 };
 
-// Вставка скриншотов
 inputMsg.onpaste = function(e) {
     if (e.clipboardData && e.clipboardData.items) {
         for (var i = 0; i < e.clipboardData.items.length; i++) {
@@ -313,6 +314,8 @@ inputMsg.onpaste = function(e) {
         }
     }
 };
+
+// Исправление №2: Приведение ключей к змеиному_регистру (link1_name, link1_url)
 function loadCustomThemeAndLinks() {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/admin/settings', true);
@@ -321,7 +324,6 @@ function loadCustomThemeAndLinks() {
             try {
                 var settings = JSON.parse(xhr.responseText);
                 
-                // 1. Применяем основной цвет к шапке
                 if (settings.theme_primary_color && settings.theme_primary_color.value) {
                     var headerEl = document.querySelector('.header');
                     if (headerEl) headerEl.style.backgroundColor = settings.theme_primary_color.value;
@@ -329,7 +331,6 @@ function loadCustomThemeAndLinks() {
                     if (btnSend) btnSend.style.backgroundColor = settings.theme_primary_color.value;
                 }
                 
-                // 2. Применяем кастомный CSS, если он есть
                 if (settings.custom_css && settings.custom_css.value) {
                     var style = document.createElement('style');
                     style.type = 'text/css';
@@ -337,15 +338,15 @@ function loadCustomThemeAndLinks() {
                     document.getElementsByTagName('head')[0].appendChild(style);
                 }
 
-                // 3. Выводим ссылки админ-панели
                 var linksContainer = document.getElementById('custom-links-container');
                 var linksZone = document.getElementById('admin-links-zone');
                 if (linksContainer && linksZone) {
                     var html = '';
-                    if (settings.link1_name && settings.link1_url && settings.link1_url.value) {
+                    // Читаем корректные ключи базы данных
+                    if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
                         html += '<a href="'+settings.link1_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link1_name.value+'</a>';
                     }
-                    if (settings.link2_name && settings.link2_url && settings.link2_url.value) {
+                    if (settings.link2_name && settings.link2_name.value && settings.link2_url && settings.link2_url.value) {
                         html += '<a href="'+settings.link2_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link2_name.value+'</a>';
                     }
                     if (html !== '') {
@@ -359,10 +360,8 @@ function loadCustomThemeAndLinks() {
     xhr.send();
 }
 
-// Запускаем применение стилей
 loadCustomThemeAndLinks();
 
-// Авторизация из URL
 window.onload = function() {
     var hash = window.location.hash;
     if (hash && hash.length > 1) {
