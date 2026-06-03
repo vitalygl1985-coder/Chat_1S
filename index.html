@@ -6,7 +6,7 @@
     <title>1C Chat Client</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <style id="dynamic-styles"></style>
+    
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
@@ -14,95 +14,59 @@
         .header h1 { font-size: 16px; font-weight: bold; }
         .user-info { font-size: 13px; font-weight: bold; }
         .main-container { flex: 1; display: flex; overflow: hidden; }
-        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
-        .sidebar-section { flex: 1; padding: 12px 16px; overflow-y: auto; }
-        .sidebar-section.users-zone { border-top: 1px solid #e5e7eb; background-color: #fafafa; }
-        .sidebar h2 { font-size: 13px; font-weight: bold; color: #374151; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; padding: 16px; overflow-y: auto; }
+        .sidebar h2 { font-size: 13px; font-weight: bold; color: #374151; margin-bottom: 12px; }
         .room-item, .user-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 12px; color: #4b5563; border-radius: 4px; }
         .room-item:hover, .user-item:hover { background-color: #f3f4f6; }
         .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
-        .btn-action-small { padding: 2px 6px; font-size: 11px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .chat-window { width: 75%; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
         .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
         .msg-block { background-color: white; padding: 10px; border-radius: 8px; max-width: 70%; margin-bottom: 12px; align-self: flex-start; }
         .msg-author { font-size: 11px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
         .msg-text { font-size: 13px; color: #1f2937; word-break: break-word; }
         .input-panel { padding: 16px; background-color: white; border-top: 1px solid #e5e7eb; }
-        .secret-row { display: flex; align-items: center; margin-bottom: 8px; }
-        .btn-secret { padding: 4px 12px; font-size: 11px; background-color: #e5e7eb; color: #374151; border: none; border-radius: 9999px; cursor: pointer; }
+        .secret-row { margin-bottom: 8px; }
+        .btn-secret { padding: 4px 12px; font-size: 11px; background-color: #e5e7eb; border: none; border-radius: 9999px; cursor: pointer; }
         .btn-secret.active { background-color: #eab308; color: white; }
-        .secret-status { font-size: 11px; color: #16a34a; margin-left: 8px; display: none; }
         .controls-row { display: flex; align-items: center; gap: 8px; }
-        .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
-        .input-msg-textarea { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: Arial, sans-serif; resize: none; min-height: 36px; background: white; }
-        .input-msg-textarea:focus { border-color: #2563eb; outline: none; }
+        .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+        .input-msg { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: Arial, sans-serif; resize: none; min-height: 36px; background: white; }
+        .input-msg:focus { border-color: #2563eb; outline: none; }
         .btn-send { background-color: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; }
-        .modal-content h3 { font-size: 14px; margin-bottom: 12px; }
-        .modal-input { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 12px; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; }
-        .btn-modal { padding: 6px 14px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
-        .btn-modal.confirm { background-color: #2563eb; color: white; }
-        .btn-modal.cancel { background-color: #e5e7eb; color: #374151; }
         img { max-width: 100%; max-height: 180px; border-radius: 4px; cursor: pointer; }
-        .file-box { display: flex; align-items: center; padding: 8px; background: #f3f4f6; border-radius: 6px; gap: 8px; }
-        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.1); border: 4px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; }
+        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.1); border: 4px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; background-color: rgba(37,99,235,0.2); }
         .drop-box { background: white; padding: 16px; border-radius: 8px; font-weight: bold; color: #2563eb; }
-        #group-members-section { display: none; }
     </style>
 </head>
 <body>
 
-<div id="universal-modal" class="custom-modal">
-    <div class="modal-content">
-        <h3 id="modal-title">Ввод данных</h3>
-        <input type="text" id="modal-input-field" class="modal-input" autocomplete="off">
-        <div class="modal-buttons">
-            <button id="btn-modal-cancel" class="btn-modal cancel">Отмена</button>
-            <button id="btn-modal-confirm" class="btn-modal confirm">ОК</button>
-        </div>
-    </div>
-</div>
-
 <div class="header">
     <h1>Corporate 1C Chat</h1>
     <div>
-        <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="margin-right:12px; padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти вручную</button>
+        <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="margin-right:12px; padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
         <span id="user-info" class="user-info">Авторизация...</span>
     </div>
 </div>
 
 <div class="main-container">
     <div class="sidebar">
-        <div class="sidebar-section">
-            <h2>Чаты и группы <button id="btn-create-group" class="btn-action-small">+ Группа</button></h2>
-            <div id="rooms-list">Загрузка...</div>
-        </div>
-        <div class="sidebar-section users-zone">
-            <h2>Сотрудники</h2>
-            <div id="users-list">Загрузка...</div>
-        </div>
-        <div class="sidebar-section users-zone" id="group-members-section">
-            <h2>Участники группы <button id="btn-add-member" class="btn-action-small">+ Добавить</button></h2>
-            <div id="group-members-list"></div>
-        </div>
+        <h2>Чаты</h2>
+        <div id="rooms-list">Загрузка...</div>
     </div>
 
     <div class="chat-window" id="chat-window">
-        <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы</div></div>
+        <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы сюда</div></div>
         <div id="messages-container" class="messages-container">
             <div class="msg-block"><span class="msg-author">Система</span><div class="msg-text">Добро пожаловать!</div></div>
         </div>
         <div class="input-panel">
             <div class="secret-row">
                 <button id="btn-secret" class="btn-secret">🔒 Шифровать</button>
-                <span id="secret-status" class="secret-status">Режим шифрования</span>
             </div>
             <div class="controls-row">
                 <input type="file" id="file-input" style="display:none">
                 <button id="btn-file" class="btn-file">📎</button>
-                <textarea id="input-msg" class="input-msg-textarea" placeholder="Введите сообщение (Ctrl+V для скриншота)..."></textarea>
+                <textarea id="input-msg" class="input-msg" placeholder="Введите сообщение..."></textarea>
                 <button id="btn-send" class="btn-send">Отправить</button>
             </div>
         </div>
@@ -113,81 +77,19 @@
 // Подавление ошибок для 1С
 window.onerror = function() { return true; };
 
-// Полифилл classList для IE
-if (!("classList" in document.documentElement)) {
-    Object.defineProperty(HTMLElement.prototype, 'classList', {
-        get: function() {
-            var self = this;
-            function update(fn) { return function(v) {
-                var c = self.className.split(/\s+/), i = c.indexOf(v);
-                fn(c, i, v);
-                self.className = c.join(" ");
-            };}
-            return {
-                add: update(function(c,i,v){ if(i===-1)c.push(v); }),
-                remove: update(function(c,i,v){ if(i!==-1)c.splice(i,1); }),
-                contains: function(v){ return self.className.split(/\s+/).indexOf(v) !== -1; }
-            };
-        }
-    });
-}
-
-// Глобальные переменные
 var socket = null;
 var currentRoomId = 1;
 var isSecretMode = false;
 var userSecretKey = "";
 var currentUserId = "";
 var currentUserRole = "";
-var currentRoomType = "";
 
 var inputMsg = document.getElementById('input-msg');
-var modal = document.getElementById('universal-modal');
-var modalTitle = document.getElementById('modal-title');
-var modalInput = document.getElementById('modal-input-field');
-var activeModalType = "";
-var decryptTargetCipher = "";
-var decryptTargetElementId = "";
-
-function openModal(title, placeholder, type) {
-    activeModalType = type;
-    modalTitle.innerText = title;
-    modalInput.value = "";
-    modalInput.placeholder = placeholder || "";
-    modal.style.display = 'flex';
-    setTimeout(function() { modalInput.focus(); }, 10);
-}
-
-document.getElementById('btn-modal-cancel').onclick = function() { modal.style.display = 'none'; };
-document.getElementById('btn-modal-confirm').onclick = function() {
-    var value = modalInput.value.trim();
-    modal.style.display = 'none';
-    if (!value) return;
-    
-    if (activeModalType === "group") {
-        if (socket) socket.emit('create_group_chat', { group_name: value, user_ids: [] });
-    } else if (activeModalType === "encrypt") {
-        userSecretKey = value;
-        isSecretMode = true;
-        document.getElementById('secret-status').style.display = 'inline';
-        document.getElementById('btn-secret').className = 'btn-secret active';
-    } else if (activeModalType === "decrypt") {
-        try {
-            var dec = CryptoJS.AES.decrypt(decryptTargetCipher, value).toString(CryptoJS.enc.Utf8);
-            if (dec) {
-                var el = document.getElementById(decryptTargetElementId + '_text');
-                if (el) { el.innerHTML = dec; el.style.cssText = "color:#1f2937;font-weight:bold;"; }
-            } else { alert("Неверный код!"); }
-        } catch(e) { alert("Ошибка расшифровки!"); }
-    } else if (activeModalType === "add_member") {
-        if (socket) socket.emit('add_user_to_group', { room_id: currentRoomId, user_id: value });
-    }
-};
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
     currentUserRole = user_role || 'user';
-    document.getElementById('user-info').innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
+    document.getElementById('user-info').innerHTML = username + (currentUserRole === 'admin' ? ' (Админ)' : '');
     
     if (socket) socket.disconnect();
     
@@ -198,18 +100,14 @@ function apply1CAuth(id_user, id_org, username, user_role) {
 
     socket.on('connect', function() {
         socket.emit('join_room_pool', { room_id: currentRoomId });
-        socket.emit('get_users_list');
         socket.emit('get_rooms_again');
     });
 
     socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
     socket.on('users_list', function(users) { renderUsersList(users); });
-    socket.on('room_members', function(members) { renderGroupMembers(members); });
-    socket.on('new_message', function(msg) { if (msg.id_room === currentRoomId) displayMessage(msg); });
+    socket.on('new_message', function(msg) { if (msg.id_room == currentRoomId) displayMessage(msg); });
     socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
-    socket.on('user_added', function() { if (socket) socket.emit('get_room_members', { room_id: currentRoomId }); });
-    socket.on('private_chat_created', function(data) { if (socket) socket.emit('get_rooms_again'); });
-    socket.on('group_created', function() { if (socket) socket.emit('get_rooms_again'); });
+    socket.on('private_chat_created', function() { if (socket) socket.emit('get_rooms_again'); });
 }
 
 function renderRoomsList(rooms) {
@@ -219,55 +117,34 @@ function renderRoomsList(rooms) {
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         var div = document.createElement('div');
-        div.className = 'room-item' + (room.id_room === currentRoomId ? ' active' : '');
+        div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
         div.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
-        (function(rid, rtype) {
+        (function(rid) {
             div.onclick = function() {
                 currentRoomId = rid;
-                currentRoomType = rtype;
                 document.getElementById('messages-container').innerHTML = "";
-                document.getElementById('group-members-section').style.display = (rtype === 'group') ? 'block' : 'none';
                 if (socket) socket.emit('join_room_pool', { room_id: rid });
-                if (socket && rtype === 'group') socket.emit('get_room_members', { room_id: rid });
+                if (socket) socket.emit('get_rooms_again');
             };
-        })(room.id_room, room.type);
+        })(room.id_room);
         container.appendChild(div);
     }
 }
 
 function renderUsersList(users) {
     var container = document.getElementById('users-list');
+    if (!container) return;
     container.innerHTML = "";
-    if (!users || users.length === 0) { container.innerHTML = "<div>Нет пользователей</div>"; return; }
+    if (!users || users.length === 0) return;
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
-        if (u.id_user === currentUserId) continue;
+        if (u.id_user == currentUserId) continue;
         var div = document.createElement('div');
         div.className = 'user-item';
         div.innerText = "👤 " + u.username;
         (function(uid, uname) {
             div.onclick = function() { if (socket) socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); };
         })(u.id_user, u.username);
-        container.appendChild(div);
-    }
-}
-
-function renderGroupMembers(members) {
-    var container = document.getElementById('group-members-list');
-    container.innerHTML = "";
-    if (!members || members.length === 0) { container.innerHTML = "<div>Нет участников</div>"; return; }
-    for (var i = 0; i < members.length; i++) {
-        var m = members[i];
-        var div = document.createElement('div');
-        div.className = 'user-item';
-        div.innerHTML = m.username + (m.role === 'admin' ? ' 👑' : '');
-        if (currentUserRole === 'admin' && m.id_user !== currentUserId) {
-            var btn = document.createElement('button');
-            btn.innerText = '✖';
-            btn.style.cssText = 'float:right;background:#ef4444;color:white;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;';
-            btn.onclick = (function(uid) { return function() { if (socket) socket.emit('remove_user_from_group', { room_id: currentRoomId, user_id: uid }); }; })(m.id_user);
-            div.appendChild(btn);
-        }
         container.appendChild(div);
     }
 }
@@ -279,8 +156,8 @@ function displayMessage(msg) {
     var text = msg.text;
     if ((msg.is_secret || text.indexOf("SECRET:") === 0) && text.indexOf("SECRET:") !== -1) {
         var cipher = text.replace("SECRET:", "");
-        var id = 'cipher_' + Math.random().toString(36).substr(2, 9);
-        text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+id+'_text" style="font-size:11px;color:#9ca3af;">[Текст скрыт]</div><button onclick="decryptMsg(\''+cipher+'\',\''+id+'\')" style="padding:2px 6px;font-size:11px;background:#fef08a;cursor:pointer;">Ввести код</button>';
+        var id = 'c_' + Math.random().toString(36).substr(2, 6);
+        text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+id+'">[Скрыто]</div><button onclick="decryptMsg(\''+cipher+'\',\''+id+'\')">Ввести код</button>';
     }
     div.innerHTML = '<span class="msg-author">'+msg.username+'</span><div class="msg-text">'+text+'</div>';
     container.appendChild(div);
@@ -288,9 +165,15 @@ function displayMessage(msg) {
 }
 
 window.decryptMsg = function(cipher, id) {
-    decryptTargetCipher = cipher;
-    decryptTargetElementId = id;
-    openModal("Расшифровка", "Введите код", "decrypt");
+    var code = prompt("Введите секретный код:");
+    if (!code) return;
+    try {
+        var dec = CryptoJS.AES.decrypt(cipher, code).toString(CryptoJS.enc.Utf8);
+        if (dec) {
+            document.getElementById(id).innerHTML = dec;
+            document.getElementById(id).style.cssText = "color:#1f2937;font-weight:bold;";
+        } else { alert("Неверный код!"); }
+    } catch(e) { alert("Ошибка расшифровки!"); }
 };
 
 function sendMessage() {
@@ -302,12 +185,11 @@ function sendMessage() {
     if (isSecretMode) {
         isSecretMode = false;
         userSecretKey = "";
-        document.getElementById('secret-status').style.display = 'none';
         document.getElementById('btn-secret').className = 'btn-secret';
     }
 }
 
-function uploadAndSendFile(file, name) {
+function uploadFile(file) {
     var fd = new FormData();
     fd.append('file', file);
     var xhr = new XMLHttpRequest();
@@ -316,8 +198,8 @@ function uploadAndSendFile(file, name) {
         if (xhr.status === 200) {
             var data = JSON.parse(xhr.responseText);
             if (data.url) {
-                var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
-                var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<div class="file-box"><span>📄</span><span>'+name+'</span><a href="'+data.url+'" target="_blank">Скачать</a></div>';
+                var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+                var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<div><a href="'+data.url+'" target="_blank">📄 '+file.name+'</a></div>';
                 if (socket) socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
         } else { alert('Ошибка загрузки'); }
@@ -325,29 +207,24 @@ function uploadAndSendFile(file, name) {
     xhr.send(fd);
 }
 
-document.getElementById('btn-create-group').onclick = function() { openModal("Создание группы", "Название группы", "group"); };
-document.getElementById('btn-add-member').onclick = function() { openModal("Добавить участника", "ID пользователя", "add_member"); };
+// Обработчики
 document.getElementById('btn-secret').onclick = function() {
-    if (!isSecretMode) openModal("Ключ шифрования", "Введите секретный ключ", "encrypt");
-    else { isSecretMode = false; userSecretKey = ""; document.getElementById('secret-status').style.display = 'none'; document.getElementById('btn-secret').className = 'btn-secret'; }
-};
-document.getElementById('btn-send').onclick = sendMessage;
-document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadAndSendFile(e.target.files[0], e.target.files[0].name); e.target.value = ""; };
-inputMsg.onkeydown = function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
-inputMsg.onpaste = function(e) {
-    if (e.clipboardData && e.clipboardData.items) {
-        for (var i = 0; i < e.clipboardData.items.length; i++) {
-            var item = e.clipboardData.items[i];
-            if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
-                uploadAndSendFile(item.getAsFile(), 'screenshot_' + Date.now() + '.png');
-                e.preventDefault();
-                return;
-            }
-        }
+    if (!isSecretMode) {
+        var key = prompt("Введите секретный ключ:");
+        if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
+    } else {
+        isSecretMode = false;
+        userSecretKey = "";
+        this.className = 'btn-secret';
     }
 };
 
+document.getElementById('btn-send').onclick = sendMessage;
+document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
+document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); e.target.value = ""; };
+inputMsg.onkeydown = function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+
+// Drag & drop
 var chatWindow = document.getElementById('chat-window');
 var dropZone = document.getElementById('drop-zone');
 window.ondragenter = window.ondragover = function(e) { e.preventDefault(); };
@@ -357,22 +234,24 @@ dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
 chatWindow.ondrop = function(e) {
     e.preventDefault();
     dropZone.style.display = 'none';
-    if (e.dataTransfer.files.length > 0) {
-        for (var i = 0; i < e.dataTransfer.files.length; i++) uploadAndSendFile(e.dataTransfer.files[i], e.dataTransfer.files[i].name);
+    if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+};
+
+// Вставка скриншотов
+inputMsg.onpaste = function(e) {
+    if (e.clipboardData && e.clipboardData.items) {
+        for (var i = 0; i < e.clipboardData.items.length; i++) {
+            var item = e.clipboardData.items[i];
+            if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
+                uploadFile(item.getAsFile());
+                e.preventDefault();
+                return;
+            }
+        }
     }
 };
 
-async function loadTheme() {
-    try {
-        var res = await fetch('/api/admin/theme');
-        var theme = await res.json();
-        var styles = ':root{--primary-color:'+(theme.theme_primary_color||'#2563eb')+';--bg-color:'+(theme.theme_background_color||'#f3f4f6')+';--text-color:'+(theme.theme_text_color||'#1f2937')+';}'+
-            'body{background:var(--bg-color);color:var(--text-color);}.header,.btn-send,.btn-secret.active{background:var(--primary-color);}'+(theme.custom_css||'');
-        document.getElementById('dynamic-styles').textContent = styles;
-    } catch(e) {}
-}
-loadTheme();
-
+// Авторизация из URL
 window.onload = function() {
     var hash = window.location.hash;
     if (hash && hash.length > 1) {
@@ -380,8 +259,11 @@ window.onload = function() {
         var p = clean.split("---");
         if (p.length >= 3) apply1CAuth(p[0], p[1], p[2], p.length >= 4 ? p[3] : 'user');
     } else {
-        var url = new URLSearchParams(window.location.search);
-        var u = url.get('id_user'), o = url.get('id_org'), n = url.get('username'), r = url.get('user_role') || 'user';
+        var urlParams = new URLSearchParams(window.location.search);
+        var u = urlParams.get('id_user');
+        var o = urlParams.get('id_org');
+        var n = urlParams.get('username');
+        var r = urlParams.get('user_role') || 'user';
         if (u && o && n) apply1CAuth(u, o, n, r);
     }
 };
