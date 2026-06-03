@@ -1,15 +1,12 @@
 {
   "name": "chat_1s",
   "version": "1.0.0",
+  "description": "Corporate 1C Chat Messenger",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "ts-node server.ts"
   },
-  "engines": {
-    "node": "18.x"
-  }
-},
   "dependencies": {
     "@fastify/cors": "^8.5.0",
     "@fastify/multipart": "^8.3.0",
@@ -25,5 +22,8 @@
   "devDependencies": {
     "@types/node": "^20.14.10",
     "@types/pg": "^8.11.6"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
