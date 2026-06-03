@@ -60,6 +60,10 @@
         <div class="sidebar-section users-zone">
             <h3>Сотрудники</h3>
             <div id="users-list">Загрузка...</div>
+        </div>     
+        <div class="sidebar-section" id="admin-links-zone" style="flex:0; min-height:60px; border-top:1px solid #e5e7eb; display:none; padding:12px;">
+            <h3>Полезные ссылки</h3>
+            <div id="custom-links-container" style="font-size:12px; display:flex; flex-direction:column; gap:4px;"></div>
         </div>
     </div>
 
@@ -122,32 +126,52 @@ var currentUserRole = "";
 var inputMsg = document.getElementById('input-msg');
 
 // Подсветка поля ввода
-inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
-inputMsg.onblur = function() { this.className = 'input-msg-div'; };
+if (inputMsg) {
+    inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
+    inputMsg.onblur = function() { this.className = 'input-msg-div'; };
+} else {
+    console.error("Input message element not found");
+}
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
     currentUserRole = user_role || 'user';
-    document.getElementById('user-info').innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
     
-    if (socket) socket.disconnect();
+    var userInfoEl = document.getElementById('user-info');
+    if (userInfoEl) {
+        userInfoEl.innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
+    }
     
-    socket = io('/', {
-        transports: ['polling', 'websocket'],
-        query: { id_user: id_user, id_org: id_org, username: username, user_role: currentUserRole }
-    });
+    // Глубокий сброс старого сокета перед созданием нового
+    if (socket) {
+        try {
+            socket.removeAllListeners();
+            socket.disconnect();
+        } catch(e) {}
+        socket = null;
+    }
+    
+    try {
+        socket = io('/', {
+            transports: ['polling', 'websocket'],
+            query: { id_user: id_user, id_org: id_org, username: username, user_role: currentUserRole }
+        });
 
-    socket.on('connect', function() {
-        console.log('Socket connected');
-        socket.emit('join_room_pool', { room_id: currentRoomId });
-        socket.emit('get_users_list');
-        socket.emit('get_rooms_again');
-    });
+        socket.on('connect', function() {
+            if (socket) {
+                socket.emit('join_room_pool', { room_id: currentRoomId });
+                socket.emit('get_users_list');
+                socket.emit('get_rooms_again');
+            }
+        });
 
-    socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
-    socket.on('users_list', function(users) { renderUsersList(users); });
-    socket.on('new_message', function(msg) { if (msg.id_room == currentRoomId) displayMessage(msg); });
-    socket.on('refresh_rooms_trigger', function() { socket.emit('get_rooms_again'); });
+        socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
+        socket.on('users_list', function(users) { renderUsersList(users); });
+        socket.on('new_message', function(msg) { if (msg && msg.id_room == currentRoomId) displayMessage(msg); });
+        socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
+    } catch(err) {
+        console.log("Socket init error masked for 1C");
+    }
 }
 
 function renderRoomsList(rooms) {
@@ -289,6 +313,54 @@ inputMsg.onpaste = function(e) {
         }
     }
 };
+function loadCustomThemeAndLinks() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/admin/settings', true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            try {
+                var settings = JSON.parse(xhr.responseText);
+                
+                // 1. Применяем основной цвет к шапке
+                if (settings.theme_primary_color && settings.theme_primary_color.value) {
+                    var headerEl = document.querySelector('.header');
+                    if (headerEl) headerEl.style.backgroundColor = settings.theme_primary_color.value;
+                    var btnSend = document.getElementById('btn-send');
+                    if (btnSend) btnSend.style.backgroundColor = settings.theme_primary_color.value;
+                }
+                
+                // 2. Применяем кастомный CSS, если он есть
+                if (settings.custom_css && settings.custom_css.value) {
+                    var style = document.createElement('style');
+                    style.type = 'text/css';
+                    style.innerHTML = settings.custom_css.value;
+                    document.getElementsByTagName('head')[0].appendChild(style);
+                }
+
+                // 3. Выводим ссылки админ-панели
+                var linksContainer = document.getElementById('custom-links-container');
+                var linksZone = document.getElementById('admin-links-zone');
+                if (linksContainer && linksZone) {
+                    var html = '';
+                    if (settings.link1_name && settings.link1_url && settings.link1_url.value) {
+                        html += '<a href="'+settings.link1_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link1_name.value+'</a>';
+                    }
+                    if (settings.link2_name && settings.link2_url && settings.link2_url.value) {
+                        html += '<a href="'+settings.link2_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link2_name.value+'</a>';
+                    }
+                    if (html !== '') {
+                        linksContainer.innerHTML = html;
+                        linksZone.style.display = 'block';
+                    }
+                }
+            } catch(e) {}
+        }
+    };
+    xhr.send();
+}
+
+// Запускаем применение стилей
+loadCustomThemeAndLinks();
 
 // Авторизация из URL
 window.onload = function() {
