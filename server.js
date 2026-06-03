@@ -120,15 +120,22 @@ fastify.get('/favicon.ico', async (req, res) => { res.status(204).send(); });
 // === API ДЛЯ АДМИН-ПАНЕЛИ ===
 
 // 1. Авторизация в админке
-fastify.post('/api/admin/auth', async (request, reply) => {
-    const { id_user, id_org } = request.body;
+// Safe Permissions Update
+fastify.post('/api/admin/user/permissions', async (request, reply) => {
+    const { target_user, permissions } = request.body;
     try {
-        const res = await pool.query('SELECT * FROM users WHERE id_user = $1 AND id_org = $2 AND role = \'admin\'', [id_user, id_org]);
-        if (res.rows.length > 0) {
-            return { success: true, admin: res.rows[0] };
+        // Явно проверяем и обновляем только разрешенные колонки
+        if ('can_manage_themes' in permissions) {
+            await pool.query('UPDATE users SET can_manage_themes = $1 WHERE id_user = $2', [permissions.can_manage_themes, target_user]);
         }
-        return { success: false, error: 'Недостаточно прав' };
-    } catch (err) { return { success: false, error: err.message }; }
+        if ('can_manage_users' in permissions) {
+            await pool.query('UPDATE users SET can_manage_users = $1 WHERE id_user = $2', [permissions.can_manage_users, target_user]);
+        }
+        if ('can_view_logs' in permissions) {
+            await pool.query('UPDATE users SET can_view_logs = $1 WHERE id_user = $2', [permissions.can_view_logs, target_user]);
+        }
+        return { success: true };
+    } catch (err) { return reply.status(500).send({ error: err.message }); }
 });
 
 // 2. Получение текущих настроек внешнего вида и ссылок
@@ -228,8 +235,14 @@ const start = async () => {
             try {
                 await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', [id_org, 'Организация из 1С']);
                 // Динамически сохраняем/обновляем роль пользователя, прилетевшую из 1С
-                await pool.query(`INSERT INTO users (id_user, id_org, username, role) VALUES ($1, $2, $3, $4) 
-                                  ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = COALESCE(NULLIF(EXCLUDED.role, 'user'), users.role)`, [id_user, id_org, username, role]);
+                await pool.query(`
+                    INSERT INTO users (id_user, id_org, username, role) 
+                    VALUES ($1, $2, $3, $4) 
+                    ON CONFLICT (id_user) 
+                    DO UPDATE SET 
+                        username = EXCLUDED.username, 
+                        role = CASE WHEN EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END
+                `, [id_user, id_org, username, role]);
                 
                 // Создаем глобальный общий чат по умолчанию, если его нет
                 const checkGeneral = await pool.query(`SELECT id_room FROM rooms WHERE id_org = $1 AND type = 'general'`, [id_org]);
