@@ -124,10 +124,13 @@ var currentUserRole = "";
 
 var inputMsg = document.getElementById('input-msg');
 
-if (inputMsg) {
-    inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
-    inputMsg.onblur = function() { this.className = 'input-msg-div'; };
-}
+// Безопасная инициализация фокуса для Trident
+try {
+    if (inputMsg) {
+        inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
+        inputMsg.onblur = function() { this.className = 'input-msg-div'; };
+    }
+} catch(e) { window.onerror(); }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
@@ -244,15 +247,26 @@ window.decryptMsg = function(cipher, id) {
 };
 
 function sendMessage() {
-    var text = inputMsg.innerText.trim();
+    // Совместимое чтение текста для всех версий IE/Trident
+    var text = "";
+    if (inputMsg) {
+        text = (inputMsg.textContent || inputMsg.innerText || "").trim();
+    }
+    
     if (!text) return;
     if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
-    socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
-    inputMsg.innerHTML = "";
+    
+    if (socket) {
+        socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
+    }
+    
+    if (inputMsg) inputMsg.innerHTML = "";
+    
     if (isSecretMode) {
         isSecretMode = false;
         userSecretKey = "";
-        document.getElementById('btn-secret').className = 'btn-secret';
+        var btnSec = document.getElementById('btn-secret');
+        if (btnSec) btnSec.className = 'btn-secret';
     }
 }
 
