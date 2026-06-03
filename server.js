@@ -206,8 +206,16 @@ fastify.get('/api/admin/logs', async (request, reply) => {
 
 const start = async () => {
     try {
-        await initDB();
-        console.log("Успешное подключение и проверка структуры таблиц PostgreSQL.");
+        // Обертываем подключение к БД в try/catch, чтобы сервер не падал при старте
+        try {
+            console.log("Пробуем подключиться к PostgreSQL...");
+            await initDB();
+            console.log("Успешное подключение и проверка структуры таблиц PostgreSQL.");
+        } catch (dbErr) {
+            console.log("!!! ОШИБКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ !!!");
+            console.log(dbErr.message);
+            console.log("Сервер продолжит работу, но запросы к БД будут вызывать ошибки. Проверьте переменные окружения.");
+        }
 
         const io = new Server(fastify.server, { cors: { origin: "*" }, maxHttpBufferSize: 1e8 });
 
@@ -234,7 +242,8 @@ const start = async () => {
             
             try {
                 await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', [id_org, 'Организация из 1С']);
-                // Динамически сохраняем/обновляем роль пользователя, прилетевшую из 1С
+                
+                // Безопасный UPSERT
                 await pool.query(`
                     INSERT INTO users (id_user, id_org, username, role) 
                     VALUES ($1, $2, $3, $4) 
@@ -244,16 +253,14 @@ const start = async () => {
                         role = CASE WHEN EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END
                 `, [id_user, id_org, username, role]);
                 
-                // Создаем глобальный общий чат по умолчанию, если его нет
                 const checkGeneral = await pool.query(`SELECT id_room FROM rooms WHERE id_org = $1 AND type = 'general'`, [id_org]);
                 if (checkGeneral.rows.length === 0) {
                     await pool.query(`INSERT INTO rooms (id_org, type, name) VALUES ($1, 'general', 'Общий чат')`, [id_org]);
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Ошибка при connection сокета:", err.message); }
 
             socket.join(`org_${id_org}`);
 
-            // Исправленная отправка списка всех доступных комнат с авто-подпиской сокета (join)
             const sendRoomsList = async () => {
                 try {
                     const roomsResult = await pool.query(`
@@ -263,13 +270,12 @@ const start = async () => {
                         JOIN room_participants rp ON r.id_room = rp.id_room WHERE r.id_org = $1 AND rp.id_user = $2
                     `, [id_org, id_user]);
                     
-                    // Решаем проблему потери сообщений: автоматически заставляем сокет слушать каждую его комнату
                     roomsResult.rows.forEach(room => {
                         socket.join(`room_${room.id_room}`);
                     });
 
                     socket.emit('rooms_list', roomsResult.rows);
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error("Ошибка при получении списка комнат:", err.message); }
             };
             await sendRoomsList();
 
@@ -277,7 +283,7 @@ const start = async () => {
                 try {
                     const usersResult = await pool.query('SELECT id_user, username FROM users WHERE id_org = $1 AND id_user != $2', [id_org, id_user]);
                     socket.emit('users_list', usersResult.rows);
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error(err.message); }
             });
 
             socket.on('create_private_chat', async (data) => {
@@ -296,7 +302,7 @@ const start = async () => {
                     await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2), ($1, $3)', [newRoomId, id_user, data.target_user_id]);
                     
                     io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error(err.message); }
             });
 
             socket.on('create_group_chat', async (data) => {
@@ -311,7 +317,7 @@ const start = async () => {
                         }
                     }
                     io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error(err.message); }
             });
 
             socket.on('join_room_pool', (data) => { socket.join(`room_${data.room_id}`); });
@@ -321,13 +327,16 @@ const start = async () => {
                 try {
                     await pool.query(`INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted) VALUES ($1, $2, $3, $4)`, [data.room_id, id_user, encryptForDB(data.text), data.is_secret]);
                     io.to(`room_${data.room_id}`).emit('new_message', { id_room: data.room_id, id_user_from: id_user, username: username, text: data.text, is_secret: data.is_secret, created_at: new Date() });
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error(err.message); }
             });
         });
 
         const listenAddress = await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
         console.log(`=== МЕССЕНДЖЕР И АДМИНКА УСПЕШНО ЗАПУЩЕНЫ НА: ${listenAddress} ===`);
-    } catch (err) { console.error(err); process.exit(1); }
+    } catch (err) { 
+        console.error("Критическая ошибка запуска Fastify:", err); 
+        process.exit(1); 
+    }
 };
 
 start();
