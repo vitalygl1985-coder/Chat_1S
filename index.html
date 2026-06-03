@@ -3,10 +3,11 @@
 <head>
     <style id="dynamic-styles"></style>
     <script>
-    async function loadTheme() {
+    async function loadThemeAndLinks() {
         try {
-            const response = await fetch('/api/admin/theme');
-            const theme = await response.json();
+            // Загрузка темы
+            const themeResp = await fetch('/api/admin/theme');
+            const theme = await themeResp.json();
             const styles = `
                 :root {
                     --primary-color: ${theme.theme_primary_color || '#2563eb'};
@@ -15,13 +16,28 @@
                 }
                 body { background: var(--bg-color); color: var(--text-color); }
                 .header, .btn-send, .btn-secret.active { background: var(--primary-color); }
-                .btn-send:hover { filter: brightness(0.9); }
                 ${theme.custom_css || ''}
             `;
             document.getElementById('dynamic-styles').textContent = styles;
-        } catch(e) { console.log('Theme load error:', e); }
+            
+            // Загрузка ссылок
+            const linksResp = await fetch('/api/admin/links');
+            const links = await linksResp.json();
+            
+            // Добавляем ссылки в футер или хедер
+            const footer = document.createElement('div');
+            footer.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 10px; text-align: center; border-top: 1px solid #e5e7eb;';
+            footer.innerHTML = `
+                ${links.link1_name ? `<a href="${links.link1_url}" target="_blank" style="margin: 0 15px; color: var(--primary-color); text-decoration: none;">${links.link1_name}</a>` : ''}
+                ${links.link2_name ? `<a href="${links.link2_url}" target="_blank" style="margin: 0 15px; color: var(--primary-color); text-decoration: none;">${links.link2_name}</a>` : ''}
+            `;
+            if (links.link1_name || links.link2_name) {
+                document.body.appendChild(footer);
+                document.querySelector('.input-panel').style.marginBottom = '50px';
+            }
+        } catch(e) { console.log('Error loading theme:', e); }
     }
-    loadTheme();
+    loadThemeAndLinks();
     </script>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta charset="UTF-8">

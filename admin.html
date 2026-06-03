@@ -6,181 +6,282 @@
     <title>Admin Panel - 1C Chat</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f3f4f6; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f3f4f6; }
         
-        .admin-container { display: flex; min-height: 100vh; }
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
         
-        /* Sidebar */
-        .sidebar { width: 250px; background: #1f2937; color: white; padding: 20px; }
-        .sidebar h2 { font-size: 18px; margin-bottom: 20px; color: #60a5fa; }
-        .sidebar nav a { display: block; padding: 10px; margin-bottom: 5px; color: #9ca3af; text-decoration: none; border-radius: 6px; cursor: pointer; }
+        .login-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .login-box h2 { margin-bottom: 20px; color: #1f2937; }
+        .login-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #d1d5db; border-radius: 6px; }
+        .login-box button { width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        .error { color: #ef4444; margin-top: 10px; display: none; }
+        
+        .admin-container { display: none; min-height: 100vh; }
+        .sidebar { width: 260px; background: #1f2937; color: white; padding: 20px; }
+        .sidebar h2 { font-size: 20px; margin-bottom: 30px; color: #60a5fa; }
+        .sidebar nav a { display: block; padding: 12px; margin-bottom: 8px; color: #9ca3af; text-decoration: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
         .sidebar nav a:hover, .sidebar nav a.active { background: #374151; color: white; }
         
-        /* Main content */
-        .main-content { flex: 1; padding: 20px; }
+        .main-content { flex: 1; padding: 20px; overflow-y: auto; }
         .tab { display: none; }
         .tab.active { display: block; }
         
-        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .card h3 { margin-bottom: 15px; color: #374151; }
+        .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h3 { margin-bottom: 20px; color: #374151; font-size: 18px; }
         
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #4b5563; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #4b5563; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
         .form-group textarea { min-height: 100px; font-family: monospace; }
         
-        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #1d4ed8; }
-        
-        .color-preview { width: 50px; height: 50px; border-radius: 4px; margin-top: 5px; border: 1px solid #d1d5db; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.3s; }
+        button:hover { background: #1d4ed8; transform: translateY(-1px); }
         
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-        th { background: #f9fafb; font-weight: bold; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f9fafb; font-weight: 600; color: #374151; }
         
-        .success { background: #10b981; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
-        .error { background: #ef4444; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
+        .sql-result { margin-top: 20px; overflow-x: auto; background: #1f2937; color: #10b981; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; }
         
-        .preview-box { margin-top: 20px; padding: 20px; border-radius: 8px; }
+        .color-row { display: flex; gap: 10px; align-items: center; }
+        .color-row input[type="color"] { width: 60px; height: 40px; cursor: pointer; }
+        .color-row span { flex: 1; }
+        
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; display: none; z-index: 1000; }
     </style>
 </head>
 <body>
-    <div class="admin-container">
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-box">
+            <h2>🔐 Вход в админ-панель</h2>
+            <input type="text" id="login-user-id" placeholder="ID пользователя">
+            <input type="text" id="login-org-id" placeholder="ID организации">
+            <div id="login-error" class="error">❌ Недостаточно прав для входа</div>
+            <button onclick="login()">Войти</button>
+        </div>
+    </div>
+    
+    <div id="admin-container" class="admin-container">
         <div class="sidebar">
-            <h2>⚙️ Admin Panel</h2>
+            <h2>⚙️ Админ-панель</h2>
             <nav>
                 <a onclick="showTab('theme')" class="active">🎨 Внешний вид</a>
                 <a onclick="showTab('users')">👥 Пользователи</a>
                 <a onclick="showTab('permissions')">🔐 Права доступа</a>
                 <a onclick="showTab('database')">🗄️ База данных</a>
+                <a onclick="showTab('links')">🔗 Ссылки</a>
                 <a onclick="showTab('logs')">📋 Логи</a>
             </nav>
         </div>
         
         <div class="main-content">
-            <!-- Tab: Theme -->
             <div id="theme-tab" class="tab active">
                 <div class="card">
-                    <h3>Настройка цветовой схемы</h3>
+                    <h3>🎨 Настройка цветовой схемы</h3>
                     <div class="form-group">
-                        <label>Основной цвет (кнопки, шапка):</label>
-                        <input type="color" id="primary-color" value="#2563eb">
-                        <div class="color-preview" id="primary-preview" style="background: #2563eb"></div>
+                        <label>Основной цвет (шапка, кнопки):</label>
+                        <div class="color-row">
+                            <input type="color" id="primary-color">
+                            <span id="primary-color-value"></span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Цвет фона страницы:</label>
-                        <input type="color" id="bg-color" value="#f3f4f6">
+                        <div class="color-row">
+                            <input type="color" id="bg-color">
+                            <span id="bg-color-value"></span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Цвет текста:</label>
-                        <input type="color" id="text-color" value="#1f2937">
-                    </div>
-                    <div class="form-group">
-                        <label>Цвет фона чата:</label>
-                        <input type="color" id="chat-bg" value="#ffffff">
+                        <div class="color-row">
+                            <input type="color" id="text-color">
+                            <span id="text-color-value"></span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Название компании:</label>
-                        <input type="text" id="company-name" placeholder="Corporate 1C Chat">
+                        <input type="text" id="company-name" placeholder="Название">
                     </div>
                     <div class="form-group">
-                        <label>Логотип URL:</label>
-                        <input type="url" id="logo-url" placeholder="https://example.com/logo.png">
+                        <label>Логотип:</label>
+                        <input type="file" id="logo-file" accept="image/*">
+                        <div id="logo-preview" style="margin-top: 10px;"></div>
                     </div>
                     <div class="form-group">
                         <label>Пользовательский CSS:</label>
-                        <textarea id="custom-css" placeholder="/* Ваши стили */"></textarea>
+                        <textarea id="custom-css" placeholder="/* Ваши дополнительные стили */"></textarea>
                     </div>
-                    <button onclick="saveTheme()">💾 Сохранить и применить</button>
-                </div>
-                
-                <div class="card">
-                    <h3>Предпросмотр</h3>
-                    <div id="preview" class="preview-box">
-                        <div style="background: #2563eb; color: white; padding: 10px; border-radius: 4px;">Пример шапки</div>
-                        <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px;">Пример сообщения в чате</div>
-                        <button style="margin-top: 10px;">Пример кнопки</button>
-                    </div>
+                    <button onclick="saveTheme()">💾 Сохранить настройки</button>
                 </div>
             </div>
             
-            <!-- Tab: Users -->
             <div id="users-tab" class="tab">
                 <div class="card">
-                    <h3>Управление пользователями</h3>
+                    <h3>👥 Пользователи системы</h3>
                     <table id="users-table">
                         <thead>
-                            <tr><th>ID</th><th>Имя</th><th>Роль</th><th>Действия</th></tr>
+                            <tr><th>ID</th><th>Имя</th><th>Роль</th><th>Админ-права</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- Tab: Permissions -->
             <div id="permissions-tab" class="tab">
                 <div class="card">
-                    <h3>Права администраторов</h3>
+                    <h3>🔐 Настройка прав администраторов</h3>
                     <table id="permissions-table">
                         <thead>
-                            <tr><th>Администратор</th><th>Управление темами</th><th>Управление пользователями</th><th>Управление ролями</th><th>Просмотр логов</th></tr>
+                            <tr><th>Администратор</th><th>Управление темами</th><th>Управление БД</th><th>Просмотр логов</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- Tab: Database -->
             <div id="database-tab" class="tab">
                 <div class="card">
-                    <h3>Выполнить SQL запрос</h3>
-                    <div class="form-group">
-                        <label>SQL запрос:</label>
-                        <textarea id="sql-query" rows="5" placeholder="SELECT * FROM users LIMIT 10"></textarea>
-                    </div>
-                    <button onclick="executeSQL()">▶️ Выполнить</button>
-                    <div id="sql-result" style="margin-top: 20px; overflow-x: auto;"></div>
+                    <h3>🗄️ Выполнить SQL запрос</h3>
+                    <textarea id="sql-query" rows="5" placeholder="SELECT * FROM users LIMIT 10" style="width:100%; font-family:monospace;"></textarea>
+                    <button onclick="executeSQL()" style="margin-top: 10px;">▶️ Выполнить</button>
+                    <div id="sql-result" class="sql-result"></div>
+                </div>
+                <div class="card">
+                    <h3>📊 Таблицы базы данных</h3>
+                    <div id="tables-list"></div>
                 </div>
             </div>
             
-            <!-- Tab: Logs -->
+            <div id="links-tab" class="tab">
+                <div class="card">
+                    <h3>🔗 Ссылки на главной странице</h3>
+                    <div class="form-group">
+                        <label>Ссылка 1 (название):</label>
+                        <input type="text" id="link1-name" placeholder="Название ссылки">
+                        <label style="margin-top: 10px;">Ссылка 1 (URL):</label>
+                        <input type="url" id="link1-url" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label>Ссылка 2 (название):</label>
+                        <input type="text" id="link2-name" placeholder="Название ссылки">
+                        <label style="margin-top: 10px;">Ссылка 2 (URL):</label>
+                        <input type="url" id="link2-url" placeholder="https://...">
+                    </div>
+                    <button onclick="saveLinks()">💾 Сохранить ссылки</button>
+                </div>
+            </div>
+            
             <div id="logs-tab" class="tab">
                 <div class="card">
-                    <h3>Системные логи</h3>
+                    <h3>📋 Системные логи</h3>
                     <button onclick="loadLogs()">🔄 Обновить</button>
-                    <pre id="logs-content" style="margin-top: 10px; background: #1f2937; color: #10b981; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 500px;"></pre>
+                    <pre id="logs-content" style="margin-top: 15px; background: #1f2937; color: #10b981; padding: 15px; border-radius: 6px; overflow-x: auto; max-height: 500px; font-size: 12px;"></pre>
                 </div>
             </div>
         </div>
     </div>
     
+    <div id="toast" class="toast"></div>
+    
     <script>
-        const API_BASE = '/api/admin';
-        let currentAdminUser = '';
+        let currentAdmin = null;
         
-        // Получаем текущего админа из URL или localStorage
-        function getCurrentAdmin() {
-            const hash = window.location.hash;
-            if (hash && hash.length > 1) {
-                const params = decodeURIComponent(hash.substring(1)).split('---');
-                if (params.length >= 2) {
-                    currentAdminUser = params[0];
-                    return currentAdminUser;
-                }
-            }
-            currentAdminUser = prompt('Введите ваш ID пользователя для администрирования:');
-            return currentAdminUser;
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = isError ? '#ef4444' : '#10b981';
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
         
-        function showTab(tabName) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.sidebar nav a').forEach(link => link.classList.remove('active'));
-            document.getElementById(`${tabName}-tab`).classList.add('active');
-            event.target.classList.add('active');
+        async function login() {
+            const id_user = document.getElementById('login-user-id').value;
+            const id_org = document.getElementById('login-org-id').value;
             
-            if (tabName === 'users') loadUsers();
-            if (tabName === 'permissions') loadPermissions();
-            if (tabName === 'logs') loadLogs();
+            if (!id_user || !id_org) {
+                document.getElementById('login-error').style.display = 'block';
+                return;
+            }
+            
+            const response = await fetch('/api/admin/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_user, id_org })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                currentAdmin = data.admin;
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('admin-container').style.display = 'flex';
+                loadAllData();
+                showToast(`Добро пожаловать, ${currentAdmin.username}!`);
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+        
+        async function loadAllData() {
+            loadSettings();
+            loadUsers();
+            loadPermissions();
+            loadTables();
+            loadLogs();
+        }
+        
+        async function loadSettings() {
+            const response = await fetch('/api/admin/settings');
+            const settings = await response.json();
+            
+            if (settings.theme_primary_color) {
+                document.getElementById('primary-color').value = settings.theme_primary_color.value;
+                document.getElementById('primary-color-value').textContent = settings.theme_primary_color.value;
+            }
+            if (settings.theme_background_color) {
+                document.getElementById('bg-color').value = settings.theme_background_color.value;
+                document.getElementById('bg-color-value').textContent = settings.theme_background_color.value;
+            }
+            if (settings.theme_text_color) {
+                document.getElementById('text-color').value = settings.theme_text_color.value;
+                document.getElementById('text-color-value').textContent = settings.theme_text_color.value;
+            }
+            if (settings.company_name) document.getElementById('company-name').value = settings.company_name.value;
+            if (settings.custom_css) document.getElementById('custom-css').value = settings.custom_css.value;
+            if (settings.link1_name) document.getElementById('link1-name').value = settings.link1_name.value;
+            if (settings.link1_url) document.getElementById('link1-url').value = settings.link1_url.value;
+            if (settings.link2_name) document.getElementById('link2-name').value = settings.link2_name.value;
+            if (settings.link2_url) document.getElementById('link2-url').value = settings.link2_url.value;
+            
+            // Обновляем превью цветов
+            document.getElementById('primary-color').addEventListener('input', (e) => {
+                document.getElementById('primary-color-value').textContent = e.target.value;
+            });
+            document.getElementById('bg-color').addEventListener('input', (e) => {
+                document.getElementById('bg-color-value').textContent = e.target.value;
+            });
+            document.getElementById('text-color').addEventListener('input', (e) => {
+                document.getElementById('text-color-value').textContent = e.target.value;
+            });
         }
         
         async function saveTheme() {
@@ -188,170 +289,159 @@
                 theme_primary_color: document.getElementById('primary-color').value,
                 theme_background_color: document.getElementById('bg-color').value,
                 theme_text_color: document.getElementById('text-color').value,
-                theme_message_bg: document.getElementById('chat-bg').value,
                 company_name: document.getElementById('company-name').value,
-                logo_url: document.getElementById('logo-url').value,
                 custom_css: document.getElementById('custom-css').value
             };
             
             for (const [key, value] of Object.entries(theme)) {
-                await fetch(`${API_BASE}/settings`, {
+                await fetch('/api/admin/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key, value, admin_user: currentAdminUser })
+                    body: JSON.stringify({ key, value, admin_user: currentAdmin.id_user })
                 });
             }
             
-            // Обновляем предпросмотр
-            updatePreview();
-            alert('Настройки сохранены! Страница обновится через 5 секунд.');
-            setTimeout(() => location.reload(), 5000);
-        }
-        
-        function updatePreview() {
-            const primary = document.getElementById('primary-color').value;
-            const bg = document.getElementById('bg-color').value;
-            const text = document.getElementById('text-color').value;
-            const chatBg = document.getElementById('chat-bg').value;
+            // Загрузка логотипа
+            const logoFile = document.getElementById('logo-file').files[0];
+            if (logoFile) {
+                const formData = new FormData();
+                formData.append('file', logoFile);
+                await fetch('/api/admin/upload-logo', { method: 'POST', body: formData });
+            }
             
-            const preview = document.getElementById('preview');
-            preview.style.background = bg;
-            preview.style.color = text;
-            
-            const header = preview.querySelector('div:first-child');
-            if (header) header.style.background = primary;
-            
-            const message = preview.querySelector('div:nth-child(2)');
-            if (message) message.style.background = chatBg;
-            
-            const button = preview.querySelector('button');
-            if (button) button.style.background = primary;
+            showToast('Настройки сохранены! Страница обновится через 3 секунды');
+            setTimeout(() => location.reload(), 3000);
         }
         
         async function loadUsers() {
-            const response = await fetch(`${API_BASE}/users`);
+            const response = await fetch('/api/admin/users');
             const users = await response.json();
             const tbody = document.querySelector('#users-table tbody');
             tbody.innerHTML = '';
             users.forEach(user => {
                 const row = tbody.insertRow();
-                row.insertCell(0).textContent = user.id_user;
+                row.insertCell(0).textContent = user.id_user.substring(0, 20) + '...';
                 row.insertCell(1).textContent = user.username;
-                row.insertCell(2).textContent = user.role;
-                row.insertCell(3).innerHTML = `<button onclick="editUser('${user.id_user}')">✏️ Редактировать</button>`;
+                row.insertCell(2).textContent = user.role === 'admin' ? '👑 Админ' : '👤 Пользователь';
+                row.insertCell(3).textContent = user.can_manage_themes ? '✅' : '❌';
             });
         }
         
         async function loadPermissions() {
-            const response = await fetch(`${API_BASE}/users`);
+            const response = await fetch('/api/admin/users');
             const users = await response.json();
+            const admins = users.filter(u => u.role === 'admin');
             const tbody = document.querySelector('#permissions-table tbody');
             tbody.innerHTML = '';
-            users.forEach(user => {
+            admins.forEach(admin => {
                 const row = tbody.insertRow();
-                row.insertCell(0).textContent = user.username;
-                row.insertCell(1).innerHTML = `<input type="checkbox" ${user.can_manage_themes ? 'checked' : ''} onchange="updatePermission('${user.id_user}', 'can_manage_themes', this.checked)">`;
-                row.insertCell(2).innerHTML = `<input type="checkbox" ${user.can_manage_users ? 'checked' : ''} onchange="updatePermission('${user.id_user}', 'can_manage_users', this.checked)">`;
-                row.insertCell(3).innerHTML = `<input type="checkbox" ${user.can_manage_roles ? 'checked' : ''} onchange="updatePermission('${user.id_user}', 'can_manage_roles', this.checked)">`;
-                row.insertCell(4).innerHTML = `<input type="checkbox" ${user.can_view_logs ? 'checked' : ''} onchange="updatePermission('${user.id_user}', 'can_view_logs', this.checked)">`;
+                row.insertCell(0).textContent = admin.username;
+                
+                const cell1 = row.insertCell(1);
+                const cb1 = document.createElement('input');
+                cb1.type = 'checkbox';
+                cb1.checked = admin.can_manage_themes;
+                cb1.onchange = () => updatePermissions(admin.id_user, 'can_manage_themes', cb1.checked);
+                cell1.appendChild(cb1);
+                
+                const cell2 = row.insertCell(2);
+                const cb2 = document.createElement('input');
+                cb2.type = 'checkbox';
+                cb2.checked = admin.can_manage_users;
+                cb2.onchange = () => updatePermissions(admin.id_user, 'can_manage_users', cb2.checked);
+                cell2.appendChild(cb2);
+                
+                const cell3 = row.insertCell(3);
+                const cb3 = document.createElement('input');
+                cb3.type = 'checkbox';
+                cb3.checked = admin.can_view_logs;
+                cb3.onchange = () => updatePermissions(admin.id_user, 'can_view_logs', cb3.checked);
+                cell3.appendChild(cb3);
             });
         }
         
-        async function updatePermission(userId, permission, value) {
+        async function updatePermissions(userId, permission, value) {
             const permissions = {};
             permissions[permission] = value;
             
-            await fetch(`${API_BASE}/user/permissions`, {
+            await fetch('/api/admin/user/permissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    target_user: userId,
-                    permissions: permissions,
-                    admin_user: currentAdminUser
-                })
+                body: JSON.stringify({ target_user: userId, permissions })
             });
+            
+            showToast('Права обновлены');
         }
         
         async function executeSQL() {
             const sql = document.getElementById('sql-query').value;
-            const response = await fetch(`${API_BASE}/sql`, {
+            if (!sql.trim()) return;
+            
+            const response = await fetch('/api/admin/sql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sql, admin_user: currentAdminUser })
+                body: JSON.stringify({ sql, admin_user: currentAdmin.id_user })
             });
+            
             const result = await response.json();
-            document.getElementById('sql-result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            
+            if (result.error) {
+                document.getElementById('sql-result').innerHTML = `<div style="color: #ef4444;">❌ ${result.error}</div>`;
+            } else {
+                document.getElementById('sql-result').innerHTML = `<pre>${JSON.stringify(result.rows, null, 2)}</pre>`;
+            }
+        }
+        
+        async function loadTables() {
+            const response = await fetch('/api/admin/sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    sql: "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name",
+                    admin_user: currentAdmin.id_user 
+                })
+            });
+            
+            const result = await response.json();
+            if (!result.error && result.rows) {
+                const tablesDiv = document.getElementById('tables-list');
+                tablesDiv.innerHTML = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">';
+                result.rows.forEach(row => {
+                    tablesDiv.innerHTML += `<span style="background: #e5e7eb; padding: 5px 10px; border-radius: 6px;">📊 ${row.table_name}</span>`;
+                });
+                tablesDiv.innerHTML += '</div>';
+            }
+        }
+        
+        async function saveLinks() {
+            const links = {
+                link1_name: document.getElementById('link1-name').value,
+                link1_url: document.getElementById('link1-url').value,
+                link2_name: document.getElementById('link2-name').value,
+                link2_url: document.getElementById('link2-url').value
+            };
+            
+            await fetch('/api/admin/links', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ links, admin_user: currentAdmin.id_user })
+            });
+            
+            showToast('Ссылки сохранены');
         }
         
         async function loadLogs() {
-            const response = await fetch(`${API_BASE}/logs?admin_user=${currentAdminUser}`);
+            const response = await fetch(`/api/admin/logs?admin_user=${currentAdmin.id_user}`);
             const data = await response.json();
             document.getElementById('logs-content').textContent = data.logs.join('\n');
         }
         
-        // Загрузка текущих настроек
-        async function loadSettings() {
-            const response = await fetch(`${API_BASE}/settings`);
-            const settings = await response.json();
-            
-            if (settings.theme_primary_color) document.getElementById('primary-color').value = settings.theme_primary_color.value;
-            if (settings.theme_background_color) document.getElementById('bg-color').value = settings.theme_background_color.value;
-            if (settings.theme_text_color) document.getElementById('text-color').value = settings.theme_text_color.value;
-            if (settings.theme_message_bg) document.getElementById('chat-bg').value = settings.theme_message_bg.value;
-            if (settings.company_name) document.getElementById('company-name').value = settings.company_name.value;
-            if (settings.logo_url) document.getElementById('logo-url').value = settings.logo_url.value;
-            if (settings.custom_css) document.getElementById('custom-css').value = settings.custom_css.value;
-            
-            updatePreview();
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.sidebar nav a').forEach(link => link.classList.remove('active'));
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
         }
-        
-        // Инициализация
-        getCurrentAdmin();
-        loadSettings();
-        
-        // Добавляем эндпоинт для выполнения SQL
-        fastify.post('/api/admin/sql', async (request, reply) => {
-            const { sql, admin_user } = request.body;
-            
-            // Проверка прав
-            const adminCheck = await pool.query(
-                'SELECT can_manage_users FROM admin_users WHERE id_user = $1',
-                [admin_user]
-            );
-            
-            if (adminCheck.rows.length === 0) {
-                return reply.status(403).send({ error: 'Недостаточно прав' });
-            }
-            
-            try {
-                const result = await pool.query(sql);
-                return result.rows;
-            } catch (err) {
-                return reply.status(500).send({ error: err.message });
-            }
-        });
-        
-        // Обновляем index.html для динамической загрузки темы
-        // Добавьте в начало index.html:
-        // <style id="dynamic-styles"></style>
-        // <script>
-        // async function loadTheme() {
-        //     const response = await fetch('/api/admin/theme');
-        //     const theme = await response.json();
-        //     const styles = `
-        //         :root {
-        //             --primary-color: ${theme.theme_primary_color || '#2563eb'};
-        //             --bg-color: ${theme.theme_background_color || '#f3f4f6'};
-        //             --text-color: ${theme.theme_text_color || '#1f2937'};
-        //         }
-        //         body { background: var(--bg-color); color: var(--text-color); }
-        //         .header, .btn-send { background: var(--primary-color); }
-        //         ${theme.custom_css || ''}
-        //     `;
-        //     document.getElementById('dynamic-styles').textContent = styles;
-        // }
-        // loadTheme();
-        // </script>
     </script>
 </body>
 </html>

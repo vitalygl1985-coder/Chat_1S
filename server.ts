@@ -49,6 +49,283 @@ fastify.get('/admin', async (request, reply) => {
     }
 });
 
+// API: Проверка авторизации админа
+fastify.post('/api/admin/auth', async (request, reply) => {
+    try {
+        const { id_user, id_org } = request.body;
+        
+        const result = await pool.query(
+            `SELECT u.id_user, u.username, u.role, 
+                    COALESCE(au.can_manage_themes, false) as can_manage_themes,
+                    COALESCE(au.can_manage_users, false) as can_manage_users,
+                    COALESCE(au.can_manage_roles, false) as can_manage_roles,
+                    COALESCE(au.can_view_logs, false) as can_view_logs
+             FROM users u
+             LEFT JOIN admin_users au ON u.id_user = au.id_user
+             WHERE u.id_user = $1 AND u.id_org = $2 AND u.role = 'admin'`,
+            [id_user, id_org]
+        );
+        
+        if (result.rows.length > 0) {
+            return { 
+                success: true, 
+                admin: result.rows[0],
+                permissions: {
+                    can_manage_themes: result.rows[0].can_manage_themes,
+                    can_manage_users: result.rows[0].can_manage_users,
+                    can_manage_roles: result.rows[0].can_manage_roles,
+                    can_view_logs: result.rows[0].can_view_logs
+                }
+            };
+        } else {
+            return reply.status(403).json({ success: false, error: 'Недостаточно прав' });
+        }
+    } catch (err) {
+        return reply.status(500).json({ error: 'Ошибка авторизации' });
+    }
+});
+
+// API: Получить все настройки
+fastify.get('/api/admin/settings', async (request, reply) => {
+    try {
+        const result = await pool.query('SELECT setting_key, setting_value, setting_type FROM admin_settings');
+        const settings = {};
+        result.rows.forEach(row => {
+            settings[row.setting_key] = {
+                value: row.setting_value,
+                type: row.setting_type
+            };
+        });
+        return settings;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения настроек' });
+    }
+});
+
+// API: Обновить настройку
+fastify.post('/api/admin/settings', async (request, reply) => {
+    try {
+        const { key, value, admin_user } = request.body;
+        
+        await pool.query(
+            `INSERT INTO admin_settings (setting_key, setting_value, updated_by, updated_at) 
+             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+             ON CONFLICT (setting_key) 
+             DO UPDATE SET setting_value = $2, updated_by = $3, updated_at = CURRENT_TIMESTAMP`,
+            [key, value, admin_user]
+        );
+        
+        return { success: true };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка обновления' });
+    }
+});
+
+// API: Получить список пользователей
+fastify.get('/api/admin/users', async (request, reply) => {
+    try {
+        const result = await pool.query(`
+            SELECT u.id_user, u.username, u.role, 
+                   COALESCE(au.can_manage_themes, false) as can_manage_themes,
+                   COALESCE(au.can_manage_users, false) as can_manage_users,
+                   COALESCE(au.can_manage_roles, false) as can_manage_roles,
+                   COALESCE(au.can_view_logs, false) as can_view_logs
+            FROM users u
+            LEFT JOIN admin_users au ON u.id_user = au.id_user
+            ORDER BY u.username
+        `);
+        return result.rows;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения пользователей' });
+    }
+});
+
+// API: Обновить права пользователя
+fastify.post('/api/admin/user/permissions', async (request, reply) => {
+    try {
+        const { target_user, permissions } = request.body;
+        
+        await pool.query(
+            `INSERT INTO admin_users (id_user, can_manage_themes, can_manage_users, can_manage_roles, can_view_logs)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (id_user)
+             DO UPDATE SET 
+                can_manage_themes = $2,
+                can_manage_users = $3,
+                can_manage_roles = $4,
+                can_view_logs = $5`,
+            [target_user, 
+             permissions.can_manage_themes || false,
+             permissions.can_manage_users || false,
+             permissions.can_manage_roles || false,
+             permissions.can_view_logs || false]
+        );
+        
+        return { success: true };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка обновления прав' });
+    }
+});
+
+// API: Выполнить SQL запрос
+fastify.post('/api/admin/sql', async (request, reply) => {
+    try {
+        const { sql, admin_user } = request.body;
+        
+        // Проверка прав
+        const adminCheck = await pool.query(
+            'SELECT can_manage_users FROM admin_users WHERE id_user = $1',
+            [admin_user]
+        );
+        
+        if (adminCheck.rows.length === 0 || !adminCheck.rows[0].can_manage_users) {
+            return reply.status(403).send({ error: 'Недостаточно прав' });
+        }
+        
+        // Безопасное выполнение SQL (только SELECT)
+        const sqlLower = sql.trim().toLowerCase();
+        if (!sqlLower.startsWith('select') && !sqlLower.startsWith('show') && !sqlLower.startsWith('describe')) {
+            return reply.status(400).send({ error: 'Разрешены только SELECT запросы' });
+        }
+        
+        const result = await pool.query(sql);
+        return { rows: result.rows, fields: result.fields };
+    } catch (err) {
+        return reply.status(500).send({ error: err.message });
+    }
+});
+
+// API: Получить логи
+fastify.get('/api/admin/logs', async (request, reply) => {
+    try {
+        const { admin_user } = request.query;
+        
+        const adminCheck = await pool.query(
+            'SELECT can_view_logs FROM admin_users WHERE id_user = $1',
+            [admin_user]
+        );
+        
+        if (adminCheck.rows.length === 0 || !adminCheck.rows[0].can_view_logs) {
+            return reply.status(403).send({ error: 'Недостаточно прав' });
+        }
+        
+        // Создаем директорию для логов если её нет
+        const logDir = path.join(__dirname, 'logs');
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir);
+        }
+        
+        const logPath = path.join(logDir, 'app.log');
+        if (fs.existsSync(logPath)) {
+            const logs = fs.readFileSync(logPath, 'utf8').split('\n').filter(l => l.trim()).slice(-200);
+            return { logs };
+        }
+        return { logs: ['Логи не найдены'] };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения логов' });
+    }
+});
+
+// API: Загрузить логотип
+fastify.post('/api/admin/upload-logo', async (request, reply) => {
+    try {
+        const data = await request.file();
+        if (!data) {
+            return reply.status(400).send({ error: 'Файл не загружен' });
+        }
+        
+        const fileExt = path.extname(data.filename);
+        const uniqueFileName = `logo${fileExt}`;
+        const saveTo = path.join(UPLOADS_DIR, uniqueFileName);
+        
+        await new Promise((resolve, reject) => {
+            const out = fs.createWriteStream(saveTo);
+            data.file.pipe(out);
+            out.on('finish', resolve);
+            out.on('error', reject);
+        });
+        
+        const logoUrl = `/uploads/${uniqueFileName}`;
+        
+        // Сохраняем URL логотипа в настройки
+        await pool.query(
+            `INSERT INTO admin_settings (setting_key, setting_value, setting_type) 
+             VALUES ('logo_url', $1, 'url')
+             ON CONFLICT (setting_key) 
+             DO UPDATE SET setting_value = $1`,
+            [logoUrl]
+        );
+        
+        return { url: logoUrl };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка загрузки логотипа' });
+    }
+});
+
+// API: Получить ссылки для index.html
+fastify.get('/api/admin/links', async (request, reply) => {
+    try {
+        const result = await pool.query(
+            "SELECT setting_key, setting_value FROM admin_settings WHERE setting_key LIKE 'link_%'"
+        );
+        const links = {};
+        result.rows.forEach(row => {
+            links[row.setting_key] = row.setting_value;
+        });
+        return links;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения ссылок' });
+    }
+});
+
+// API: Обновить ссылки
+fastify.post('/api/admin/links', async (request, reply) => {
+    try {
+        const { links, admin_user } = request.body;
+        
+        for (const [key, value] of Object.entries(links)) {
+            await pool.query(
+                `INSERT INTO admin_settings (setting_key, setting_value, setting_type, updated_by) 
+                 VALUES ($1, $2, 'url', $3)
+                 ON CONFLICT (setting_key) 
+                 DO UPDATE SET setting_value = $2, updated_by = $3`,
+                [key, value, admin_user]
+            );
+        }
+        
+        return { success: true };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка сохранения ссылок' });
+    }
+});
+
+// API: Получить тему
+fastify.get('/api/admin/theme', async (request, reply) => {
+    try {
+        const result = await pool.query(
+            "SELECT setting_key, setting_value FROM admin_settings WHERE setting_type IN ('color', 'css')"
+        );
+        const theme = {};
+        result.rows.forEach(row => {
+            theme[row.setting_key] = row.setting_value;
+        });
+        return theme;
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения темы' });
+    }
+});
+
+// Админ-панель
+fastify.get('/admin', async (request, reply) => {
+    try {
+        const adminPath = path.join(__dirname, 'admin.html');
+        const htmlContent = fs.readFileSync(adminPath, 'utf8');
+        reply.type('text/html').send(htmlContent);
+    } catch (err) {
+        reply.status(500).send('Ошибка загрузки админ-панели');
+    }
+});
+
 // API: Получить все настройки
 fastify.get('/api/admin/settings', async (request, reply) => {
     try {
