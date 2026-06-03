@@ -8,6 +8,8 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fastifyCors from '@fastify/cors';
 import 'dotenv/config';
+// Установите sharp: npm install sharp
+import sharp from 'sharp';
 
 console.log("=== Инициализация Fastify сервера ===");
 
@@ -29,8 +31,9 @@ if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR);
 }
 
+const MAX_FILE_SIZE_MB = 10; // Ограничиваем 10 МБ вместо 100
 fastify.register(multipart, {
-    limits: { fileSize: 100 * 1024 * 1024 }
+    limits: { fileSize: MAX_FILE_SIZE_MB * 1024 * 1024 }
 });
 
 fastify.register(fastifyStatic, {
@@ -120,7 +123,39 @@ fastify.post('/api/admin/settings', async (request, reply) => {
         return reply.status(500).send({ error: 'Ошибка обновления' });
     }
 });
+// Эндпоинт для админов
+fastify.get('/api/admin/stats', async (request, reply) => {
+    try {
+        const stats = await pool.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM messages) as total_messages,
+                (SELECT COUNT(*) FROM messages WHERE created_at > NOW() - INTERVAL '1 day') as messages_today,
+                pg_database_size(current_database()) as db_size_bytes,
+                (SELECT COUNT(*) FROM messages WHERE is_user_encrypted = true) as encrypted_messages
+        `);
+        
+        const uploadsSize = getDirectorySize(UPLOADS_DIR);
+        
+        return {
+            messages: stats.rows[0],
+            dbSizeMB: (stats.rows[0].db_size_bytes / 1024 / 1024).toFixed(2),
+            uploadsSizeMB: (uploadsSize / 1024 / 1024).toFixed(2),
+            storageUsedPercent: ((stats.rows[0].db_size_bytes + uploadsSize) / (1024 * 1024 * 1024) * 100).toFixed(1)
+        };
+    } catch (err) {
+        return reply.status(500).send({ error: 'Ошибка получения статистики' });
+    }
+});
 
+function getDirectorySize(dirPath) {
+    let size = 0;
+    const files = fs.readdirSync(dirPath);
+    for (const file of files) {
+        const stats = fs.statSync(path.join(dirPath, file));
+        if (stats.isFile()) size += stats.size;
+    }
+    return size;
+}
 // API: Получить список пользователей
 fastify.get('/api/admin/users', async (request, reply) => {
     try {
@@ -481,6 +516,55 @@ const pool = new Pool({
     }
 });
 
+// Очистка файлов старше N дней
+async function cleanupOldFiles() {
+    const UPLOADS_DIR = path.join(__dirname, 'uploads');
+    const MAX_FILE_AGE_DAYS = 30; // Храним файлы 30 дней
+    
+    try {
+        const files = fs.readdirSync(UPLOADS_DIR);
+        const now = Date.now();
+        
+        for (const file of files) {
+            const filePath = path.join(UPLOADS_DIR, file);
+            const stats = fs.statSync(filePath);
+            const fileAge = (now - stats.mtimeMs) / (1000 * 60 * 60 * 24);
+            
+            if (fileAge > MAX_FILE_AGE_DAYS) {
+                fs.unlinkSync(filePath);
+                console.log(`Удален старый файл: ${file}`);
+                
+                // Удаляем запись о файле из БД (если есть)
+                await pool.query('DELETE FROM files WHERE file_path = $1', [filePath]);
+                // Создаем таблицу для архива
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS messages_archive (
+                        LIKE messages INCLUDING ALL
+                    );
+                    
+                    -- Автоматическое архивирование сообщений старше 3 месяцев
+                    CREATE OR REPLACE FUNCTION archive_old_messages() RETURNS void AS $$
+                    BEGIN
+                        INSERT INTO messages_archive 
+                        SELECT * FROM messages 
+                        WHERE created_at < NOW() - INTERVAL '90 days';
+                        
+                        DELETE FROM messages 
+                        WHERE created_at < NOW() - INTERVAL '90 days';
+                    END;
+                    $$ LANGUAGE plpgsql;
+                `);
+            }
+        }
+        console.log('Очистка файлов завершена');
+    } catch (err) {
+        console.error('Ошибка очистки файлов:', err);
+    }
+}
+
+// Запускаем очистку раз в день
+setInterval(cleanupOldFiles, 24 * 60 * 60 * 1000);
+
 // Функция инициализации всех таблиц
 async function initializeDatabase() {
     console.log("Проверка и создание таблиц БД...");
@@ -549,7 +633,17 @@ fastify.post('/upload', async (request, reply) => {
         if (!data) {
             return reply.status(400).send({ error: 'Файл не прикреплен' });
         }
-
+        // Сжимаем изображения
+        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileExt);
+        if (isImage) {
+            await sharp(saveTo)
+                .resize(1920, 1080, { fit: 'inside' })
+                .jpeg({ quality: 80 })
+                .toFile(saveTo + '.tmp');
+            
+            fs.renameSync(saveTo + '.tmp', saveTo);
+            console.log(`Изображение сжато: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+        }
         const fileExt = path.extname(data.filename);
         const uniqueFileName = `${crypto.randomUUID()}${fileExt}`;
         const saveTo = path.join(UPLOADS_DIR, uniqueFileName);
