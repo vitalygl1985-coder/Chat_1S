@@ -63,6 +63,7 @@ async function initializeDatabase() {
             id_user VARCHAR(36) PRIMARY KEY,
             id_org VARCHAR(36) REFERENCES organizations(id_org) ON DELETE CASCADE,
             username VARCHAR(255) NOT NULL,
+            role VARCHAR(50) DEFAULT 'user',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
         `CREATE TABLE IF NOT EXISTS rooms (
@@ -70,6 +71,7 @@ async function initializeDatabase() {
             id_org VARCHAR(36) REFERENCES organizations(id_org) ON DELETE CASCADE,
             type VARCHAR(50) NOT NULL,
             name VARCHAR(255) NOT NULL,
+            created_by VARCHAR(36) REFERENCES users(id_user),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
         `CREATE TABLE IF NOT EXISTS room_participants (
@@ -142,7 +144,7 @@ fastify.get('/', async (request, reply) => {
         const htmlContent = fs.readFileSync(indexPath, 'utf8');
         reply.type('text/html').send(htmlContent);
     } catch (err) {
-        reply.status(500).send('Ошибка сервера: не найден файл index.html в папке сервера');
+        reply.status(500).send('Ошибка сервера: не найден файл index.html');
     }
 });
 
@@ -155,7 +157,6 @@ const start = async () => {
         await pool.query('SELECT NOW()');
         console.log('=== Успешное подключение к базе данных Railway! ===');
         
-        // Инициализируем таблицы
         await initializeDatabase();
 
         const io = new Server(fastify.server, { 
@@ -164,30 +165,52 @@ const start = async () => {
         });
 
         io.use(async (socket, next) => {
-            let { id_user, id_org, username } = socket.handshake.query;
+            let { id_user, id_org, username, user_role } = socket.handshake.query;
             if (!id_user || !id_org || !username) {
                 return next(new Error("Ошибка: 1С не передала параметры авторизации"));
             }
+            
             let cleanOrgId = String(id_org).toLowerCase().trim();
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
             if (!uuidRegex.test(cleanOrgId)) {
                 const hash = crypto.createHash('md5').update(cleanOrgId).digest('hex');
                 cleanOrgId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
             }
+            
             const cleanUserId = String(id_user).trim();
-            socket.data = { id_user: cleanUserId, id_org: cleanOrgId, username };
+            const cleanRole = user_role === 'admin' ? 'admin' : 'user';
+            
+            socket.data = { 
+                id_user: cleanUserId, 
+                id_org: cleanOrgId, 
+                username: String(username).trim(),
+                role: cleanRole
+            };
             next();
         });
 
         io.on('connection', async (socket) => {
-            const { id_org, id_user, username } = socket.data;
+            const { id_org, id_user, username, role } = socket.data;
+            console.log(`✅ ${username} (${role}) подключен`);
             
             try {
-                await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', [id_org, 'Организация из 1С']);
-                await pool.query('INSERT INTO users (id_user, id_org, username) VALUES ($1, $2, $3) ON CONFLICT (id_user) DO NOTHING', [id_user, id_org, username]);
-                await pool.query(`INSERT INTO rooms (id_room, id_org, type, name) VALUES (1, $1, 'general', 'Общий чат') ON CONFLICT (id_room) DO NOTHING`, [id_org]);
+                await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', 
+                    [id_org, 'Организация из 1С']);
+                
+                await pool.query(`INSERT INTO users (id_user, id_org, username, role) 
+                    VALUES ($1, $2, $3, $4) ON CONFLICT (id_user) DO UPDATE SET role = $4`, 
+                    [id_user, id_org, username, role]);
+                
+                await pool.query(`INSERT INTO rooms (id_room, id_org, type, name, created_by) 
+                    VALUES (1, $1, 'general', 'Общий чат', $2) ON CONFLICT (id_room) DO NOTHING`, 
+                    [id_org, id_user]);
+                
+                // Добавляем пользователя в общий чат
+                await pool.query(`INSERT INTO room_participants (id_room, id_user) 
+                    VALUES (1, $1) ON CONFLICT DO NOTHING`, [id_user]);
+                    
             } catch (err) {
-                console.error('Ошибка синхронизации данных с БД:', err);
+                console.error('Ошибка регистрации:', err);
             }
 
             socket.join(`org_${id_org}`);
@@ -196,14 +219,12 @@ const start = async () => {
             const sendRoomsList = async () => {
                 try {
                     const roomsResult = await pool.query(`
-                        SELECT r.id_room, r.name, r.type 
+                        SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
+                            (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as member_count
                         FROM rooms r
-                        WHERE r.id_room = 1 AND r.id_org = $1
-                        UNION
-                        SELECT r.id_room, r.name, r.type 
-                        FROM rooms r
-                        JOIN room_participants rp ON r.id_room = rp.id_room
-                        WHERE r.id_org = $1 AND rp.id_user = $2
+                        LEFT JOIN room_participants rp ON r.id_room = rp.id_room
+                        WHERE r.id_org = $1 AND (rp.id_user = $2 OR r.type = 'general')
+                        ORDER BY r.id_room
                     `, [id_org, id_user]);
                     socket.emit('rooms_list', roomsResult.rows);
                 } catch (err) {
@@ -213,11 +234,117 @@ const start = async () => {
 
             await sendRoomsList();
 
+            // Получение списка пользователей
             socket.on('get_users_list', async () => {
                 try {
-                    const usersResult = await pool.query('SELECT id_user, username FROM users WHERE id_org = $1 AND id_user != $2', [id_org, id_user]);
+                    const usersResult = await pool.query(
+                        'SELECT id_user, username, role FROM users WHERE id_org = $1 AND id_user != $2',
+                        [id_org, id_user]
+                    );
                     socket.emit('users_list', usersResult.rows);
                 } catch (err) { console.error(err); }
+            });
+
+            // СОЗДАНИЕ ГРУППЫ - только для администраторов
+            socket.on('create_group_chat', async (data: { group_name: string, user_ids: string[] }) => {
+                if (role !== 'admin') {
+                    socket.emit('error', { message: 'Только администраторы могут создавать группы' });
+                    return;
+                }
+                
+                try {
+                    const newRoom = await pool.query(
+                        'INSERT INTO rooms (id_org, type, name, created_by) VALUES ($1, $2, $3, $4) RETURNING id_room',
+                        [id_org, 'group', data.group_name, id_user]
+                    );
+                    const newRoomId = newRoom.rows[0].id_room;
+
+                    // Добавляем создателя
+                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2)', 
+                        [newRoomId, id_user]);
+                    
+                    // Добавляем выбранных пользователей
+                    for (const targetId of data.user_ids) {
+                        await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2) ON CONFLICT DO NOTHING', 
+                            [newRoomId, targetId]);
+                    }
+
+                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
+                    socket.emit('group_created', { id_room: newRoomId, name: data.group_name });
+                } catch (err) { 
+                    console.error(err);
+                    socket.emit('error', { message: 'Ошибка создания группы' });
+                }
+            });
+
+            // ПОЛУЧЕНИЕ СПИСКА УЧАСТНИКОВ КОМНАТЫ
+            socket.on('get_room_members', async (data: { room_id: number }) => {
+                try {
+                    const members = await pool.query(`
+                        SELECT u.id_user, u.username, u.role
+                        FROM room_participants rp
+                        JOIN users u ON rp.id_user = u.id_user
+                        WHERE rp.id_room = $1
+                    `, [data.room_id]);
+                    socket.emit('room_members', members.rows);
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+
+            // ДОБАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ В ГРУППУ (только для администраторов)
+            socket.on('add_user_to_group', async (data: { room_id: number, user_id: string }) => {
+                if (role !== 'admin') {
+                    socket.emit('error', { message: 'Только администраторы могут добавлять пользователей' });
+                    return;
+                }
+                
+                try {
+                    // Проверяем, что комната - группа
+                    const room = await pool.query('SELECT type FROM rooms WHERE id_room = $1 AND id_org = $2', 
+                        [data.room_id, id_org]);
+                    
+                    if (room.rows[0]?.type !== 'group') {
+                        socket.emit('error', { message: 'Это не групповая комната' });
+                        return;
+                    }
+                    
+                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                        [data.room_id, data.user_id]);
+                    
+                    // Уведомляем всех участников организации
+                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
+                    socket.emit('user_added', { room_id: data.room_id, user_id: data.user_id });
+                } catch (err) {
+                    console.error(err);
+                    socket.emit('error', { message: 'Ошибка добавления пользователя' });
+                }
+            });
+
+            // УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ИЗ ГРУППЫ (только для администраторов)
+            socket.on('remove_user_from_group', async (data: { room_id: number, user_id: string }) => {
+                if (role !== 'admin') {
+                    socket.emit('error', { message: 'Только администраторы могут удалять пользователей' });
+                    return;
+                }
+                
+                try {
+                    // Нельзя удалить создателя группы
+                    const room = await pool.query('SELECT created_by FROM rooms WHERE id_room = $1', [data.room_id]);
+                    if (room.rows[0]?.created_by === data.user_id) {
+                        socket.emit('error', { message: 'Нельзя удалить создателя группы' });
+                        return;
+                    }
+                    
+                    await pool.query('DELETE FROM room_participants WHERE id_room = $1 AND id_user = $2',
+                        [data.room_id, data.user_id]);
+                    
+                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
+                    socket.emit('user_removed', { room_id: data.room_id, user_id: data.user_id });
+                } catch (err) {
+                    console.error(err);
+                    socket.emit('error', { message: 'Ошибка удаления пользователя' });
+                }
             });
 
             socket.on('create_private_chat', async (data: { target_user_id: string, target_username: string }) => {
@@ -235,31 +362,22 @@ const start = async () => {
                     }
 
                     const roomName = `${username} ⇄ ${data.target_username}`;
-                    const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'private', roomName]);
+                    const newRoom = await pool.query(
+                        'INSERT INTO rooms (id_org, type, name, created_by) VALUES ($1, $2, $3, $4) RETURNING id_room',
+                        [id_org, 'private', roomName, id_user]
+                    );
                     const newRoomId = newRoom.rows[0].id_room;
 
-                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2), ($1, $3)', [newRoomId, id_user, data.target_user_id]);
+                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2), ($1, $3)', 
+                        [newRoomId, id_user, data.target_user_id]);
                     
-                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err); }
-            });
-
-            socket.on('create_group_chat', async (data: { group_name: string, user_ids: string[] }) => {
-                try {
-                    const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'group', data.group_name]);
-                    const newRoomId = newRoom.rows[0].id_room;
-
-                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2)', [newRoomId, id_user]);
-                    for (const targetId of data.user_ids) {
-                        await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2) ON CONFLICT DO NOTHING', [newRoomId, targetId]);
-                    }
-
                     io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
                 } catch (err) { console.error(err); }
             });
 
             socket.on('join_room_pool', (data: { room_id: number }) => {
                 socket.join(`room_${data.room_id}`);
+                socket.emit('joined_room', { room_id: data.room_id });
             });
 
             socket.on('get_rooms_again', async () => {
@@ -269,7 +387,11 @@ const start = async () => {
             socket.on('send_message', async (data: { room_id: number, text: string, is_secret: boolean }) => {
                 try {
                     const encryptedTextForDB = encryptForDB(data.text);
-                    await pool.query(`INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted) VALUES ($1, $2, $3, $4)`, [data.room_id, id_user, encryptedTextForDB, data.is_secret]);
+                    await pool.query(
+                        `INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted) 
+                         VALUES ($1, $2, $3, $4)`,
+                        [data.room_id, id_user, encryptedTextForDB, data.is_secret]
+                    );
 
                     io.to(`room_${data.room_id}`).emit('new_message', {
                         id_room: data.room_id,

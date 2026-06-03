@@ -20,12 +20,18 @@
         .main-container { flex: 1; display: flex; overflow: hidden; }
         
         /* Боковая панель */
-        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; padding: 16px; overflow-y: auto; }
-        .sidebar h2 { font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 12px; }
-        .room-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 13px; color: #4b5563; border-radius: 4px; }
-        .room-item:hover { background-color: #f3f4f6; }
+        .sidebar { width: 25%; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+        .sidebar-section { flex: 1; padding: 12px 16px; overflow-y: auto; }
+        .sidebar-section.users-zone { border-top: 1px solid #e5e7eb; background-color: #fafafa; }
+        
+        .sidebar h2 { font-size: 13px; font-weight: bold; color: #374151; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .room-item, .user-item { padding: 8px; margin-bottom: 6px; cursor: pointer; font-size: 12px; color: #4b5563; border-radius: 4px; }
+        .room-item:hover, .user-item:hover { background-color: #f3f4f6; }
         .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
         
+        .btn-action-small { padding: 2px 6px; font-size: 11px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-action-small:hover { background-color: #059669; }
+
         /* Чат */
         .chat-window { width: 75%; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
         .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -46,28 +52,60 @@
         .btn-file { background-color: #e5e7eb; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-right: 8px; font-size: 14px; }
         .btn-file:hover { background-color: #d1d5db; }
         
-        /* Поле ввода */
-        .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none; background-color: white; min-height: 36px; max-height: 100px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-        .input-msg-div:focus { border-color: #2563eb; }
-        .input-msg-div:empty:before { content: "Введите сообщение (Ctrl+V для скриншота)..."; color: #9ca3af; }
+        /* ИСПРАВЛЕНО: textarea вместо contenteditable */
+        .input-msg-textarea { 
+            flex: 1; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            padding: 8px 12px; 
+            font-size: 13px; 
+            outline: none; 
+            background-color: white; 
+            font-family: Arial, sans-serif;
+            resize: vertical;
+            min-height: 36px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .input-msg-textarea:focus { border-color: #2563eb; }
         
         .btn-send { background-color: #2563eb; color: white; border: none; padding: 8px 20px; border-radius: 6px; margin-left: 8px; cursor: pointer; font-weight: bold; font-size: 13px; height: 36px; }
         .btn-send:hover { background-color: #1d4ed8; }
         
-        /* Оверлей Drag-and-Drop */
         .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(37, 99, 235, 0.1); border: 4px dashed #2563eb; z-index: 50; align-items: center; justify-content: center; display: none; }
         .drop-box { background-color: white; padding: 16px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: bold; color: #2563eb; }
+        img { max-width: 100%; max-height: 180px; border-radius: 4px; margin-top: 4px; }
+
+        /* Модальное окно */
+        .custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .modal-content h3 { font-size: 14px; margin-bottom: 12px; color: #1f2937; font-weight: bold; }
+        .modal-input { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; margin-bottom: 12px; outline: none; }
+        .modal-input:focus { border-color: #2563eb; }
+        .modal-buttons { display: flex; justify-content: flex-end; }
+        .btn-modal { padding: 6px 14px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 8px; }
+        .btn-modal.confirm { background-color: #2563eb; color: white; }
+        .btn-modal.cancel { background-color: #e5e7eb; color: #374151; }
         
         /* Стили для файлов */
-        .file-box { display: flex; align-items: center; padding: 8px; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; margin-top: 4px; max-width: 250px; }
-        .file-icon { font-size: 24px; margin-right: 8px; }
-        .file-name { font-size: 12px; font-weight: bold; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .file-link { font-size: 11px; color: #2563eb; text-decoration: none; font-weight: bold; }
-        .file-link:hover { text-decoration: underline; }
-        img { max-width: 100%; max-height: 180px; border-radius: 4px; margin-top: 4px; }
+        .file-box { display: flex; align-items: center; padding: 8px; background-color: #f3f4f6; border-radius: 6px; margin-top: 4px; }
+        .file-icon { font-size: 20px; margin-right: 8px; }
+        .file-name { font-size: 11px; color: #374151; }
+        .file-link { font-size: 11px; color: #2563eb; text-decoration: none; margin-left: 8px; }
     </style>
 </head>
-<body id="chat-body">
+<body>
+
+    <div id="universal-modal" class="custom-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Ввод данных</h3>
+            <input type="text" id="modal-input-field" class="modal-input" placeholder="" autocomplete="off">
+            <div class="modal-buttons">
+                <button id="btn-modal-cancel" class="btn-modal cancel">Отмена</button>
+                <button id="btn-modal-confirm" class="btn-modal confirm">ОК</button>
+            </div>
+        </div>
+    </div>
 
     <div class="header">
         <h1>Corporate 1C Chat</h1>
@@ -79,9 +117,17 @@
 
     <div class="main-container">
         <div class="sidebar">
-            <h2>Чаты и группы</h2>
-            <div id="rooms-list">
-                <div style="font-size: 11px; color: #9ca3af;">Ожидание параметров 1С...</div>
+            <div class="sidebar-section">
+                <h2>Чаты и группы <button class="btn-action-small" id="btn-create-group">+ Группа</button></h2>
+                <div id="rooms-list">
+                    <div style="font-size: 11px; color: #9ca3af;">Ожидание параметров 1С...</div>
+                </div>
+            </div>
+            <div class="sidebar-section users-zone">
+                <h2>Сотрудники (Личные чаты)</h2>
+                <div id="users-list">
+                    <div style="font-size: 11px; color: #9ca3af;">Загрузка пользователей...</div>
+                </div>
             </div>
         </div>
 
@@ -105,9 +151,8 @@
                 <div class="controls-row">
                     <input type="file" id="file-input" style="display: none;">
                     <button id="btn-file" class="btn-file" title="Прикрепить файл">📎</button>
-                    
-                    <div id="input-msg" contenteditable="true" class="input-msg-div"></div>
-                    
+                    <!-- ИСПРАВЛЕНО: textarea вместо div с contenteditable -->
+                    <textarea id="input-msg" class="input-msg-textarea" placeholder="Введите сообщение (Ctrl+V для скриншота)..."></textarea>
                     <button id="btn-send" class="btn-send">Отправить</button>
                 </div>
             </div>
@@ -115,37 +160,30 @@
     </div>
 
     <script>
-        // 1. Железный глушитель вообще всех ошибок JS в интерфейсе 1С
-    window.onerror = function(message, url, line) {
-        console.log("Подавлена ошибка:", message);
-        return true; 
-    };
-
-    // 2. Глушим специфические ошибки мыши и фокуса, которые вызывают панику у IE
-    document.attachEvent ? document.attachEvent('onclick', function() { return true; }) : document.onclick = function() { return true; };
-    
-    // 3. Полифилл безопасности для classList (IE11 ломается при кликах на динамические классы)
-    if (!("classList" in document.documentElement)) {
-        Object.defineProperty(HTMLElement.prototype, 'classList', {
-            get: function() {
-                var self = this;
-                function update(fn) {
-                    return function(value) {
-                        var classes = self.className.split(/\s+/),
-                            index = classes.indexOf(value);
-                        fn(classes, index, value);
-                        self.className = classes.join(" ");
+        // Глушители ошибок для движка 1С 8.3.5
+        window.onerror = function() { return true; };
+        
+        // Полифилл classList для IE
+        if (!("classList" in document.documentElement)) {
+            Object.defineProperty(HTMLElement.prototype, 'classList', {
+                get: function() {
+                    var self = this;
+                    function update(fn) {
+                        return function(value) {
+                            var classes = self.className.split(/\s+/), index = classes.indexOf(value);
+                            fn(classes, index, value);
+                            self.className = classes.join(" ");
+                        }
                     }
+                    return {
+                        add: update(function(classes, index, value) { if (!~index) classes.push(value); }),
+                        remove: update(function(classes, index, value) { if (~index) classes.splice(index, 1); }),
+                        toggle: update(function(classes, index, value) { if (~index) classes.splice(index, 1); else classes.push(value); }),
+                        contains: function(value) { return !!~self.className.split(/\s+/).indexOf(value); }
+                    };
                 }
-                return {
-                    add: update(function(classes, index, value) { if (!~index) classes.push(value); }),
-                    remove: update(function(classes, index, value) { if (~index) classes.splice(index, 1); }),
-                    toggle: update(function(classes, index, value) { if (~index) classes.splice(index, 1); else classes.push(value); }),
-                    contains: function(value) { return !!~self.className.split(/\s+/).indexOf(value); }
-                };
-            }
-        });
-    }
+            });
+        }
 
         var socket;
         var currentRoomId = 1; 
@@ -153,9 +191,59 @@
         var userSecretKey = "";
         var inputMsg = document.getElementById('input-msg');
 
-        function initChat(id_user, id_org, username) {
-            apply1CAuth(id_user, id_org, username);
+        // Модальное окно
+        var activeModalType = "";
+        var decryptTargetCipher = "";
+        var decryptTargetElementId = "";
+
+        var uModal = document.getElementById('universal-modal');
+        var uTitle = document.getElementById('modal-title');
+        var uInput = document.getElementById('modal-input-field');
+
+        function openUniversalModal(title, placeholder, type) {
+            activeModalType = type;
+            uTitle.innerText = title;
+            uInput.value = "";
+            uInput.placeholder = placeholder;
+            uModal.style.display = 'flex';
+            setTimeout(function() { uInput.focus(); }, 10);
         }
+
+        document.getElementById('btn-modal-cancel').onclick = function() {
+            uModal.style.display = 'none';
+        };
+
+        document.getElementById('btn-modal-confirm').onclick = function() {
+            var value = uInput.value.trim();
+            uModal.style.display = 'none';
+            if (!value) return;
+
+            if (activeModalType === "group") {
+                socket.emit('create_group_chat', { group_name: value, user_ids: [] });
+            } 
+            else if (activeModalType === "encrypt") {
+                userSecretKey = value;
+                isSecretMode = true;
+                document.getElementById('secret-status').style.display = 'inline';
+                document.getElementById('btn-secret').className = 'btn-secret active';
+            } 
+            else if (activeModalType === "decrypt") {
+                try {
+                    var decryptedText = CryptoJS.AES.decrypt(decryptTargetCipher, value).toString(CryptoJS.enc.Utf8);
+                    if (decryptedText) {
+                        var txtElement = document.getElementById(decryptTargetElementId + '_text');
+                        if (txtElement) {
+                            txtElement.innerHTML = decryptedText;
+                            txtElement.style.cssText = "color:#1f2937;font-weight:bold;font-size:13px;font-style:normal;";
+                        }
+                    } else {
+                        alert("Неверный код!");
+                    }
+                } catch (e) {
+                    alert("Ошибка расшифровки!");
+                }
+            }
+        };
 
         function apply1CAuth(id_user, id_org, username) {
             document.getElementById('user-info').innerText = username;
@@ -166,8 +254,17 @@
                 query: { id_user: id_user, id_org: id_org, username: username }
             });
 
+            socket.on('connect', function() {
+                socket.emit('join_room_pool', { room_id: currentRoomId });
+                socket.emit('get_users_list');
+            });
+
             socket.on('rooms_list', function(rooms) {
                 renderRoomsList(rooms);
+            });
+
+            socket.on('users_list', function(users) {
+                renderUsersList(users);
             });
 
             socket.on('new_message', function(msg) {
@@ -176,34 +273,27 @@
                 }
             });
             
-            socket.on('connect_error', function(err) {
-                console.log('Ошибка сокета:', err);
+            socket.on('refresh_rooms_trigger', function() {
+                socket.emit('get_rooms_again');
             });
         }
 
         function renderRoomsList(rooms) {
             var roomsContainer = document.getElementById('rooms-list');
             roomsContainer.innerHTML = ""; 
-
-            if (!rooms || rooms.length === 0) {
-                roomsContainer.innerHTML = '<div style="font-size:11px;color:#9ca3af;">Нет доступных комнат</div>';
-                return;
-            }
-
-            // ИСПРАВЛЕНО: Заменили .forEach на классический цикл for, совместимый со старым движком IE внутри 1С
             for (var i = 0; i < rooms.length; i++) {
                 var room = rooms[i];
                 var roomDiv = document.createElement('div');
                 var isActive = room.id_room === currentRoomId;
                 
                 roomDiv.className = 'room-item' + (isActive ? ' active' : '');
-                roomDiv.innerText = room.name;
+                roomDiv.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
                 
-                // Используем замыкание, чтобы сохранить правильный id_room в цикле
                 (function(roomId) {
                     roomDiv.onclick = function() {
                         currentRoomId = roomId;
-                        document.getElementById('messages-container').innerHTML = ""; 
+                        socket.emit('join_room_pool', { room_id: roomId });
+                        document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка сообщений...</div></div>"; 
                         socket.emit('get_rooms_again'); 
                     };
                 })(room.id_room);
@@ -212,21 +302,56 @@
             }
         }
 
-        document.getElementById('btn-file').onclick = function() {
-            document.getElementById('file-input').click();
+        function renderUsersList(users) {
+            var container = document.getElementById('users-list');
+            container.innerHTML = "";
+            if (!users || users.length === 0) {
+                container.innerHTML = '<div style="font-size:11px;color:#9ca3af;padding:4px;">Нет других сотрудников</div>';
+                return;
+            }
+            for (var i = 0; i < users.length; i++) {
+                var u = users[i];
+                var div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerText = "👤 " + u.username;
+                
+                (function(targetId, targetName) {
+                    div.onclick = function() {
+                        socket.emit('create_private_chat', { target_user_id: targetId, target_username: targetName });
+                    };
+                })(u.id_user, u.username);
+                container.appendChild(div);
+            }
+        }
+
+        document.getElementById('btn-create-group').onclick = function() {
+            openUniversalModal("Создание новой группы", "Название группы...", "group");
         };
 
+        document.getElementById('btn-secret').onclick = function() {
+            if (!isSecretMode) {
+                openUniversalModal("Режим шифрования", "Введите секретный ключ...", "encrypt");
+            } else {
+                isSecretMode = false;
+                userSecretKey = "";
+                document.getElementById('secret-status').style.display = 'none';
+                document.getElementById('btn-secret').className = 'btn-secret';
+            }
+        };
+
+        document.getElementById('btn-file').onclick = function() { 
+            document.getElementById('file-input').click(); 
+        };
+        
         document.getElementById('file-input').onchange = function(e) {
             var file = e.target.files[0];
-            if (!file) return;
-            uploadAndSendFile(file, file.name);
+            if (file) uploadAndSendFile(file, file.name);
             e.target.value = ""; 
         };
 
         function uploadAndSendFile(fileBlob, fileName) {
             var formData = new FormData();
             formData.append('file', fileBlob, fileName);
-
             var container = document.getElementById('messages-container');
             var loadingDiv = document.createElement('div');
             loadingDiv.id = "file-loading-status";
@@ -240,109 +365,59 @@
             xhr.onload = function() {
                 var statusEl = document.getElementById('file-loading-status');
                 if (statusEl) statusEl.parentNode.removeChild(statusEl);
-
                 if (xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     if (data.url) {
-                        var messageContent = "";
                         var isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
-
-                        if (isImage) {
-                            messageContent = '<img src="' + data.url + '" onclick="window.open(\'' + data.url + '\')" style="cursor:pointer;" />';
-                        } else {
-                            messageContent = '<div class="file-box"><span class="file-icon">📄</span><div><div class="file-name">' + fileName + '</div><a href="' + data.url + '" target="_blank" download class="file-link">Скачать</a></div></div>';
-                        }
-
-                        socket.emit('send_message', {
-                            room_id: currentRoomId,
-                            text: messageContent,
-                            is_secret: false
-                        });
+                        var content = isImage ? 
+                            '<img src="' + data.url + '" onclick="window.open(\'' + data.url + '\')" style="cursor:pointer; max-width:100%;" />' : 
+                            '<div class="file-box"><span class="file-icon">📄</span><div><div class="file-name">' + fileName + '</div><a href="' + data.url + '" target="_blank" class="file-link">Скачать</a></div></div>';
+                        socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
-                } else {
-                    alert('Ошибка отправки файла.');
+                } else { 
+                    alert('Ошибка отправки файла.'); 
                 }
             };
-
             xhr.onerror = function() {
                 var statusEl = document.getElementById('file-loading-status');
                 if (statusEl) statusEl.parentNode.removeChild(statusEl);
                 alert('Сетевая ошибка при отправке файла.');
             };
-
             xhr.send(formData);
         }
 
+        // Обработка вставки скриншотов
         inputMsg.onpaste = function(event) {
             if (event && event.clipboardData && event.clipboardData.items) {
                 var items = event.clipboardData.items;
-                // ИСПРАВЛЕНО: Перебор коллекции через стандартный индекс вместо конструкции for...in
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
                     if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
-                        var blob = item.getAsFile();
-                        uploadAndSendFile(blob, 'screenshot_' + Date.now() + '.png');
-                        event.preventDefault();
+                        uploadAndSendFile(item.getAsFile(), 'screenshot_' + Date.now() + '.png');
+                        event.preventDefault(); 
                         return;
                     }
                 }
             }
-
-            var tempDiv = document.createElement('div');
-            tempDiv.contentEditable = true;
-            tempDiv.style.cssText = "position:absolute; left:-9999px; top:0; width:1px; height:1px; overflow:hidden;";
-            document.body.appendChild(tempDiv);
-            
-            if (tempDiv.focus) { 
-                tempDiv.focus(); 
-            }
-
-            setTimeout(function() {
-                var img = tempDiv.querySelector('img');
-                if (img && img.src) {
-                    var srcData = img.src;
-                    if (srcData.indexOf('data:image/') === 0) {
-                        var blob = base64ToBlob(srcData);
-                        uploadAndSendFile(blob, 'screenshot_' + Date.now() + '.png');
-                    }
-                }
-                
-                if (tempDiv.parentNode) { 
-                    tempDiv.parentNode.removeChild(tempDiv); 
-                }
-                inputMsg.focus();
-            }, 5);
         };
 
-        function base64ToBlob(base64Data) {
-            var parts = base64Data.split(';base64,');
-            var contentType = parts[0].split(':')[1];
-            var raw = window.atob(parts[1]);
-            var rawLength = raw.length;
-            var uInt8Array = new Uint8Array(rawLength);
-
-            for (var i = 0; i < rawLength; ++i) {
-                uInt8Array[i] = raw.charCodeAt(i);
-            }
-
-            return new Blob([uInt8Array], { type: contentType });
-        }
-
+        // Drag & drop
         var chatWindow = document.getElementById('chat-window');
         var dropZone = document.getElementById('drop-zone');
-
-        window.ondragenter = window.ondragover = window.ondragleave = window.ondrop = function(e) {
-            e.preventDefault(); e.stopPropagation();
+        
+        window.ondragenter = window.ondragover = window.ondragleave = window.ondrop = function(e) { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
         };
-
-        chatWindow.ondragenter = chatWindow.ondragover = function() {
-            dropZone.style.display = 'flex';
+        
+        chatWindow.ondragenter = chatWindow.ondragover = function() { 
+            dropZone.style.display = 'flex'; 
         };
-
-        dropZone.ondragleave = function() {
-            dropZone.style.display = 'none';
+        
+        dropZone.ondragleave = function() { 
+            dropZone.style.display = 'none'; 
         };
-
+        
         chatWindow.ondrop = function(e) {
             dropZone.style.display = 'none';
             var files = e.dataTransfer.files;
@@ -353,34 +428,18 @@
             }
         };
 
-        document.getElementById('btn-secret').onclick = function() {
-            if (!isSecretMode) {
-                var password = prompt("Введите секретный код:");
-                if (password) {
-                    userSecretKey = password;
-                    isSecretMode = true;
-                    document.getElementById('secret-status').style.display = 'inline';
-                    document.getElementById('btn-secret').className = 'btn-secret active';
-                }
-            } else {
-                isSecretMode = false;
-                userSecretKey = "";
-                document.getElementById('secret-status').style.display = 'none';
-                document.getElementById('btn-secret').className = 'btn-secret';
-            }
-        };
-
         document.getElementById('btn-send').onclick = sendMessage;
         
+        // Отправка по Enter (Shift+Enter для новой строки)
         inputMsg.onkeydown = function(e) {
-            if (e.key === 'Enter' || e.keyCode === 13) {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault(); 
                 sendMessage();
             }
         };
 
         function sendMessage() {
-            var text = inputMsg.innerText.trim();
+            var text = inputMsg.value.trim();
             if (!text) return;
 
             if (isSecretMode) {
@@ -393,47 +452,38 @@
                 is_secret: isSecretMode
             });
 
-            inputMsg.innerHTML = ""; 
-            if (isSecretMode) document.getElementById('btn-secret').click();
+            inputMsg.value = "";
+            if (isSecretMode) {
+                isSecretMode = false;
+                userSecretKey = "";
+                document.getElementById('secret-status').style.display = 'none';
+                document.getElementById('btn-secret').className = 'btn-secret';
+            }
         }
 
         function displayMessage(msg) {
             var container = document.getElementById('messages-container');
             var msgDiv = document.createElement('div');
             msgDiv.className = "msg-block";
-
             var displayText = msg.text;
             
             if (msg.is_secret || (msg.text && msg.text.indexOf("SECRET:") === 0)) {
                 var cleanCipher = msg.text.replace("SECRET:", "");
                 var uniqueId = 'cipher_' + Math.random().toString(36).substr(2, 9);
-                
-                displayText = '<div style="color:#eab308;font-weight:bold;">🔒 Зашифровано</div><div id="' + uniqueId + '_text" style="font-size:11px;color:#9ca3af;font-style:italic;margin-bottom:4px;">[Текст скрыт]</div><button onclick="decryptUserMessage(\'' + cleanCipher + '\', \'' + uniqueId + '\')" style="padding:2px 6px;font-size:11px;border:none;background-color:#fef08a;color:#854d0e;border-radius:4px;cursor:pointer;">Ввести код</button>';
+                displayText = '<div style="color:#eab308;font-weight:bold;">🔒 Зашифровано</div>' +
+                             '<div id="' + uniqueId + '_text" style="font-size:11px;color:#9ca3af;font-style:italic;margin-bottom:4px;">[Текст скрыт]</div>' +
+                             '<button onclick="triggerHTMLDecryption(\'' + cleanCipher + '\', \'' + uniqueId + '\')" style="padding:2px 6px;font-size:11px;border:none;background-color:#fef08a;color:#854d0e;border-radius:4px;cursor:pointer;">Ввести код</button>';
             }
-
+            
             msgDiv.innerHTML = '<span class="msg-author">' + msg.username + '</span><div class="msg-text">' + displayText + '</div>';
             container.appendChild(msgDiv);
             container.scrollTop = container.scrollHeight;
         }
 
-        function decryptUserMessage(cipherText, elementId) {
-            var code = prompt("Введите кодовое слово:");
-            if (!code) return;
-
-            try {
-                var bytes = CryptoJS.AES.decrypt(cipherText, code);
-                var decryptedText = bytes.toString(CryptoJS.enc.Utf8);
-
-                if (decryptedText) {
-                    var txtElement = document.getElementById(elementId + '_text');
-                    txtElement.innerHTML = decryptedText;
-                    txtElement.style.cssText = "color:#1f2937;font-weight:bold;font-size:13px;font-style:normal;";
-                } else {
-                    alert("Неверный код!");
-                }
-            } catch (e) {
-                alert("Ошибка расшифровки!");
-            }
+        function triggerHTMLDecryption(cipherText, elementId) {
+            decryptTargetCipher = cipherText;
+            decryptTargetElementId = elementId;
+            openUniversalModal("Расшифровка сообщения", "Введите кодовое слово...", "decrypt");
         }
 
         function getQueryParam(param) {
@@ -449,13 +499,19 @@
         }
 
         window.onload = function() {
-            var url_id_user = getQueryParam('id_user');
-            var url_id_org = getQueryParam('id_org');
-            var url_username = getQueryParam('username');
-
-            if (url_id_user && url_id_org && url_username) {
-                apply1CAuth(url_id_user, url_id_org, url_username);
+            var hash = window.location.hash;
+            if (hash && hash.length > 1) {
+                var cleanHash = decodeURIComponent(hash.substring(1));
+                var params = cleanHash.split("---");
+                if (params.length >= 3) {
+                    apply1CAuth(params[0].trim(), params[1].trim(), params[2].trim());
+                    return;
+                }
             }
+            var u = getQueryParam('id_user');
+            var o = getQueryParam('id_org');
+            var n = getQueryParam('username');
+            if (u && o && n) apply1CAuth(u, o, n);
         };
     </script>
 </body>

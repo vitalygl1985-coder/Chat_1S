@@ -129,6 +129,11 @@
                     <div style="font-size: 11px; color: #9ca3af;">Загрузка пользователей...</div>
                 </div>
             </div>
+            <!-- Добавьте после списка сотрудников -->
+            <div class="sidebar-section users-zone" id="group-members-section" style="display: none;">
+                <h2>Участники группы <button class="btn-action-small" id="btn-add-member">+ Добавить</button></h2>
+                <div id="group-members-list"></div>
+            </div>
         </div>
 
         <div class="chat-window" id="chat-window"> 
@@ -245,14 +250,18 @@
             }
         };
 
-        function apply1CAuth(id_user, id_org, username) {
-            document.getElementById('user-info').innerText = username;
-            document.getElementById('rooms-list').innerHTML = '<div style="font-size: 11px; color: #9ca3af;">Загрузка комнат из БД...</div>';
-            
-            socket = io('/', {
-                transports: ['polling', 'websocket'],
-                query: { id_user: id_user, id_org: id_org, username: username }
-            });
+        function apply1CAuth(id_user, id_org, username, user_role) {
+        document.getElementById('user-info').innerHTML = username + (user_role === 'admin' ? ' 👑 <span style="color:#eab308;">(Админ)</span>' : '');
+        
+        socket = io('/', {
+            transports: ['polling', 'websocket'],
+            query: { 
+                id_user: id_user, 
+                id_org: id_org, 
+                username: username,
+                user_role: user_role  // Передаем роль на сервер
+            }
+        });
 
             socket.on('connect', function() {
                 socket.emit('join_room_pool', { room_id: currentRoomId });
@@ -498,21 +507,69 @@
             return null;
         }
 
-        window.onload = function() {
+      window.onload = function() {
             var hash = window.location.hash;
             if (hash && hash.length > 1) {
                 var cleanHash = decodeURIComponent(hash.substring(1));
                 var params = cleanHash.split("---");
+                
+                // Новый формат: id_user---id_org---username---role
                 if (params.length >= 3) {
-                    apply1CAuth(params[0].trim(), params[1].trim(), params[2].trim());
+                    var id_user = params[0].trim();
+                    var id_org = params[1].trim();
+                    var username = params[2].trim();
+                    var user_role = params.length >= 4 ? params[3].trim() : 'user';
+                    
+                    // Сохраняем роль глобально
+                    window.currentUserRole = user_role;
+                    
+                    apply1CAuth(id_user, id_org, username, user_role);
                     return;
                 }
             }
+            
+            // Старый формат для обратной совместимости
             var u = getQueryParam('id_user');
             var o = getQueryParam('id_org');
             var n = getQueryParam('username');
-            if (u && o && n) apply1CAuth(u, o, n);
+            var r = getQueryParam('user_role') || 'user';
+            if (u && o && n) {
+                window.currentUserRole = r;
+                apply1CAuth(u, o, n, r);
+            }
         };
+        // Отображение участников группы при клике на группу
+        function showGroupMembers(roomId) {
+            if (currentRoomType === 'group') {
+                document.getElementById('group-members-section').style.display = 'block';
+                socket.emit('get_room_members', { room_id: roomId });
+            } else {
+                document.getElementById('group-members-section').style.display = 'none';
+            }
+        }
+
+        socket.on('room_members', function(members) {
+            var container = document.getElementById('group-members-list');
+            container.innerHTML = "";
+            for (var i = 0; i < members.length; i++) {
+                var m = members[i];
+                var div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = m.username + (m.role === 'admin' ? ' 👑' : '') + 
+                    (userRole === 'admin' && m.id_user !== currentUserId ? 
+                        '<button onclick="removeFromGroup(\'' + m.id_user + '\')" style="float:right;background:red;color:white;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;">✖</button>' : '');
+                container.appendChild(div);
+            }
+        });
+
+        // Добавление пользователя в группу
+        document.getElementById('btn-add-member').onclick = function() {
+            openUniversalModal("Добавить пользователя", "ID пользователя...", "add_member");
+        };
+
+        socket.on('user_added', function(data) {
+            socket.emit('get_room_members', { room_id: data.room_id });
+        });
     </script>
 </body>
 </html>
