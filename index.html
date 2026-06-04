@@ -48,7 +48,7 @@
 <body>
 
 <div class="header">
-    <h1>Corporate 1C Chat</h1>
+    <h1>💊 КЕЙСЕР корп.чат 💊</h1>
     <div class="header-controls">
         <div id="custom-links-container" class="header-links"></div>
         <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
@@ -88,11 +88,12 @@
 </div>
 
 <script>
+// Тотальное подавление исключений на уровне window
 window.onerror = function(message, url, line) { 
-    console.log("1C Error Suppressed: " + message + " at line " + line);
     return true; 
 };
 
+// Жесткая изоляция кликов и фокусов
 try {
     document.onclick = function() { return true; };
     document.onfocusin = function() { return true; };
@@ -141,20 +142,14 @@ try {
     }
 } catch(e) { }
 
-// Безопасное открытие ссылок во внешнем браузере Windows, минуя Trident
 window.safeOpenLink = function(url) {
     try {
-        // Проверка на встроенный объект 1С (если запущен внутри обработки)
         if (window.external && typeof window.external.SelectOrg === 'unknown') {
             window.open(url, "_blank");
             return;
         }
     } catch(e) {}
-    
-    // Стандартный безопасный fallback через симуляцию клика без зависания DOM
-    setTimeout(function() {
-        window.open(url, "_blank");
-    }, 50);
+    setTimeout(function() { window.open(url, "_blank"); }, 50);
 };
 
 function apply1CAuth(id_user, id_org, username, user_role) {
@@ -166,6 +161,7 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         userInfoEl.innerHTML = String(username) + (currentUserRole === 'admin' ? ' 👑' : '');
     }
     
+    // Безопасное уничтожение старого сокета при переавторизации
     if (socket) {
         try {
             socket.removeAllListeners();
@@ -200,70 +196,74 @@ function apply1CAuth(id_user, id_org, username, user_role) {
                 socket.emit('get_rooms_again');
             }
         });
-    } catch(err) {
-        console.log("Socket init masked");
-    }
+    } catch(err) { }
 }
 
 function renderRoomsList(rooms) {
-    var container = document.getElementById('rooms-list');
-    if (!container) return;
-    container.innerHTML = "";
-    if (!rooms || rooms.length === 0) { container.innerHTML = "<div>Нет чатов</div>"; return; }
-    for (var i = 0; i < rooms.length; i++) {
-        var room = rooms[i];
-        var div = document.createElement('div');
-        div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
-        div.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
-        (function(rid) {
-            div.onclick = function() {
-                currentRoomId = rid;
-                var msgCont = document.getElementById('messages-container');
-                if (msgCont) msgCont.innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка...</div></div>";
-                if (socket) {
-                    socket.emit('join_room_pool', { room_id: rid });
-                    socket.emit('get_rooms_again');
-                }
-            };
-        })(room.id_room);
-        container.appendChild(div);
-    }
+    try {
+        var container = document.getElementById('rooms-list');
+        if (!container) return;
+        container.innerHTML = "";
+        if (!rooms || rooms.length === 0) { container.innerHTML = "<div>Нет чатов</div>"; return; }
+        for (var i = 0; i < rooms.length; i++) {
+            var room = rooms[i];
+            var div = document.createElement('div');
+            div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
+            div.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
+            (function(rid) {
+                div.onclick = function() {
+                    currentRoomId = rid;
+                    var msgCont = document.getElementById('messages-container');
+                    if (msgCont) msgCont.innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка...</div></div>";
+                    if (socket) {
+                        socket.emit('join_room_pool', { room_id: rid });
+                        socket.emit('get_rooms_again');
+                    }
+                };
+            })(room.id_room);
+            container.appendChild(div);
+        }
+    } catch(e) { }
 }
 
 function renderUsersList(users) {
-    var container = document.getElementById('users-list');
-    if (!container) return;
-    container.innerHTML = "";
-    if (!users || users.length === 0) { container.innerHTML = "<div>Нет пользователей</div>"; return; }
-    for (var i = 0; i < users.length; i++) {
-        var u = users[i];
-        if (u.id_user == currentUserId) continue;
-        var div = document.createElement('div');
-        div.className = 'user-item';
-        div.innerText = "👤 " + u.username;
-        (function(uid, uname) {
-            div.onclick = function() { 
-                if (socket) socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); 
-            };
-        })(u.id_user, u.username);
-        container.appendChild(div);
-    }
+    try {
+        var container = document.getElementById('users-list');
+        if (!container) return;
+        container.innerHTML = "";
+        if (!users || users.length === 0) { container.innerHTML = "<div>Нет пользователей</div>"; return; }
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            if (u.id_user == currentUserId) continue;
+            var div = document.createElement('div');
+            div.className = 'user-item';
+            div.innerText = "👤 " + u.username;
+            (function(uid, uname) {
+                div.onclick = function() { 
+                    if (socket) socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); 
+                };
+            })(u.id_user, u.username);
+            container.appendChild(div);
+        }
+    } catch(e) { }
 }
 
 function displayMessage(msg) {
-    var container = document.getElementById('messages-container');
-    if (!container) return;
-    var div = document.createElement('div');
-    div.className = 'msg-block';
-    var text = String(msg.text);
-    if ((msg.is_secret || text.indexOf("SECRET:") === 0) && text.indexOf("SECRET:") !== -1) {
-        var cipher = text.replace("SECRET:", "");
-        var id = 'c_' + Math.random().toString(36).substr(2, 6);
-        text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+id+'">[Скрыто]</div><button onclick="decryptMsg(\''+cipher+'\',\''+id+'\')">Ввести код</button>';
-    }
-    div.innerHTML = '<span class="msg-author">'+msg.username+'</span><div class="msg-text">'+text+'</div>';
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+    try {
+        var container = document.getElementById('messages-container');
+        if (!container) return;
+        var div = document.createElement('div');
+        div.className = 'msg-block';
+        var text = String(msg.text);
+        if ((msg.is_secret || text.indexOf("SECRET:") === 0) && text.indexOf("SECRET:") !== -1) {
+            var cipher = text.replace("SECRET:", "");
+            var id = 'c_' + Math.random().toString(36).substr(2, 6);
+            text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+id+'">[Скрыто]</div><button onclick="decryptMsg(\''+cipher+'\',\''+id+'\')">Ввести код</button>';
+        }
+        div.innerHTML = '<span class="msg-author">'+msg.username+'</span><div class="msg-text">'+text+'</div>';
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    } catch(e) { }
 }
 
 window.decryptMsg = function(cipher, id) {
@@ -284,18 +284,17 @@ function sendMessage() {
     if (inputMsg) {
         text = (inputMsg.textContent || inputMsg.innerText || "").trim();
     }
-    
     if (!text) return;
     try {
         if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
     } catch(e) { }
     
     if (socket) {
-        socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
+        try {
+            socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
+        } catch(e) {}
     }
-    
     if (inputMsg) inputMsg.innerHTML = "";
-    
     if (isSecretMode) {
         isSecretMode = false;
         userSecretKey = "";
@@ -305,151 +304,161 @@ function sendMessage() {
 }
 
 function uploadFile(file) {
-    var fd = new FormData();
-    fd.append('file', file);
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/upload', true);
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            try {
-                var data = JSON.parse(xhr.responseText);
-                if (data && data.url && socket) {
-                    var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                    var content = isImg ? '<img src="'+data.url+'" onclick="window.safeOpenLink(\''+data.url+'\')" />' : '<span class="link-click" onclick="window.safeOpenLink(\''+data.url+'\')" style="color:#2563eb; text-decoration:underline;">📄 '+file.name+'</span>';
-                    socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
-                }
-            } catch(e) {}
-        } else { alert('Ошибка'); }
-    };
-    xhr.send(fd);
+    try {
+        var fd = new FormData();
+        fd.append('file', file);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data && data.url && socket) {
+                        var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+                        var content = isImg ? '<img src="'+data.url+'" onclick="window.safeOpenLink(\''+data.url+'\')" />' : '<span class="link-click" onclick="window.safeOpenLink(\''+data.url+'\')" style="color:#2563eb; text-decoration:underline;">📄 '+file.name+'</span>';
+                        socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
+                    }
+                } catch(e) {}
+            } else { alert('Ошибка'); }
+        };
+        xhr.send(fd);
+    } catch(e) {}
 }
 
-var btnCreateGroup = document.getElementById('btn-create-group');
-if (btnCreateGroup) {
-    btnCreateGroup.onclick = function() {
-        var name = prompt("Название группы:");
-        if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [] });
-    };
-}
+try {
+    var btnCreateGroup = document.getElementById('btn-create-group');
+    if (btnCreateGroup) {
+        btnCreateGroup.onclick = function() {
+            var name = prompt("Название группы:");
+            if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [] });
+        };
+    }
+    var btnSecret = document.getElementById('btn-secret');
+    if (btnSecret) {
+        btnSecret.onclick = function() {
+            if (!isSecretMode) {
+                var key = prompt("Ключ шифрования:");
+                if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
+            } else {
+                isSecretMode = false;
+                userSecretKey = "";
+                this.className = 'btn-secret';
+            }
+        };
+    }
+    var btnSend = document.getElementById('btn-send');
+    if (btnSend) btnSend.onclick = sendMessage;
 
-var btnSecret = document.getElementById('btn-secret');
-if (btnSecret) {
-    btnSecret.onclick = function() {
-        if (!isSecretMode) {
-            var key = prompt("Ключ шифрования:");
-            if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
-        } else {
-            isSecretMode = false;
-            userSecretKey = "";
-            this.className = 'btn-secret';
-        }
-    };
-}
+    var btnFile = document.getElementById('btn-file');
+    if (btnFile) {
+        btnFile.onclick = function() { 
+            var fileInp = document.getElementById('file-input');
+            if (fileInp) fileInp.click(); 
+        };
+    }
+    var fileInput = document.getElementById('file-input');
+    if (fileInput) {
+        fileInput.onchange = function(e) { 
+            if (e && e.target && e.target.files && e.target.files[0]) { uploadFile(e.target.files[0]); }
+            if (this) this.value = ""; 
+        };
+    }
+    if (inputMsg) {
+        inputMsg.onkeydown = function(e) { 
+            var ev = e || window.event;
+            if (ev && ev.key === 'Enter' && !ev.shiftKey) { 
+                if (ev.preventDefault) ev.preventDefault(); else ev.returnValue = false;
+                sendMessage(); 
+            } 
+        };
+    }
+} catch(e) {}
 
-var btnSend = document.getElementById('btn-send');
-if (btnSend) btnSend.onclick = sendMessage;
+try {
+    var dropZone = document.getElementById('drop-zone');
+    var chatWindow = document.getElementById('chat-window');
+    if (chatWindow && dropZone) {
+        chatWindow.ondragover = function(e) { if (e.preventDefault) e.preventDefault(); dropZone.style.display = 'flex'; };
+        dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
+        chatWindow.ondrop = function(e) {
+            if (e.preventDefault) e.preventDefault();
+            dropZone.style.display = 'none';
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+        };
+    }
+} catch(e) {}
 
-var btnFile = document.getElementById('btn-file');
-if (btnFile) {
-    btnFile.onclick = function() { 
-        var fileInp = document.getElementById('file-input');
-        if (fileInp) fileInp.click(); 
-    };
-}
-
-var fileInput = document.getElementById('file-input');
-if (fileInput) {
-    fileInput.onchange = function(e) { 
-        if (e && e.target && e.target.files && e.target.files[0]) {
-            uploadFile(e.target.files[0]); 
-        }
-        if (this) this.value = ""; 
-    };
-}
-
-if (inputMsg) {
-    inputMsg.onkeydown = function(e) { 
-        var ev = e || window.event;
-        if (ev && ev.key === 'Enter' && !ev.shiftKey) { 
-            if (ev.preventDefault) ev.preventDefault(); else ev.returnValue = false;
-            sendMessage(); 
-        } 
-    };
-}
-
-var dropZone = document.getElementById('drop-zone');
-var chatWindow = document.getElementById('chat-window');
-if (chatWindow && dropZone) {
-    chatWindow.ondragover = function(e) { if (e.preventDefault) e.preventDefault(); dropZone.style.display = 'flex'; };
-    dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
-    chatWindow.ondrop = function(e) {
-        if (e.preventDefault) e.preventDefault();
-        dropZone.style.display = 'none';
-        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
-    };
-}
-
-if (inputMsg) {
-    inputMsg.onpaste = function(e) {
-        var clipboardData = e.clipboardData || window.clipboardData;
-        if (clipboardData && clipboardData.items) {
-            for (var i = 0; i < clipboardData.items.length; i++) {
-                var item = clipboardData.items[i];
-                if (item && item.kind === 'file' && item.type && item.type.indexOf('image/') === 0) {
-                    uploadFile(item.getAsFile());
-                    if (e.preventDefault) e.preventDefault();
-                    return;
+try {
+    if (inputMsg) {
+        inputMsg.onpaste = function(e) {
+            var clipboardData = e.clipboardData || window.clipboardData;
+            if (clipboardData && clipboardData.items) {
+                for (var i = 0; i < clipboardData.items.length; i++) {
+                    var item = clipboardData.items[i];
+                    if (item && item.kind === 'file' && item.type && item.type.indexOf('image/') === 0) {
+                        uploadFile(item.getAsFile());
+                        if (e.preventDefault) e.preventDefault();
+                        return;
+                    }
                 }
             }
-        }
-    };
-}
+        };
+    }
+} catch(e) {}
 
 function loadCustomThemeAndLinks() {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/admin/settings', true);
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            try {
-                var settings = JSON.parse(xhr.responseText);
-                if (!settings) return;
-                
-                if (settings.theme_primary_color && settings.theme_primary_color.value) {
-                    var headerEl = document.querySelector('.header');
-                    if (headerEl) headerEl.style.backgroundColor = settings.theme_primary_color.value;
-                    var btnSendEl = document.getElementById('btn-send');
-                    if (btnSendEl) btnSendEl.style.backgroundColor = settings.theme_primary_color.value;
-                }
-                
-                if (settings.custom_css && settings.custom_css.value) {
-                    var style = document.createElement('style');
-                    style.type = 'text/css';
-                    style.innerHTML = settings.custom_css.value;
-                    var head = document.getElementsByTagName('head')[0];
-                    if (head) head.appendChild(style);
-                }
-
-                var linksContainer = document.getElementById('custom-links-container');
-                if (linksContainer) {
-                    var html = '';
-                    // Исправление: Избавление от тегов <a> во избежание перехвата навигации ядром 1С
-                    if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
-                        html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link1_url.value+'\')">🔗 '+settings.link1_name.value+'</span>';
+    try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/admin/settings', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var settings = JSON.parse(xhr.responseText);
+                    if (!settings) return;
+                    
+                    if (settings.theme_primary_color && settings.theme_primary_color.value) {
+                        var headerEl = document.querySelector('.header');
+                        if (headerEl) headerEl.style.backgroundColor = settings.theme_primary_color.value;
+                        var btnSendEl = document.getElementById('btn-send');
+                        if (btnSendEl) btnSendEl.style.backgroundColor = settings.theme_primary_color.value;
                     }
-                    if (settings.link2_name && settings.link2_name.value && settings.link2_url && settings.link2_url.value) {
-                        html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link2_url.value+'\')">🔗 '+settings.link2_name.value+'</span>';
+                    if (settings.custom_css && settings.custom_css.value) {
+                        var style = document.createElement('style');
+                        style.type = 'text/css';
+                        style.innerHTML = settings.custom_css.value;
+                        var head = document.getElementsByTagName('head')[0];
+                        if (head) head.appendChild(style);
                     }
-                    if (html !== '') {
-                        linksContainer.innerHTML = html;
+                    var linksContainer = document.getElementById('custom-links-container');
+                    if (linksContainer) {
+                        var html = '';
+                        if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
+                            html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link1_url.value+'\')">🔗 '+settings.link1_name.value+'</span>';
+                        }
+                        if (settings.link2_name && settings.link2_name.value && settings.link2_url && settings.link2_url.value) {
+                            html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link2_url.value+'\')">🔗 '+settings.link2_name.value+'</span>';
+                        }
+                        if (html !== '') { linksContainer.innerHTML = html; }
                     }
-                }
-            } catch(e) {}
-        }
-    };
-    xhr.send();
+                } catch(e) {}
+            }
+        };
+        xhr.send();
+    } catch(e) {}
 }
 
 loadCustomThemeAndLinks();
+
+// КРИТИЧЕСКИЙ КЛЮЧ: Принудительное тотальное уничтожение подписок при закрытии окна в 1С
+window.onbeforeunload = function() {
+    try {
+        if (socket) {
+            socket.removeAllListeners();
+            socket.disconnect();
+            socket = null;
+        }
+    } catch(e) {}
+};
 
 window.onload = function() {
     try {
