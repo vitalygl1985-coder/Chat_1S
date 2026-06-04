@@ -107,7 +107,88 @@ def init_db():
         conn.close()
 
 init_db()
-# --- API АВТОРИЗАЦИИ ---
+
+# ========== PYDANTIC МОДЕЛИ (ДОЛЖНЫ БЫТЬ ДО ИСПОЛЬЗОВАНИЯ) ==========
+
+class AuthRequest(BaseModel):
+    id_user: str
+    id_org: str
+    username: str
+    role: str = "user"
+
+class SendMessageRequest(BaseModel):
+    room_id: int
+    text: str
+    is_secret: bool = False
+    id_user_from: str
+    username: str
+
+class AddToRoomRequest(BaseModel):
+    room_id: int
+    user_id: str
+    admin_id: str
+
+class RemoveFromRoomRequest(BaseModel):
+    room_id: int
+    user_id: str
+    admin_id: str
+
+class CreateGroupRequest(BaseModel):
+    id_org: str
+    name: str
+    created_by: str
+    creator_name: str
+    is_admin: bool = False
+
+class CreatePrivateChatRequest(BaseModel):
+    id_org: str
+    user1_id: str
+    user1_name: str
+    user2_id: str
+    user2_name: str
+
+class DeleteRoomRequest(BaseModel):
+    room_id: int
+    admin_id: str
+
+class ArchiveRoomRequest(BaseModel):
+    room_id: int
+    admin_id: str
+
+class AdminAuthRequest(BaseModel):
+    id_user: str
+    id_org: str
+
+class SaveSettingsRequest(BaseModel):
+    theme_primary_color: str
+    link1_name: str
+    link1_url: str
+    link2_name: str
+    link2_url: str
+
+class ExecuteSqlRequest(BaseModel):
+    sql: str
+
+# ========== HTML СТРАНИЦЫ ==========
+
+@app.get("/", response_class=HTMLResponse)
+async def get_chat_page():
+    try:
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"Ошибка загрузки index.html: {str(e)}"
+
+@app.get("/admin", response_class=HTMLResponse)
+async def get_admin_page():
+    try:
+        with open("admin.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"Ошибка admin.html: {str(e)}"
+
+# ========== API АВТОРИЗАЦИИ ==========
+
 @app.post("/api/auth")
 async def auth_user(data: AuthRequest):
     conn = get_db_connection()
@@ -139,7 +220,8 @@ async def auth_user(data: AuthRequest):
         cur.close()
         conn.close()
 
-# --- API КОМНАТ ---
+# ========== API КОМНАТ ==========
+
 @app.get("/api/rooms")
 async def get_rooms(id_org: str, id_user: str):
     conn = get_db_connection()
@@ -197,7 +279,8 @@ async def get_room_participants(room_id: int):
         cur.close()
         conn.close()
 
-# --- API СООБЩЕНИЙ ---
+# ========== API СООБЩЕНИЙ ==========
+
 @app.get("/api/messages")
 async def get_messages(room_id: int, after: Optional[int] = 0):
     conn = get_db_connection()
@@ -242,7 +325,8 @@ async def send_message(data: SendMessageRequest):
         cur.close()
         conn.close()
 
-# --- API УПРАВЛЕНИЯ ---
+# ========== API УПРАВЛЕНИЯ ==========
+
 @app.post("/api/add_to_room")
 async def add_to_room(data: AddToRoomRequest):
     conn = get_db_connection()
@@ -376,84 +460,9 @@ async def archive_room(data: ArchiveRoomRequest):
     finally:
         cur.close()
         conn.close()
-        
-class AuthRequest(BaseModel):
-    id_user: str
-    id_org: str
-    username: str
-    role: str = "user"
 
-class SendMessageRequest(BaseModel):
-    room_id: int
-    text: str
-    is_secret: bool = False
-    id_user_from: str
-    username: str
+# ========== ФАЙЛЫ ==========
 
-class AddToRoomRequest(BaseModel):
-    room_id: int
-    user_id: str
-    admin_id: str
-
-class RemoveFromRoomRequest(BaseModel):
-    room_id: int
-    user_id: str
-    admin_id: str
-
-class CreateGroupRequest(BaseModel):
-    id_org: str
-    name: str
-    created_by: str
-    creator_name: str
-    is_admin: bool = False
-
-class CreatePrivateChatRequest(BaseModel):
-    id_org: str
-    user1_id: str
-    user1_name: str
-    user2_id: str
-    user2_name: str
-
-class DeleteRoomRequest(BaseModel):
-    room_id: int
-    admin_id: str
-
-class ArchiveRoomRequest(BaseModel):
-    room_id: int
-    admin_id: str
-
-class AdminAuthRequest(BaseModel):
-    id_user: str
-    id_org: str
-
-class SaveSettingsRequest(BaseModel):
-    theme_primary_color: str
-    link1_name: str
-    link1_url: str
-    link2_name: str
-    link2_url: str
-
-class ExecuteSqlRequest(BaseModel):
-    sql: str
-
-# --- HTML СТРАНИЦЫ ---
-@app.get("/", response_class=HTMLResponse)
-async def get_chat_page():
-    try:
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception as e:
-        return f"Ошибка загрузки index.html: {str(e)}"
-
-@app.get("/admin", response_class=HTMLResponse)
-async def get_admin_page():
-    try:
-        with open("admin.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception as e:
-        return f"Ошибка admin.html: {str(e)}"
-
-# --- ФАЙЛЫ ---
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -509,7 +518,8 @@ async def download_file(file_uuid: str):
             )
     raise HTTPException(status_code=404, detail="Файл не найден")
 
-# --- АДМИН API ---
+# ========== АДМИН API ==========
+
 @app.get("/api/admin/settings")
 async def get_admin_settings():
     conn = get_db_connection()
@@ -622,7 +632,7 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
         cur.close()
         conn.close()
 
-# --- SOCKET.IO EVENTS ---
+# ========== SOCKET.IO EVENTS (ДЛЯ СОВМЕСТИМОСТИ) ==========
 
 @sio.event
 async def connect(sid, environ, auth=None):
@@ -766,7 +776,7 @@ async def get_room_history(sid, data):
         conn.close()
 
 @sio.event
-async def send_message(sid, data):
+async def send_message_socket(sid, data):
     room_id = data.get('room_id')
     text = data.get('text')
     is_secret = data.get('is_secret', False)
@@ -801,7 +811,7 @@ async def send_message(sid, data):
         conn.close()
 
 @sio.event
-async def get_room_participants(sid, data):
+async def get_room_participants_socket(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
@@ -824,7 +834,7 @@ async def get_room_participants(sid, data):
         conn.close()
 
 @sio.event
-async def add_user_to_room(sid, data):
+async def add_user_to_room_socket(sid, data):
     room_id = data.get('room_id')
     user_id = data.get('user_id')
     if not room_id or not user_id:
@@ -860,7 +870,7 @@ async def add_user_to_room(sid, data):
         conn.close()
 
 @sio.event
-async def remove_user_from_room(sid, data):
+async def remove_user_from_room_socket(sid, data):
     room_id = data.get('room_id')
     target_user_id = data.get('target_user_id')
     if not room_id or not target_user_id:
@@ -897,7 +907,7 @@ async def remove_user_from_room(sid, data):
         conn.close()
 
 @sio.event
-async def delete_room(sid, data):
+async def delete_room_socket(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
@@ -926,7 +936,7 @@ async def delete_room(sid, data):
         conn.close()
 
 @sio.event
-async def archive_room_history(sid, data):
+async def archive_room_history_socket(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
@@ -963,7 +973,7 @@ async def archive_room_history(sid, data):
         conn.close()
 
 @sio.event
-async def create_group_chat(sid, data):
+async def create_group_chat_socket(sid, data):
     group_name = data.get('group_name')
     if not group_name:
         return
@@ -993,7 +1003,7 @@ async def create_group_chat(sid, data):
         conn.close()
 
 @sio.event
-async def create_private_chat(sid, data):
+async def create_private_chat_socket(sid, data):
     target_user_id = data.get('target_user_id')
     target_username = data.get('target_username')
     session = await sio.get_session(sid)
