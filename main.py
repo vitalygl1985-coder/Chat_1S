@@ -12,7 +12,7 @@ from psycopg2.extras import RealDictCursor
 # Инициализируем FastAPI
 app = FastAPI()
 
-# Разрешаем CORS
+# Разрешаем CORS, чтобы 1С и любые клиенты не блокировались браузерами
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Настройка Socket.IO сервера
+# Настройка Socket.IO сервера (с поддержкой polling для старых движков IE/1С)
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
@@ -29,17 +29,24 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
-    # Если Railway отдал URL, начинающийся с postgres://, заменяем на postgresql:// для psycopg2
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url)
 
-# Модель данных для авторизации админа
+# --- МОДЕЛИ ДАННЫХ ДЛЯ PVDANTIC ---
+
 class AdminAuthRequest(BaseModel):
     id_user: str
     id_org: str
 
-# --- РОУТЫ ДЛЯ СТАТИКИ И СТРАНИЦ ---
+class SaveSettingsRequest(BaseModel):
+    theme_primary_color: str
+    link1_name: str
+    link1_url: str
+    link2_name: str
+    link2_url: str
+
+# --- РОУТЫ ДЛЯ СТАТИКИ И HTML-СТРАНИЦ ---
 
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
@@ -57,13 +64,76 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка загрузки admin.html: {str(e)}"
 
-# --- НОВЫЙ РОУТ: АВТОРИЗАЦИЯ АДМИНИСТРАТОРА (Устраняет 404) ---
+# --- РАБОТА С ТАБЛИЦЕЙ ADMIN_SETTINGS (ДИНАМИЧЕСКИЙ ВНЕШНИЙ ВИД) ---
+
+@app.get("/api/admin/settings")
+async def get_admin_settings():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT key, value FROM admin_settings")
+        rows = cur.fetchall()
+        
+        settings_dict = {}
+        for row in rows:
+            settings_dict[row['key']] = {"value": row['value']}
+            
+        # Дефолтные настройки, если таблица в базе пустая
+        if not settings_dict:
+            return {
+                "theme_primary_color": {"value": "#2563eb"},
+                "link1_name": {"value": ""},
+                "link1_url": {"value": ""},
+                "link2_name": {"value": ""},
+                "link2_url": {"value": ""}
+            }
+            
+        return settings_dict
+    except Exception as e:
+        print(f"Ошибка получения настроек из БД: {e}")
+        return JSONResponse(status_code=500, content={"message": "Ошибка БД"})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/admin/settings")
+async def save_admin_settings(data: SaveSettingsRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        settings_to_save = {
+            "theme_primary_color": data.theme_primary_color,
+            "link1_name": data.link1_name,
+            "link1_url": data.link1_url,
+            "link2_name": data.link2_name,
+            "link2_url": data.link2_url
+        }
+        
+        # Перезаписываем или обновляем настройки (UPSERT логика)
+        for key, value in settings_to_save.items():
+            cur.execute("""
+                INSERT INTO admin_settings (key, value)
+                VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """, (key, value))
+            
+        conn.commit()
+        return {"success": True, "message": "Настройки успешно сохранены"}
+    except Exception as e:
+        print(f"Ошибка сохранения настроек в БД: {e}")
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "message": "Не удалось сохранить настройки"})
+    finally:
+        cur.close()
+        conn.close()
+
+# --- АВТОРИЗАЦИЯ АДМИНИСТРАТОРА ---
+
 @app.post("/api/admin/auth")
 async def admin_auth(data: AdminAuthRequest):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Проверяем, существует ли пользователь, активен ли он и является ли админом
         query = """
             SELECT id_user, username, role, id_org 
             FROM users 
@@ -73,22 +143,20 @@ async def admin_auth(data: AdminAuthRequest):
         user = cur.fetchone()
         
         if not user:
-            return JSONResponse(status_code=403, content={"success": False, "message": "Пользователь не найден в данной организации"})
+            return JSONResponse(status_code=403, content={"success": False, "message": "Пользователь не найден"})
         
         if user['role'] != 'admin':
-            return JSONResponse(status_code=403, content={"success": False, "message": "Недостаточно прав. Требуется роль admin"})
+            return JSONResponse(status_code=403, content={"success": False, "message": "Требуется роль admin"})
         
-        # Если всё ок — пускаем в панель
         return {"success": True, "user": user}
-        
     except Exception as e:
         print(f"Ошибка авторизации админа: {e}")
-        return JSONResponse(status_code=500, content={"success": False, "message": "Внутренняя ошибка сервера"})
+        return JSONResponse(status_code=500, content={"success": False, "message": "Ошибка сервера"})
     finally:
         cur.close()
         conn.close()
 
-# --- ОБРАБОТЧИКИ СОБЫТИЙ SOCKET.IO ---
+# --- ОБРАБОТЧИКИ СОБЫТИЙ SOCKET.IO (ЧАТ И TEAMS-СТРУКТУРА) ---
 
 @sio.event
 async def connect(sid, environ, auth=None):
@@ -223,7 +291,7 @@ async def send_message(sid, data):
 
         await sio.emit('new_message', new_msg, room=f"room_{room_id}")
     except Exception as e:
-        print(f"Ошибка отправки: {e}")
+        print(f"Ошибка отправки сообщения: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -280,7 +348,7 @@ async def add_user_to_room(sid, data):
         participants = cur.fetchall()
         await sio.emit('room_participants_list', {'participants': participants}, room=f"room_{room_id}")
     except Exception as e:
-        print(f"Ошибка добавления: {e}")
+        print(f"Ошибка добавления человека: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -308,7 +376,7 @@ async def create_group_chat(sid, data):
         conn.commit()
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
-        print(f"Ошибка кабинета: {e}")
+        print(f"Ошибка создания кабинета: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -351,10 +419,11 @@ async def create_private_chat(sid, data):
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, id_user))
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, target_user_id))
         conn.commit()
+        
         await sio.emit('private_chat_created', {'id_room': room_id}, to=sid)
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
-        print(f"Ошибка приватного чата: {e}")
+        print(f"Ошибка создания личного чата: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -364,4 +433,5 @@ async def create_private_chat(sid, data):
 async def disconnect(sid):
     print(f"Отключился: {sid}")
 
+# Монтируем Socket.IO приложение на выделенный путь /socket.io
 app.mount("/socket.io", socket_app)
