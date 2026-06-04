@@ -29,8 +29,12 @@
         .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
         
         .btn-small { padding: 2px 6px; font-size: 10px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; float: right; }
+        .btn-danger-xs { padding: 1px 4px; font-size: 9px; background-color: #ef4444; color: white; border: none; border-radius: 3px; cursor: pointer; float: right; }
         
         .chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; border-right: 1px solid #e5e7eb; }
+        .chat-header { padding: 10px 16px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; color: #374151; }
+        .chat-actions { display: flex; gap: 6px; }
+        
         .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
         .msg-block { background-color: white; padding: 8px 12px; border-radius: 8px; max-width: 70%; margin-bottom: 8px; align-self: flex-start; }
         .msg-author { font-size: 10px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
@@ -38,7 +42,7 @@
         
         .participants-panel { width: 220px; background-color: white; display: flex; flex-direction: column; padding: 12px; overflow-y: auto; }
         .participants-panel h3 { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-        .participant-item { padding: 4px 6px; font-size: 12px; color: #4b5563; }
+        .participant-item { padding: 4px 6px; font-size: 12px; color: #4b5563; line-height: 18px; clear: both; }
 
         .input-panel { padding: 12px; background-color: white; border-top: 1px solid #e5e7eb; }
         .secret-row { margin-bottom: 6px; }
@@ -79,6 +83,15 @@
 
     <div class="chat-window" id="chat-window">
         <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы</div></div>
+        
+        <div class="chat-header">
+            <span id="current-chat-title">Выберите кабинет или сотрудника</span>
+            <div class="chat-actions" id="chat-management-actions" style="display: none;">
+                <button onclick="triggerArchive()" class="btn-small" style="background:#eab308; float:none;">📦 В архив</button>
+                <button onclick="triggerDeleteRoom()" class="btn-small" style="background:#ef4444; float:none;">❌ Удалить</button>
+            </div>
+        </div>
+
         <div id="messages-container" class="messages-container">
             <div class="msg-block"><span class="msg-author">Система</span><div class="msg-text">Выберите кабинет или сотрудника для начала общения.</div></div>
         </div>
@@ -117,6 +130,8 @@ try {
 
 var socket = null;
 var currentRoomId = null;
+var currentRoomType = "";
+var currentRoomCreator = "";
 var isSecretMode = false;
 var userSecretKey = "";
 var currentUserId = "";
@@ -191,7 +206,19 @@ function apply1CAuth(id_user, id_org, username, user_role) {
             if (msg && msg.id_room == currentRoomId) displayMessage(msg, false); 
         });
         
+        socket.on('system_alert', function(data) { alert(data.message); });
         socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
+        
+        socket.on('download_archive_file', function(data) {
+            var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data.messages, null, 2));
+            var downloadAnchorElement = document.createElement('a');
+            downloadAnchorElement.setAttribute("href", dataStr);
+            downloadAnchorElement.setAttribute("download", "archive_room_" + currentRoomId + ".json");
+            document.body.appendChild(downloadAnchorElement);
+            downloadAnchorElement.click();
+            downloadAnchorElement.remove();
+            alert("История переписки успешно сохранена на ваше устройство. На сервере ветка очищена.");
+        });
     } catch(err) { }
 }
 
@@ -205,14 +232,32 @@ function renderRoomsList(rooms) {
             var room = rooms[i];
             var div = document.createElement('div');
             div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
-            div.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
+            div.innerText = (room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ')) + room.name;
             
             (function(r) {
                 div.onclick = function() {
                     currentRoomId = r.id_room;
+                    currentRoomType = r.type;
+                    currentRoomCreator = r.created_by;
                     
+                    document.getElementById('current-chat-title').innerText = r.name;
+                    
+                    // Показываем блок управления (Архив, Удаление) только для групповых комнат, где у юзера есть права
+                    var mgtActions = document.getElementById('chat-management-actions');
+                    if (mgtActions) {
+                        if (r.type === 'private') {
+                            mgtActions.style.display = 'none';
+                        } else {
+                            mgtActions.style.display = (currentUserRole === 'admin' || r.created_by == currentUserId) ? 'flex' : 'none';
+                        }
+                    }
+
                     var btnAdd = document.getElementById('btn-add-participant');
-                    if (btnAdd) btnAdd.style.display = r.type === 'group' ? 'inline-block' : 'none';
+                    if (btnAdd) {
+                        if (r.type === 'private') btnAdd.style.display = 'none';
+                        else if (r.type === 'admin_group') btnAdd.style.display = (currentUserRole === 'admin') ? 'inline-block' : 'none';
+                        else btnAdd.style.display = 'inline-block'; // В обычных комнатах добавлять могут любые участники
+                    }
 
                     document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка истории...</div></div>";
                     
@@ -257,9 +302,27 @@ function renderParticipantsList(list) {
     container.innerHTML = "";
     if (!list || list.length === 0) { container.innerHTML = "<div>Только вы</div>"; return; }
     for (var i = 0; i < list.length; i++) {
+        var p = list[i];
         var div = document.createElement('div');
         div.className = 'participant-item';
-        div.innerText = "• " + list[i].username;
+        div.innerText = "• " + p.username;
+        
+        // Кнопка удаления участника (Выгнать из комнаты Teams)
+        if (currentRoomType !== 'private' && p.id_user != currentUserId) {
+            if (currentUserRole === 'admin' || currentRoomCreator == currentUserId) {
+                var btnKick = document.createElement('button');
+                btnKick.className = 'btn-danger-xs';
+                btnKick.innerText = 'Выгнать';
+                (function(targetId) {
+                    btnKick.onclick = function() {
+                        if (confirm("Исключить данного сотрудника из этого кабинета?")) {
+                            if (socket) socket.emit('remove_user_from_room', { room_id: currentRoomId, target_user_id: targetId });
+                        }
+                    };
+                })(p.id_user);
+                div.appendChild(btnKick);
+            }
+        }
         container.appendChild(div);
     }
 }
@@ -286,6 +349,23 @@ document.getElementById('btn-add-participant').onclick = function() {
         } else { alert("Неверный ID!"); }
     }
 };
+
+function triggerDeleteRoom() {
+    if (currentRoomId && confirm("Вы уверены, что хотите полностью удалить этот кабинет и всю историю переписки?")) {
+        if (socket) socket.emit('delete_room', { room_id: currentRoomId });
+        document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Кабинет удален.</div></div>";
+        document.getElementById('current-chat-title').innerText = "Выберите кабинет или сотрудника";
+        document.getElementById('chat-management-actions').style.display = 'none';
+        document.getElementById('participants-list').innerText = "Не выбран чат";
+        currentRoomId = null;
+    }
+}
+
+function triggerArchive() {
+    if (currentRoomId && confirm("Выгрузить лог переписки на это устройство и полностью стереть его с сервера?")) {
+        if (socket) socket.emit('archive_room_history', { room_id: currentRoomId });
+    }
+}
 
 function displayMessage(msg, isBulkLoad) {
     try {
