@@ -563,17 +563,19 @@ function uploadFile(file) {
                         var content = isImg ? '<img src="'+absoluteUrl+'" />' : '<a href="'+absoluteUrl+'" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:bold; cursor:pointer;">📄 Скачать: '+file.name+'</a>';
                         socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
-                } catch(e) {}
+                } catch(e) { alert("Ошибка парсинга ответа сервера"); }
             } else { alert('Ошибка отправки файла.'); }
         };
+        xhr.onerror = function() { alert('Ошибка сети при отправке файла'); };
         xhr.send(fd);
-    } catch(e) {}
+    } catch(e) { alert('Ошибка при вызове uploadFile: ' + e.message); }
 }
 
 function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket) return;
     
     var cleanBase64 = rawInputString;
+    // Парсинг Base64 из HTML-вставки
     if (rawInputString.indexOf('src="') !== -1) {
         var match = rawInputString.match(/src="([^"]+)"/);
         if (match && match[1]) { cleanBase64 = match[1]; }
@@ -584,26 +586,32 @@ function uploadBase64Image(rawInputString) {
     cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
 
     try {
-        var byteCharacters = atob(cleanBase64);
-        var byteNumbers = new Array(byteCharacters.length);
-        for (var i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        // Проверка: atob работает в большинстве версий 1С 8.3.5, но если нет — используем fallback
+        if (typeof atob === 'function') {
+            var byteCharacters = atob(cleanBase64);
+            var byteNumbers = new Array(byteCharacters.length);
+            for (var i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            var byteArray = new Uint8Array(byteNumbers);
+            var blob = new Blob([byteArray], {type: 'image/png'});
+            var file = new File([blob], "screenshot_1c_" + Date.now() + ".png", {type: "image/png"});
+            uploadFile(file);
+        } else {
+            alert("Ваш браузер 1С не поддерживает декодирование Base64. Используйте кнопку 'Прикрепить файл'.");
         }
-        var byteArray = new Uint8Array(byteNumbers);
-        var blob = new Blob([byteArray], {type: 'image/png'});
-        var file = new File([blob], "screenshot_1c_" + Date.now() + ".png", {type: "image/png"});
-        
-        uploadFile(file);
     } catch(e) {
-        alert("Не удалось декодировать скриншот.");
+        alert("Ошибка декодирования скриншота: " + e.message);
     }
 }
 
+// ПРАВКА: Вставка скриншота через Ctrl+V
 if (inputMsg) {
     inputMsg.onpaste = function(event) {
         var clipboardData = event.clipboardData || window.clipboardData;
         if (!clipboardData) return;
         
+        // Для IE/1С используем getData
         var htmlData = "";
         try { htmlData = clipboardData.getData("HTML") || clipboardData.getData("Text"); } catch(e) {}
         
