@@ -58,13 +58,12 @@
         .file-link { color: #2563eb; text-decoration: underline; font-weight: bold; cursor: pointer; }
         .file-link:hover { text-decoration: none; }
         img { max-width: 100%; max-height: 150px; border-radius: 4px; cursor: pointer; display: block; margin-top: 4px; }
-        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.05); border: 3px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; }
-        .drop-box { background: white; padding: 12px; border-radius: 6px; font-weight: bold; color: #2563eb; font-size: 12px; }
         
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 100; }
-        .modal-body { background: white; padding: 16px; border-radius: 8px; width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .modal-body { background: white; padding: 16px; border-radius: 8px; width: 350px; max-width: 90%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .modal-body h4 { font-size: 13px; margin-bottom: 10px; }
-        .modal-body select, .modal-body input { width: 100%; padding: 6px; font-size: 12px; margin-bottom: 12px; outline: none; border: 1px solid #d1d5db; }
+        .modal-body select, .modal-body input, .modal-body textarea { width: 100%; padding: 6px; font-size: 12px; margin-bottom: 12px; outline: none; border: 1px solid #d1d5db; }
+        .modal-body textarea { height: 80px; font-family: monospace; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; }
     </style>
 </head>
@@ -89,8 +88,6 @@
     </div>
 
     <div class="chat-window" id="chat-window">
-        <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы</div></div>
-        
         <div class="chat-header">
             <span id="current-chat-title">Выберите кабинет или сотрудника</span>
             <div class="chat-actions" id="chat-management-actions" style="display: none;">
@@ -105,12 +102,12 @@
         <div class="input-panel">
             <div class="secret-row">
                 <button id="btn-secret" class="btn-secret">🔒 Шифровать</button>
-                <button id="btn-paste-screen" class="btn-secret" style="background:#e5e7eb; color:#1f2937; margin-left:6px;">📋 Вставить скриншот</button>
+                <button id="btn-paste-screen" class="btn-secret" style="background:#e5e7eb; color:#1f2937; margin-left:6px;">📋 Вставить скриншот (Base64)</button>
             </div>
             <div class="controls-row">
                 <input type="file" id="file-input" style="display:none">
                 <button id="btn-file" class="btn-file">📎</button>
-                <div id="input-msg" class="input-msg-div" contenteditable="true" data-placeholder="Напишите сообщение... Для вставки скриншота нажмите Ctrl+V или кнопку выше"></div>
+                <div id="input-msg" class="input-msg-div" contenteditable="true" data-placeholder="Напишите сообщение..."></div>
                 <button id="btn-send" class="btn-send">Отправить</button>
             </div>
         </div>
@@ -158,11 +155,17 @@
     </div>
 </div>
 
+<!-- МОДАЛЬНОЕ ОКНО ДЛЯ ВСТАВКИ BASE64 СКРИНШОТА - ОСНОВНОЙ СПОСОБ ДЛЯ 1С -->
 <div class="modal-overlay" id="base64-image-modal">
     <div class="modal-body">
-        <h4>Вставка скриншота</h4>
-        <p style="font-size:11px; color:#6b7280; margin-bottom:8px;">Вставьте скриншот (Ctrl+V) прямо в поле ниже:</p>
-        <input type="text" id="modal-base64-field" placeholder="Ожидание вставки..." />
+        <h4>Вставка скриншота (Base64)</h4>
+        <p style="font-size:11px; color:#6b7280; margin-bottom:8px;">
+            1. Сделайте скриншот (PrintScreen)<br>
+            2. Вставьте его в любое место (Ctrl+V)<br>
+            3. Скопируйте сюда содержимое поля "src=" из HTML<br>
+            или вставьте напрямую base64 строку
+        </p>
+        <textarea id="modal-base64-field" placeholder='Например: data:image/png;base64,iVBORw0KGgo...'></textarea>
         <div class="modal-buttons">
             <button onclick="closeBase64Modal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
             <button id="base64-modal-submit-btn" class="btn-small" style="background:#2563eb;">Отправить</button>
@@ -171,7 +174,13 @@
 </div>
 
 <script>
-window.onerror = function(message, url, line) { return true; };
+window.onerror = function(message, url, line) { 
+    // Подавляем ошибки 1С, но логируем в консоль для отладки
+    if (message && message.indexOf('0x800a01b6') === -1) {
+        console.log('Error: ' + message);
+    }
+    return true; 
+};
 
 var socket = null;
 var currentRoomId = null;
@@ -438,8 +447,9 @@ function openBase64Modal(submitCallback) {
     field.value = "";
     document.getElementById('base64-image-modal').style.display = 'flex';
     document.getElementById('base64-modal-submit-btn').onclick = function() {
-        if (field.value.trim() !== "") {
-            submitCallback(field.value.trim());
+        var val = field.value.trim();
+        if (val !== "") {
+            submitCallback(val);
         }
         closeBase64Modal();
     };
@@ -538,7 +548,7 @@ function sendMessage() {
     
     var sendAsSecret = isSecretMode;
     try {
-        if (isSecretMode) {
+        if (isSecretMode && userSecretKey) {
             text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
         }
     } catch(e) { }
@@ -562,10 +572,9 @@ function uploadFile(file) {
                     if (data && data.url && socket) {
                         var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                         var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
-                        // ИСПРАВЛЕНО: ссылка для скачивания с правильным обработчиком
                         var content = isImg ? 
                             '<img src="'+absoluteUrl+'" onclick="window.open(\''+absoluteUrl+'\')" />' : 
-                            '<a href="'+absoluteUrl+'" class="file-link" onclick="downloadFile(\''+data.url+'\', \''+file.name+'\'); return false;">📄 Скачать: '+file.name+'</a>';
+                            '<a href="#" onclick="downloadFile(\''+data.url+'\', \''+file.name+'\'); return false;" style="color:#2563eb; text-decoration:underline;">📄 Скачать: '+file.name+'</a>';
                         socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
                 } catch(e) { alert("Ошибка парсинга ответа сервера"); }
@@ -576,87 +585,71 @@ function uploadFile(file) {
     } catch(e) { alert('Ошибка при вызове uploadFile: ' + e.message); }
 }
 
-// ИСПРАВЛЕНО: функция для принудительного скачивания файла в 1С
+// Функция скачивания файла для 1С (через iframe)
 function downloadFile(url, filename) {
     var fullUrl = window.location.protocol + '//' + window.location.host + url;
-    // Для IE/1С используем создание iframe для скачивания
+    // Для IE/1С используем iframe
     var iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = fullUrl;
     document.body.appendChild(iframe);
     setTimeout(function() {
-        document.body.removeChild(iframe);
-    }, 5000);
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 10000);
     return false;
 }
 
-// ИСПРАВЛЕНО: функция для отправки скриншота из буфера обмена
-function handlePasteEvent(event) {
-    var clipboardData = event.clipboardData || window.clipboardData;
-    if (!clipboardData) return true;
+// Функция отправки base64 изображения (основной способ для 1С)
+function uploadBase64Image(base64String) {
+    if (!currentRoomId || !socket) return;
     
-    // Проверяем наличие изображения в буфере
-    if (clipboardData.items) {
-        for (var i = 0; i < clipboardData.items.length; i++) {
-            var item = clipboardData.items[i];
-            if (item.type && item.type.indexOf('image') !== -1) {
-                var file = item.getAsFile();
-                if (file) {
-                    uploadFile(file);
-                    if (event.preventDefault) event.preventDefault();
-                    return false;
-                }
-            }
+    // Очищаем строку от HTML тегов и лишнего
+    var cleanBase64 = base64String;
+    
+    // Если пришла HTML строка с src="data:image..."
+    if (base64String.indexOf('src="') !== -1) {
+        var match = base64String.match(/src="([^"]+)"/);
+        if (match && match[1]) {
+            cleanBase64 = match[1];
         }
     }
     
-    // Fallback: пытаемся получить HTML с data:image
-    var htmlData = "";
-    try { 
-        htmlData = clipboardData.getData("HTML") || clipboardData.getData("Text"); 
-    } catch(e) {}
+    // Если пришла data:image/png;base64,xxx - оставляем как есть для отображения
+    // Но для загрузки на сервер нужно отправить файл
     
-    if (htmlData && htmlData.indexOf("data:image") !== -1) {
-        uploadBase64Image(htmlData);
-        if (event.preventDefault) event.preventDefault();
-        return false;
+    if (cleanBase64.indexOf('data:image') === 0) {
+        // Это data URL, показываем как есть
+        var imgHtml = '<img src="'+cleanBase64+'" style="max-width:100%; max-height:150px;" />';
+        socket.emit('send_message', { room_id: currentRoomId, text: imgHtml, is_secret: false });
+        return;
     }
     
-    return true;
-}
-
-function uploadBase64Image(rawInputString) {
-    if (!currentRoomId || !socket) return;
-    
-    var cleanBase64 = rawInputString;
-    if (rawInputString.indexOf('src="') !== -1) {
-        var match = rawInputString.match(/src="([^"]+)"/);
-        if (match && match[1]) { cleanBase64 = match[1]; }
-    }
-    if (cleanBase64.indexOf(",") !== -1) {
-        cleanBase64 = cleanBase64.split(",")[1];
-    }
-    cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
-
+    // Пробуем декодировать base64 и отправить как файл
     try {
+        // Убираем префикс если есть
+        if (cleanBase64.indexOf(',') !== -1) {
+            cleanBase64 = cleanBase64.split(',')[1];
+        }
+        cleanBase64 = cleanBase64.replace(/\s/g, '');
+        
         // Декодируем base64 в бинарные данные
         var binaryString = atob(cleanBase64);
         var len = binaryString.length;
-        var bytes = new Uint8Array(len);
+        var bytes = new Array(len);
         for (var i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
-        var blob = new Blob([bytes], {type: 'image/png'});
-        var file = new File([blob], "screenshot_" + Date.now() + ".png", {type: "image/png"});
+        var byteArray = new Uint8Array(bytes);
+        var blob = new Blob([byteArray], {type: 'image/png'});
+        var file = new File([blob], "screenshot_" + new Date().getTime() + ".png", {type: "image/png"});
         uploadFile(file);
     } catch(e) {
-        alert("Ошибка декодирования скриншота: " + e.message);
+        // Если не получилось декодировать - отправляем как текст
+        alert("Не удалось распознать изображение. Убедитесь, что вы вставили корректную base64 строку.\nОшибка: " + e.message);
     }
 }
 
-// Навешиваем обработчик paste на всё окно
-window.onpaste = handlePasteEvent;
-
+// Обработчик кнопки "Вставить скриншот"
 document.getElementById('btn-paste-screen').onclick = function() {
     openBase64Modal(function(base64Code) {
         uploadBase64Image(base64Code);
@@ -671,21 +664,28 @@ document.getElementById('btn-create-group').onclick = function() {
 
 document.getElementById('btn-secret').onclick = function() {
     if (!isSecretMode) {
-        openSecretModal("Задайте ключ шифрования для исходящих", function(enteredKey) {
+        openSecretModal("Задайте ключ шифрования для исходящих сообщений", function(enteredKey) {
             userSecretKey = enteredKey;
             isSecretMode = true;
             document.getElementById('btn-secret').className = 'btn-secret active';
+            alert("Режим шифрования включен. Все отправляемые сообщения будут зашифрованы.");
         });
     } else {
         isSecretMode = false;
         userSecretKey = "";
-        this.className = 'btn-secret';
+        document.getElementById('btn-secret').className = 'btn-secret';
+        alert("Режим шифрования выключен.");
     }
 };
 
 document.getElementById('btn-send').onclick = sendMessage;
 document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); this.value = ""; };
+document.getElementById('file-input').onchange = function(e) { 
+    if (e.target.files && e.target.files[0]) {
+        uploadFile(e.target.files[0]);
+    }
+    this.value = ""; 
+};
 
 if (inputMsg) {
     inputMsg.onkeydown = function(e) { 

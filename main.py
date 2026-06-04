@@ -163,7 +163,6 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ИСПРАВЛЕНО: правильный Content-Disposition для IE/1С
 @app.get("/download/{file_uuid}")
 async def download_file(file_uuid: str):
     # Ищем файл в папке
@@ -182,10 +181,9 @@ async def download_file(file_uuid: str):
             if not original_name:
                 original_name = filename.split("_", 1)[-1] if "_" in filename else filename
             
-            # Кодируем имя файла для IE
+            # Кодируем имя файла
             encoded_name = urllib.parse.quote(original_name)
             
-            # Возвращаем с правильными заголовками для принудительного скачивания
             return FileResponse(
                 file_path,
                 media_type='application/octet-stream',
@@ -311,7 +309,11 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
-    params = dict(x.split('=') for x in query_params.split('&') if '=' in x)
+    params = {}
+    for part in query_params.split('&'):
+        if '=' in part:
+            key, val = part.split('=', 1)
+            params[key] = val
     
     id_user = urllib.parse.unquote(params.get('id_user', ''))
     id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
