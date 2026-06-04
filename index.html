@@ -51,7 +51,6 @@
         .controls-row { display: flex; gap: 8px; align-items: center; }
         .btn-file { background-color: #e5e7eb; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
         
-        /* Стили плейсхолдера */
         .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 12px; min-height: 34px; max-height: 80px; overflow-y: auto; background: white; outline: none; color: #1f2937; }
         .input-msg-div:empty:before { content: attr(data-placeholder); color: #9ca3af; }
         
@@ -152,6 +151,18 @@
         <div class="modal-buttons">
             <button onclick="closeTextModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
             <button id="text-modal-submit-btn" class="btn-small" style="background:#10b981;">Создать</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="base64-image-modal">
+    <div class="modal-body">
+        <h4>Вставка скриншота</h4>
+        <p style="font-size:11px; color:#6b7280; margin-bottom:8px;">Вставьте base64-код изображения из буфера обмена:</p>
+        <input type="text" id="modal-base64-field" placeholder="data:image/png;base64,..." />
+        <div class="modal-buttons">
+            <button onclick="closeBase64Modal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
+            <button id="base64-modal-submit-btn" class="btn-small" style="background:#2563eb;">Отправить</button>
         </div>
     </div>
 </div>
@@ -419,6 +430,20 @@ function openTextModal(title, submitCallback) {
 
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
+function openBase64Modal(submitCallback) {
+    var field = document.getElementById('modal-base64-field');
+    field.value = "";
+    document.getElementById('base64-image-modal').style.display = 'flex';
+    document.getElementById('base64-modal-submit-btn').onclick = function() {
+        if (field.value.trim() !== "") {
+            submitCallback(field.value.trim());
+        }
+        closeBase64Modal();
+    };
+}
+
+function closeBase64Modal() { document.getElementById('base64-image-modal').style.display = 'none'; }
+
 document.getElementById('btn-add-participant').onclick = function() {
     if (!currentRoomId) return;
     openUserModal("Добавить сотрудника в кабинет", function(selectedUserId) {
@@ -518,7 +543,6 @@ function sendMessage() {
     if (inputMsg) inputMsg.innerHTML = "";
 }
 
-// ПРАВКА 2: Формирование абсолютных прямых ссылок /download/ для обхода ограничений IE в 1С
 function uploadFile(file) {
     try {
         var fd = new FormData();
@@ -542,13 +566,38 @@ function uploadFile(file) {
     } catch(e) {}
 }
 
-// ПРАВКА 3: Кроссбраузерный paste-обработчик скриншотов под архитектуру Trident (1С 8.3.5)
+// ПРАВКА 2: Отправка сырых Base64 скриншотов для 1С 8.3.5
+function uploadBase64Image(base64Data) {
+    if (!currentRoomId || !socket) return;
+    
+    // Если строка содержит префикс data:image, очищаем его для формирования чистого файла
+    var cleanBase64 = base64Data;
+    if (base64Data.indexOf(",") !== -1) {
+        cleanBase64 = base64Data.split(",")[1];
+    }
+    
+    try {
+        // Конвертируем Base64 в байты, понятные для бэкенда FastAPI
+        var byteCharacters = atob(cleanBase64);
+        var byteNumbers = new Array(byteCharacters.length);
+        for (var i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        var byteArray = new Uint8Array(byteNumbers);
+        var blob = new Blob([byteArray], {type: 'image/png'});
+        var file = new File([blob], "screenshot_1c_" + Date.now() + ".png", {type: "image/png"});
+        
+        uploadFile(file);
+    } catch(e) {
+        alert("Ошибка разбора кода скриншота. Убедитесь, что скопировано именно изображение.");
+    }
+}
+
 if (inputMsg) {
     inputMsg.onpaste = function(event) {
         var clipboardData = event.clipboardData || window.clipboardData;
         if (!clipboardData) return;
         
-        // Метод 1: Современные хром-оболочки (items)
         var items = clipboardData.items;
         if (items) {
             for (var i = 0; i < items.length; i++) {
@@ -564,15 +613,11 @@ if (inputMsg) {
     };
 }
 
-// ПРАВКА 3: Логика кнопки ручной вставки изображения прямо из ОС Windows
+// ПРАВКА: Принудительный вызов немодального окна для ввода Base64 скриншота в 1С
 document.getElementById('btn-paste-screen').onclick = function() {
-    try {
-        if (window.clipboardData) {
-            alert("Используйте Ctrl+V для прямой отправки из буфера обмена ОС.");
-        } else {
-            alert("Буфер обмена пуст или недоступен. Сделайте снимок экрана и нажмите Ctrl+V внутри поля ввода.");
-        }
-    } catch(e) {}
+    openBase64Modal(function(base64Code) {
+        uploadBase64Image(baseCode);
+    });
 };
 
 document.getElementById('btn-create-group').onclick = function() {
