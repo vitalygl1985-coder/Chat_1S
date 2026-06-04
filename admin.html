@@ -53,17 +53,16 @@
         .form-group textarea { min-height: 100px; font-family: monospace; }
         
         button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.3s; }
-        button:hover { background: #1d4ed8; transform: translateY(-1px); }
+        button:hover { background: #1d4ed8; }
         
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
         th { background: #f9fafb; font-weight: 600; color: #374151; }
         
-        .sql-result { margin-top: 20px; overflow-x: auto; background: #1f2937; color: #10b981; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; }
+        .sql-result { margin-top: 20px; overflow-x: auto; background: #1f2937; color: #10b981; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; }
         
         .color-row { display: flex; gap: 10px; align-items: center; }
         .color-row input[type="color"] { width: 60px; height: 40px; cursor: pointer; }
-        .color-row span { flex: 1; }
         
         .toast { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; display: none; z-index: 1000; }
     </style>
@@ -72,8 +71,8 @@
     <div id="login-overlay" class="login-overlay">
         <div class="login-box">
             <h2>🔐 Вход в админ-панель</h2>
-            <input type="text" id="login-user-id" placeholder="ID пользователя">
-            <input type="text" id="login-org-id" placeholder="ID организации">
+            <input type="text" id="login-user-id" placeholder="ID пользователя" value="Admin">
+            <input type="text" id="login-org-id" placeholder="ID организации" value="00000000-0000-0000-0000-000000000001">
             <div id="login-error" class="error">❌ Недостаточно прав для входа</div>
             <button onclick="login()">Войти</button>
         </div>
@@ -83,102 +82,73 @@
         <div class="sidebar">
             <h2>⚙️ Админ-панель</h2>
             <nav>
-                <a id="nav-theme" onclick="showTab('theme')" class="active">🎨 Внешний вид</a>
+                <a id="nav-theme" onclick="showTab('theme')">🎨 Внешний вид</a>
                 <a id="nav-users" onclick="showTab('users')">👥 Пользователи</a>
-                <a id="nav-permissions" onclick="showTab('permissions')">🔐 Права доступа</a>
-                <a id="nav-database" onclick="showTab('database')">🗄️ База данных</a>
+                <a id="nav-database" onclick="showTab('database')" class="active">🗄️ База данных</a>
                 <a id="nav-links" onclick="showTab('links')">🔗 Ссылки</a>
-                <a id="nav-logs" onclick="showTab('logs')">📋 Логи</a>
             </nav>
         </div>
         
         <div class="main-content">
-            <div id="theme-tab" class="tab active">
+            <!-- Вкладка Внешний вид -->
+            <div id="theme-tab" class="tab">
                 <div class="card">
                     <h3>🎨 Настройка цветовой схемы</h3>
                     <div class="form-group">
                         <label>Основной цвет (шапка, кнопки):</label>
                         <div class="color-row">
-                            <input type="color" id="primary-color">
-                            <span id="primary-color-value"></span>
+                            <input type="color" id="primary-color" value="#2563eb">
+                            <span id="primary-color-value">#2563eb</span>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Цвет фона страницы:</label>
-                        <div class="color-row">
-                            <input type="color" id="bg-color">
-                            <span id="bg-color-value"></span>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Цвет текста:</label>
-                        <div class="color-row">
-                            <input type="color" id="text-color">
-                            <span id="text-color-value"></span>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Название компании:</label>
-                        <input type="text" id="company-name" placeholder="Название">
-                    </div>
-                    <div class="form-group">
-                        <label>Логотип:</label>
-                        <input type="file" id="logo-file" accept="image/*">
-                        <div id="logo-preview" style="margin-top: 10px;"></div>
-                    </div>
-                    <div class="form-group">
-                        <label>Пользовательский CSS:</label>
-                        <textarea id="custom-css" placeholder="/* Ваши дополнительные стили */"></textarea>
                     </div>
                     <button onclick="saveTheme()">💾 Сохранить настройки</button>
                 </div>
             </div>
             
+            <!-- Вкладка Пользователи -->
             <div id="users-tab" class="tab">
                 <div class="card">
                     <h3>👥 Пользователи системы</h3>
                     <table id="users-table">
                         <thead>
-                            <tr><th>ID</th><th>Имя</th><th>Роль</th><th>Админ-права</th></tr>
+                            <tr><th>ID</th><th>Имя</th><th>Роль</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
                 </div>
-            </div>
-            
-            <div id="permissions-tab" class="tab">
                 <div class="card">
-                    <h3>🔐 Настройка прав администраторов</h3>
-                    <table id="permissions-table">
-                        <thead>
-                            <tr><th>Администратор</th><th>Управление темами</th><th>Управление БД</th><th>Просмотр логов</th></tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                    <h3>➕ Добавить/Изменить роль пользователя</h3>
+                    <div class="form-group">
+                        <label>ID пользователя:</label>
+                        <input type="text" id="user-id" placeholder="ID пользователя">
+                    </div>
+                    <div class="form-group">
+                        <label>Новая роль:</label>
+                        <select id="user-role">
+                            <option value="user">Пользователь</option>
+                            <option value="admin">Администратор</option>
+                        </select>
+                    </div>
+                    <button onclick="updateUserRole()">🔄 Обновить роль</button>
                 </div>
             </div>
             
-            <div id="database-tab" class="tab">
+            <!-- Вкладка База данных -->
+            <div id="database-tab" class="tab active">
                 <div class="card">
                     <h3>🗄️ Выполнить SQL запрос</h3>
-                    <textarea id="sql-query" rows="5" placeholder="SELECT * FROM users LIMIT 10" style="width:100%; font-family:monospace;"></textarea>
+                    <textarea id="sql-query" rows="6" placeholder="SELECT * FROM users LIMIT 10" style="width:100%; font-family:monospace;"></textarea>
                     <button onclick="executeSQL()" style="margin-top: 10px;">▶️ Выполнить</button>
                     <div id="sql-result" class="sql-result"></div>
                 </div>
-                <div class="card" style="border: 1px solid #fca5a5; background: #fff5f5;">
-                    <h3 style="color: #dc2626;">⚠️ Инструменты быстрой очистки (Редактирование БД)</h3>
-                    <p style="font-size: 13px; color: #4b5563; margin-bottom: 15px;">Удаление истории сообщений или очистка комнат в один клик:</p>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="quickDbAction('clear_messages')" style="background: #dc2626;">🗑️ Очистить всю историю сообщений</button>
-                        <button onclick="quickDbAction('clear_chats')" style="background: #7f1d1d;">❌ Удалить все созданные группы и приватные чаты</button>
-                    </div>
-                </div>
                 <div class="card">
-                    <h3>📊 Таблицы базы данных</h3>
-                    <div id="tables-list"></div>
+                    <h3>📊 Структура базы данных</h3>
+                    <button onclick="showTableStructure()">📋 Показать структуру всех таблиц</button>
+                    <div id="structure-result" class="sql-result" style="margin-top: 10px;"></div>
                 </div>
             </div>
             
+            <!-- Вкладка Ссылки -->
             <div id="links-tab" class="tab">
                 <div class="card">
                     <h3>🔗 Ссылки на главной странице</h3>
@@ -195,14 +165,6 @@
                         <input type="url" id="link2-url" placeholder="https://...">
                     </div>
                     <button onclick="saveLinks()">💾 Сохранить ссылки</button>
-                </div>
-            </div>
-            
-            <div id="logs-tab" class="tab">
-                <div class="card">
-                    <h3>📋 Системные логи</h3>
-                    <button onclick="loadLogs()">🔄 Обновить</button>
-                    <pre id="logs-content" style="margin-top: 15px; background: #1f2937; color: #10b981; padding: 15px; border-radius: 6px; overflow-x: auto; max-height: 500px; font-size: 12px;"></pre>
                 </div>
             </div>
         </div>
@@ -230,278 +192,254 @@
                 return;
             }
             
-            const response = await fetch('/api/admin/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_user, id_org })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                currentAdmin = data.admin;
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('admin-container').style.display = 'flex';
-                loadAllData();
-                showToast(`Добро пожаловать, ${currentAdmin.username}!`);
-            } else {
-                document.getElementById('login-error').style.display = 'block';
-            }
-        }
-        
-        async function loadAllData() {
-            loadSettings();
-            loadUsers();
-            loadPermissions();
-            loadTables();
-            loadLogs();
-        }
-        
-        async function loadSettings() {
-            const response = await fetch('/api/admin/settings');
-            const settings = await response.json();
-            
-            if (settings.theme_primary_color) {
-                document.getElementById('primary-color').value = settings.theme_primary_color.value;
-                document.getElementById('primary-color-value').textContent = settings.theme_primary_color.value;
-            }
-            if (settings.theme_background_color) {
-                document.getElementById('bg-color').value = settings.theme_background_color.value;
-                document.getElementById('bg-color-value').textContent = settings.theme_background_color.value;
-            }
-            if (settings.theme_text_color) {
-                document.getElementById('text-color').value = settings.theme_text_color.value;
-                document.getElementById('text-color-value').textContent = settings.theme_text_color.value;
-            }
-            if (settings.company_name) document.getElementById('company-name').value = settings.company_name.value;
-            if (settings.custom_css) document.getElementById('custom-css').value = settings.custom_css.value;
-            if (settings.link1_name) document.getElementById('link1-name').value = settings.link1_name.value;
-            if (settings.link1_url) document.getElementById('link1-url').value = settings.link1_url.value;
-            if (settings.link2_name) document.getElementById('link2-name').value = settings.link2_name.value;
-            if (settings.link2_url) document.getElementById('link2-url').value = settings.link2_url.value;
-            
-            document.getElementById('primary-color').oninput = function(e) {
-                document.getElementById('primary-color-value').textContent = e.target.value;
-            };
-            document.getElementById('bg-color').oninput = function(e) {
-                document.getElementById('bg-color-value').textContent = e.target.value;
-            };
-            document.getElementById('text-color').oninput = function(e) {
-                document.getElementById('text-color-value').textContent = e.target.value;
-            };
-        }
-        
-        async function saveTheme() {
-            const theme = {
-                theme_primary_color: document.getElementById('primary-color').value,
-                theme_background_color: document.getElementById('bg-color').value,
-                theme_text_color: document.getElementById('text-color').value,
-                company_name: document.getElementById('company-name').value,
-                custom_css: document.getElementById('custom-css').value
-            };
-            
-            for (const [key, value] of Object.entries(theme)) {
-                await fetch('/api/admin/settings', {
+            try {
+                const response = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key, value, admin_user: currentAdmin.id_user })
+                    body: JSON.stringify({ id_user, id_org })
                 });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentAdmin = data.admin;
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('admin-container').style.display = 'flex';
+                    loadUsers();
+                    loadSettings();
+                    loadLinks();
+                    showToast(`Добро пожаловать, ${currentAdmin.username}!`);
+                } else {
+                    document.getElementById('login-error').style.display = 'block';
+                }
+            } catch(e) {
+                document.getElementById('login-error').style.display = 'block';
+                document.getElementById('login-error').textContent = 'Ошибка: ' + e.message;
             }
+        }
+        
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.sidebar nav a').forEach(link => link.classList.remove('active'));
             
-            const logoFile = document.getElementById('logo-file').files[0];
-            if (logoFile) {
-                const formData = new FormData();
-                formData.append('file', logoFile);
-                await fetch('/api/admin/upload-logo', { method: 'POST', body: formData });
-            }
+            const tab = document.getElementById(tabName + '-tab');
+            if (tab) tab.classList.add('active');
             
-            showToast('Настройки сохранены! Страница обновится через 3 секунды');
-            setTimeout(() => location.reload(), 3000);
+            const link = document.getElementById('nav-' + tabName);
+            if (link) link.classList.add('active');
         }
         
         async function loadUsers() {
-            const response = await fetch('/api/admin/users');
-            const users = await response.json();
-            const tbody = document.querySelector('#users-table tbody');
-            tbody.innerHTML = '';
-            users.forEach(user => {
-                const row = tbody.insertRow();
-                row.insertCell(0).textContent = user.id_user;
-                row.insertCell(1).textContent = user.username;
-                
-                const roleCell = row.insertCell(2);
-                roleCell.innerHTML = `
-                    <span>${user.role === 'admin' ? '👑 Админ' : '👤 Юзер'}</span>
-                    <button style="padding:2px 5px; font-size:10px; margin-left:10px; background:#6b7280;" 
-                            onclick="toggleUserRole('${user.id_user}', '${user.role}')">🔄 Изменить</button>
-                `;
-                
-                row.insertCell(3).textContent = user.can_manage_themes ? '✅' : '❌';
-            });
-        }
-
-        async function toggleUserRole(userId, currentRole) {
-            const newRole = currentRole === 'admin' ? 'user' : 'admin';
-            const sql = `UPDATE users SET role = '${newRole}' WHERE id_user = '${userId}'`;
-            
-            await fetch('/api/admin/sql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sql, admin_user: currentAdmin.id_user })
-            });
-            
-            showToast('Роль пользователя изменена успешно');
-            loadUsers();
-            loadPermissions();
-        }
-                        
-        async function loadPermissions() {
-            const response = await fetch('/api/admin/users');
-            const users = await response.json();
-            const admins = users.filter(u => u.role === 'admin');
-            const tbody = document.querySelector('#permissions-table tbody');
-            tbody.innerHTML = '';
-            admins.forEach(admin => {
-                const row = tbody.insertRow();
-                row.insertCell(0).textContent = admin.username;
-                
-                const cell1 = row.insertCell(1);
-                const cb1 = document.createElement('input');
-                cb1.type = 'checkbox';
-                cb1.checked = admin.can_manage_themes;
-                cb1.onclick = function() { updatePermissions(admin.id_user, 'can_manage_themes', cb1.checked); };
-                cell1.appendChild(cb1);
-                
-                const cell2 = row.insertCell(2);
-                const cb2 = document.createElement('input');
-                cb2.type = 'checkbox';
-                cb2.checked = admin.can_manage_users;
-                cb2.onclick = function() { updatePermissions(admin.id_user, 'can_manage_users', cb2.checked); };
-                cell2.appendChild(cb2);
-                
-                const cell3 = row.insertCell(3);
-                const cb3 = document.createElement('input');
-                cb3.type = 'checkbox';
-                cb3.checked = admin.can_view_logs;
-                cb3.onclick = function() { updatePermissions(admin.id_user, 'can_view_logs', cb3.checked); };
-                cell3.appendChild(cb3);
-            });
-        }
-        
-        async function updatePermissions(userId, permission, value) {
-            const permissions = {};
-            permissions[permission] = value;
-            
-            await fetch('/api/admin/user/permissions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_user: userId, permissions })
-            });
-            
-            showToast('Права обновлены');
-        }
-        
-        async function executeSQL() {
-            const sql = document.getElementById('sql-query').value;
-            if (!sql.trim()) return;
-            
-            const response = await fetch('/api/admin/sql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sql, admin_user: currentAdmin.id_user })
-            });
-            
-            const result = await response.json();
-            
-            if (result.error) {
-                document.getElementById('sql-result').innerHTML = `<div style="color: #ef4444;">❌ ${result.error}</div>`;
-            } else {
-                document.getElementById('sql-result').innerHTML = `<pre>${JSON.stringify(result.rows, null, 2)}</pre>`;
-            }
-        }
-        
-        async function loadTables() {
-            const response = await fetch('/api/admin/sql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    sql: "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name",
-                    admin_user: currentAdmin.id_user 
-                })
-            });
-            
-            const result = await response.json();
-            if (!result.error && result.rows) {
-                const tablesDiv = document.getElementById('tables-list');
-                tablesDiv.innerHTML = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">';
-                result.rows.forEach(row => {
-                    tablesDiv.innerHTML += `<span style="background: #e5e7eb; padding: 5px 10px; border-radius: 6px;">📊 ${row.table_name}</span>`;
+            try {
+                const response = await fetch('/api/admin/users');
+                const users = await response.json();
+                const tbody = document.querySelector('#users-table tbody');
+                tbody.innerHTML = '';
+                users.forEach(user => {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = user.id_user;
+                    row.insertCell(1).textContent = user.username;
+                    row.insertCell(2).textContent = user.role === 'admin' ? '👑 Администратор' : '👤 Пользователь';
                 });
-                tablesDiv.innerHTML += '</div>';
+            } catch(e) {
+                showToast('Ошибка загрузки пользователей: ' + e.message, true);
             }
+        }
+        
+        async function updateUserRole() {
+            const userId = document.getElementById('user-id').value;
+            const newRole = document.getElementById('user-role').value;
+            
+            if (!userId) {
+                showToast('Введите ID пользователя', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/execute-sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql: `UPDATE users SET role = '${newRole}' WHERE id_user = '${userId}'` })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast(`Роль пользователя ${userId} изменена на ${newRole}`);
+                    loadUsers();
+                } else {
+                    showToast('Ошибка: ' + result.message, true);
+                }
+            } catch(e) {
+                showToast('Ошибка: ' + e.message, true);
+            }
+        }
+        
+        async function saveTheme() {
+            const primaryColor = document.getElementById('primary-color').value;
+            
+            try {
+                const response = await fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        theme_primary_color: primaryColor,
+                        link1_name: '',
+                        link1_url: '',
+                        link2_name: '',
+                        link2_url: ''
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Настройки сохранены!');
+                } else {
+                    showToast('Ошибка сохранения', true);
+                }
+            } catch(e) {
+                showToast('Ошибка: ' + e.message, true);
+            }
+        }
+        
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/admin/settings');
+                const settings = await response.json();
+                if (settings.theme_primary_color && settings.theme_primary_color.value) {
+                    document.getElementById('primary-color').value = settings.theme_primary_color.value;
+                    document.getElementById('primary-color-value').textContent = settings.theme_primary_color.value;
+                }
+            } catch(e) {}
+        }
+        
+        async function loadLinks() {
+            try {
+                const response = await fetch('/api/admin/settings');
+                const settings = await response.json();
+                if (settings.link1_name) document.getElementById('link1-name').value = settings.link1_name.value;
+                if (settings.link1_url) document.getElementById('link1-url').value = settings.link1_url.value;
+                if (settings.link2_name) document.getElementById('link2-name').value = settings.link2_name.value;
+                if (settings.link2_url) document.getElementById('link2-url').value = settings.link2_url.value;
+            } catch(e) {}
         }
         
         async function saveLinks() {
             const links = {
+                theme_primary_color: '#2563eb',
                 link1_name: document.getElementById('link1-name').value,
                 link1_url: document.getElementById('link1-url').value,
                 link2_name: document.getElementById('link2-name').value,
                 link2_url: document.getElementById('link2-url').value
             };
             
-            await fetch('/api/admin/links', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ links, admin_user: currentAdmin.id_user })
-            });
-            
-            showToast('Ссылки сохранены');
-        }
-        
-        async function loadLogs() {
-            const response = await fetch(`/api/admin/logs?admin_user=${currentAdmin.id_user}`);
-            const data = await response.json();
-            document.getElementById('logs-content').textContent = data.logs.join('\n');
-        }
-        
-        // Исправленное безопасное переключение вкладок
-        function showTab(tabName) {
-            document.querySelectorAll('.tab').forEach(function(tab) { tab.classList.remove('active'); });
-            document.querySelectorAll('.sidebar nav a').forEach(function(link) { link.classList.remove('active'); });
-            
-            document.getElementById(tabName + '-tab').classList.add('active');
-            
-            var activeLink = document.getElementById('nav-' + tabName);
-            if (activeLink) {
-                activeLink.classList.add('active');
+            try {
+                const response = await fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(links)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Ссылки сохранены');
+                } else {
+                    showToast('Ошибка сохранения', true);
+                }
+            } catch(e) {
+                showToast('Ошибка: ' + e.message, true);
             }
         }
         
-        async function quickDbAction(action) {
-            let sql = "";
-            if (action === 'clear_messages') {
-                if (!confirm("Вы уверены, что хотите БЕЗВОЗВРАТНО удалить все сообщения во всех чатах?")) return;
-                sql = "TRUNCATE TABLE messages RESTART IDENTITY;";
-            } else if (action === 'clear_chats') {
-                if (!confirm("Вы уверены, что хотите удалить все приватные и групповые чаты? Общий чат будет сохранен.")) return;
-                sql = "DELETE FROM room_participants WHERE id_room != 1; DELETE FROM rooms WHERE id_room != 1; DELETE FROM messages WHERE id_room != 1;";
+        async function executeSQL() {
+            const sql = document.getElementById('sql-query').value;
+            if (!sql.trim()) {
+                showToast('Введите SQL запрос', true);
+                return;
             }
             
-            if (!sql) return;
-            
-            const response = await fetch('/api/admin/sql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sql, admin_user: currentAdmin.id_user })
-            });
-            const result = await response.json();
-            if (result.error) {
-                showToast('Ошибка БД: ' + result.error, true);
-            } else {
-                showToast('Таблицы успешно модифицированы!');
-                if(typeof loadTables === 'function') loadTables();
+            try {
+                const response = await fetch('/api/admin/execute-sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql })
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('sql-result');
+                
+                if (!result.success) {
+                    resultDiv.innerHTML = `<div style="color: #ef4444;">❌ ${result.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                }
+            } catch(e) {
+                document.getElementById('sql-result').innerHTML = `<div style="color: #ef4444;">❌ Ошибка: ${e.message}</div>`;
             }
-        }        
+        }
+        
+        async function showTableStructure() {
+            const sql = `SELECT 
+                table_name,
+                column_name,
+                data_type,
+                is_nullable,
+                CASE 
+                    WHEN EXISTS (
+                        SELECT 1 FROM information_schema.key_column_usage kcu
+                        JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
+                        WHERE tc.constraint_type = 'PRIMARY KEY' 
+                        AND kcu.table_name = c.table_name 
+                        AND kcu.column_name = c.column_name
+                    ) THEN 'YES' ELSE 'NO' 
+                END as is_primary_key
+            FROM information_schema.columns c
+            WHERE c.table_schema = 'public'
+            ORDER BY c.table_name, c.ordinal_position;`;
+            
+            try {
+                const response = await fetch('/api/admin/execute-sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql })
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('structure-result');
+                
+                if (!result.success) {
+                    resultDiv.innerHTML = `<div style="color: #ef4444;">❌ ${result.message}</div>`;
+                } else {
+                    let html = '<table style="width:100%; font-size:12px;">';
+                    html += '<thead><tr><th>Таблица</th><th>Колонка</th><th>Тип</th><th>NULL</th><th>PK</th></tr></thead><tbody>';
+                    for (const row of result.data) {
+                        html += `<tr>
+                            <td>${row.table_name}</td>
+                            <td>${row.column_name}</td>
+                            <td>${row.data_type}</td>
+                            <td>${row.is_nullable}</td>
+                            <td>${row.is_primary_key}</td>
+                        </tr>`;
+                    }
+                    html += '</tbody></table>';
+                    resultDiv.innerHTML = html;
+                }
+            } catch(e) {
+                document.getElementById('structure-result').innerHTML = `<div style="color: #ef4444;">❌ Ошибка: ${e.message}</div>`;
+            }
+        }
+        
+        document.getElementById('primary-color').oninput = function(e) {
+            document.getElementById('primary-color-value').textContent = e.target.value;
+        };
+        
+        window.onload = function() {
+            const savedUser = localStorage.getItem('admin_user');
+            const savedOrg = localStorage.getItem('admin_org');
+            if (savedUser && savedOrg) {
+                document.getElementById('login-user-id').value = savedUser;
+                document.getElementById('login-org-id').value = savedOrg;
+            }
+        };
     </script>
 </body>
 </html>

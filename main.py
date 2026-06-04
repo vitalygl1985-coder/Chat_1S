@@ -572,6 +572,23 @@ async def save_admin_settings(data: SaveSettingsRequest):
         cur.close()
         conn.close()
 
+@app.get("/api/admin/users")
+async def admin_get_users(id_org: str = None):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        if id_org:
+            validated_org = clean_uuid(id_org)
+            cur.execute("SELECT id_user, username, role, is_active FROM users WHERE id_org = %s::uuid ORDER BY username ASC", (validated_org,))
+        else:
+            cur.execute("SELECT id_user, username, role, is_active FROM users ORDER BY username ASC")
+        return cur.fetchall()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
 @app.post("/api/admin/auth")
 async def admin_auth(data: AdminAuthRequest):
     validated_org = clean_uuid(data.id_org)
