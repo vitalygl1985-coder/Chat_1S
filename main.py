@@ -87,6 +87,13 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        # Создаем общий кабинет, если его нет
+        cur.execute("SELECT 1 FROM rooms WHERE type='admin_group' AND UPPER(name) LIKE 'ОБЩ%' LIMIT 1")
+        if not cur.fetchone():
+            cur.execute("""
+                INSERT INTO rooms (id_org, type, name, created_by)
+                VALUES ('00000000-0000-0000-0000-000000000001'::uuid, 'admin_group', 'ОБЩИЙ КАБИНЕТ', 'system')
+            """)
         conn.commit()
     except Exception as e:
         print(f"Ошибка инициализации БД: {e}")
@@ -127,14 +134,13 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
-# Измененная логика upload: формируем "чистый" путь без знаков вопроса
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
         orig_filename = file.filename
         file_extension = os.path.splitext(orig_filename)[1]
         if not file_extension:
-            file_extension = ".png" # Фолбек для скриншотов
+            file_extension = ".png"
             
         unique_id = str(uuid.uuid4())
         saved_filename = f"{unique_id}{file_extension}"
@@ -142,22 +148,51 @@ async def upload_file(file: UploadFile = File(...)):
         
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
+        
+        # Сохраняем соответствие UUID -> оригинальное имя
+        mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+        file_map = {}
+        if os.path.exists(mapping_file):
+            with open(mapping_file, "r", encoding="utf-8") as f:
+                file_map = json.load(f)
+        file_map[unique_id] = orig_filename
+        with open(mapping_file, "w", encoding="utf-8") as f:
+            json.dump(file_map, f)
             
-        # Формируем URL вида /download/уникальный_ид/ОригинальноеИмя.ext
-        encoded_orig_name = urllib.parse.quote(orig_filename)
-        return {"url": f"/download/{saved_filename}/{encoded_orig_name}"}
+        return {"url": f"/download/{unique_id}", "filename": orig_filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ПРАВКА СКАЧИВАНИЯ: Роут полностью избавлен от Query-параметров, мешавших 1С
+# ИСПРАВЛЕНО: правильный Content-Disposition для IE/1С
 @app.get("/download/{file_uuid}")
-async def download_file_direct(file_uuid: str):
-    # Ищем файл в папке по UUID (мы сохраняли их как UUID.ext)
+async def download_file(file_uuid: str):
+    # Ищем файл в папке
     for filename in os.listdir(UPLOAD_DIR):
         if filename.startswith(file_uuid):
             file_path = os.path.join(UPLOAD_DIR, filename)
-            # Извлекаем оригинальное имя из базы (или передаем через заголовок)
-            return FileResponse(file_path, media_type='application/octet-stream')
+            
+            # Получаем оригинальное имя из маппинга
+            mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+            original_name = None
+            if os.path.exists(mapping_file):
+                with open(mapping_file, "r", encoding="utf-8") as f:
+                    file_map = json.load(f)
+                    original_name = file_map.get(file_uuid)
+            
+            if not original_name:
+                original_name = filename.split("_", 1)[-1] if "_" in filename else filename
+            
+            # Кодируем имя файла для IE
+            encoded_name = urllib.parse.quote(original_name)
+            
+            # Возвращаем с правильными заголовками для принудительного скачивания
+            return FileResponse(
+                file_path,
+                media_type='application/octet-stream',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\'{encoded_name}'
+                }
+            )
     raise HTTPException(status_code=404, detail="Файл не найден")
 
 @app.get("/api/admin/settings")
@@ -222,9 +257,9 @@ async def admin_auth(data: AdminAuthRequest):
         user = cur.fetchone()
         if not user or user['role'] != 'admin':
             if data.id_user.lower() == 'admin' or data.id_user == 'Админ_Кейсер':
-                return {"success": True, "user": {"id_user": data.id_user, "username": data.id_user, "role": "admin", "id_org": validated_org}}
+                return {"success": True, "admin": {"id_user": data.id_user, "username": data.id_user, "role": "admin", "id_org": validated_org}}
             return JSONResponse(status_code=403, content={"success": False, "message": "Доступ запрещен."})
-        return {"success": True, "user": user}
+        return {"success": True, "admin": user}
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "message": str(e)})
     finally:
@@ -289,7 +324,6 @@ async def connect(sid, environ, auth=None):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Упрощенный, безопасный запрос создания пользователя
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
@@ -299,7 +333,6 @@ async def connect(sid, environ, auth=None):
             id_org = EXCLUDED.id_org
         """, (id_user, id_org, username, user_role))
         
-        # Авто-вход в кабинет "ОБЩИЙ" (admin_group)
         cur.execute("""
             SELECT id_room FROM rooms 
             WHERE id_org = %s::uuid AND UPPER(name) LIKE 'ОБЩ%%' AND type = 'admin_group'
@@ -307,11 +340,9 @@ async def connect(sid, environ, auth=None):
         """, (id_org,))
         room_general = cur.fetchone()
         if room_general:
-            # Исправлено: передача id_room как списка с одним элементом (кортеж)
             cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
                         (room_general[0], id_user))
             
-        # Авто-вход админов в АДМИН
         if user_role == 'admin':
             cur.execute("SELECT id_room FROM rooms WHERE name = 'АДМИН' AND id_org = %s::uuid", (id_org,))
             room_admin = cur.fetchone()
