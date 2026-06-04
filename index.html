@@ -140,6 +140,17 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="text-input-modal">
+    <div class="modal-body">
+        <h4 id="text-modal-title">Введите имя нового кабинета</h4>
+        <input type="text" id="modal-text-field" placeholder="Название..." />
+        <div class="modal-buttons">
+            <button onclick="closeTextModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
+            <button id="text-modal-submit-btn" class="btn-small" style="background:#10b981;">Создать</button>
+        </div>
+    </div>
+</div>
+
 <script>
 window.onerror = function(message, url, line) { return true; };
 
@@ -184,8 +195,6 @@ window.onclick = function() { stopTitleBlink(); };
 function selectRoomById(roomId) {
     currentRoomId = roomId;
     if (!socket) return;
-    
-    // Эмулируем клик: запрашиваем данные и переключаем заголовки
     socket.emit('join_room_pool', { room_id: roomId });
     socket.emit('get_room_history', { room_id: roomId });
     socket.emit('get_room_participants', { room_id: roomId });
@@ -223,7 +232,7 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
     socket.on('users_list', function(users) { globalUsersCache = users; renderUsersRightPanel(users); });
     
-    // ФИКС: Перехватываем создание личного диалога и сразу фокусируем на нём интерфейс
+    // ФИКС: Принудительный сброс интерфейса и фокус на ID новой комнаты
     socket.on('private_chat_created', function(data) {
         if (data && data.id_room) {
             selectRoomById(data.id_room);
@@ -284,7 +293,6 @@ function renderRoomsList(rooms) {
         div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
         div.innerText = (room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ')) + room.name;
         
-        // Если комната стала активной (через фокус), обновляем заголовки метаданных
         if (room.id_room == currentRoomId) {
             currentRoomType = room.type;
             currentRoomCreator = room.created_by;
@@ -392,6 +400,21 @@ function openSecretModal(title, submitCallback) {
 
 function closeSecretModal() { document.getElementById('secret-input-modal').style.display = 'none'; }
 
+function openTextModal(title, submitCallback) {
+    document.getElementById('text-modal-title').innerText = title;
+    var field = document.getElementById('modal-text-field');
+    field.value = "";
+    document.getElementById('text-input-modal').style.display = 'flex';
+    document.getElementById('text-modal-submit-btn').onclick = function() {
+        if(field.value.trim() !== "") {
+            submitCallback(field.value.trim());
+        }
+        closeTextModal();
+    };
+}
+
+function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
+
 document.getElementById('btn-add-participant').onclick = function() {
     if (!currentRoomId) return;
     openUserModal("Добавить сотрудника в кабинет", function(selectedUserId) {
@@ -424,6 +447,7 @@ function triggerArchive() {
     }
 }
 
+// ФИКС: Глубокая очистка строки от HTML-тегов перед отправкой в дешифратор CryptoJS
 function displayMessage(msg, isBulkLoad) {
     try {
         var container = document.getElementById('messages-container');
@@ -436,12 +460,12 @@ function displayMessage(msg, isBulkLoad) {
         var isUserEncrypted = msg.is_user_encrypted || false;
 
         if (isUserEncrypted || text.indexOf("SECRET:") === 0) {
-            var cipher = text.replace("SECRET:", "");
+            var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
             var uniqueId = 'c_' + Math.random().toString(36).substr(2, 6);
             
-            text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+uniqueId+'">[Скрыто]</div>' +
+            text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+uniqueId+'" data-cipher="'+cipher+'">[Скрыто]</div>' +
                    '<button class="btn-small" style="float:none; margin-top:4px; background:#eab308;" ' +
-                   'onclick="decryptMsg(\''+cipher+'\',\''+uniqueId+'\')">Расшифровать</button>';
+                   'onclick="decryptMsg(\''+uniqueId+'\')">Расшифровать</button>';
         }
         
         div.innerHTML = '<span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div>';
@@ -450,9 +474,26 @@ function displayMessage(msg, isBulkLoad) {
     } catch(e) { }
 }
 
+window.decryptMsg = function(elementId) {
+    var targetElement = document.getElementById(elementId);
+    if (!targetElement) return;
+    var cipher = targetElement.getAttribute("data-cipher");
+    
+    openSecretModal("Введите секретный ключ", function(enteredKey) {
+        try {
+            var decryptedBytes = CryptoJS.AES.decrypt(cipher, enteredKey);
+            var clearText = decryptedBytes.toString(CryptoJS.enc.Utf8);
+            if (clearText) {
+                targetElement.innerHTML = clearText;
+                targetElement.style.cssText = "color:#1f2937; font-weight:bold;";
+            } else { alert("Неверный ключ!"); }
+        } catch(e) { alert("Ошибка расшифровки!"); }
+    });
+};
+
 function sendMessage() {
     var text = "";
-    if (inputMsg) { text = (inputMsg.innerHTML || inputMsg.innerText || "").trim(); }
+    if (inputMsg) { text = (inputMsg.innerText || inputMsg.textContent || "").trim(); }
     if (!text || !currentRoomId) return;
     
     var sendAsSecret = isSecretMode;
@@ -509,8 +550,9 @@ if (inputMsg) {
 }
 
 document.getElementById('btn-create-group').onclick = function() {
-    var name = prompt("Название нового кабинета:");
-    if (name && socket) socket.emit('create_group_chat', { group_name: name });
+    openTextModal("Создание нового кабинета", function(enteredRoomName) {
+        if(socket) socket.emit('create_group_chat', { group_name: enteredRoomName });
+    });
 };
 
 document.getElementById('btn-secret').onclick = function() {

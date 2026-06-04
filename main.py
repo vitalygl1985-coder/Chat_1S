@@ -26,12 +26,10 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Создаем папку для загрузки файлов, если её нет
 UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-# Раздаем файлы из папки uploads статикой
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 def get_db_connection():
@@ -116,8 +114,6 @@ class SaveSettingsRequest(BaseModel):
 class ExecuteSqlRequest(BaseModel):
     sql: str
 
-# --- HTTP ЭНДПОИНТЫ ПАНЕЛЕЙ И СТАТИКИ ---
-
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     try:
@@ -134,22 +130,17 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
-# Загрузка файлов и скриншотов на сервер (Устраняет ошибку "прикрепить файл не работает")
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
         file_extension = os.path.splitext(file.filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = os.path.join(UPLOAD_DIR, unique_filename)
-        
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
-            
-        # Возвращаем полный URL загруженного файла/скриншота
-        file_url = f"/uploads/{unique_filename}"
-        return {"url": file_url}
+        return {"url": f"/uploads/{unique_filename}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка сохранения файла: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
 
 @app.get("/api/admin/settings")
 async def get_admin_settings():
@@ -222,10 +213,9 @@ async def admin_auth(data: AdminAuthRequest):
         cur.close()
         conn.close()
 
-# Заглушка для предотвращения 404 ошибок в старых админ-панелях
 @app.post("/api/admin/user/permissions")
 async def admin_user_permissions():
-    return {"success": True, "message": "Права синхронизированы"}
+    return {"success": True}
 
 @app.get("/api/admin/users")
 async def admin_get_users(id_org: str = None):
@@ -254,7 +244,7 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
             result = cur.fetchall()
         else:
             conn.commit()
-            result = {"status": "Успешно выполнено"}
+            result = {"status": "Успешно"}
         return {"success": True, "data": result}
     except Exception as e:
         conn.rollback()
@@ -263,7 +253,7 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
         cur.close()
         conn.close()
 
-# --- SOCKET.IO EVENTS (БИЗНЕС-ЛОГИКА КОРПОРАТИВНОГО ЧАТА) ---
+# --- SOCKET.IO EVENTS ---
 
 @sio.event
 async def connect(sid, environ, auth=None):
@@ -287,14 +277,18 @@ async def connect(sid, environ, auth=None):
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (id_user, id_org, username, user_role))
         
-        # --- ПРАВКА 1 И 2: АВТО-ДОБАВЛЕНИЕ В КАБИНЕТЫ "ОБЩИЙ" И "АДМИН" ---
-        # Ищем кабинет ОБЩИЙ
-        cur.execute("SELECT id_room FROM rooms WHERE name = 'ОБЩИЙ' AND id_org = %s::uuid", (id_org,))
+        cur.execute("""
+            SELECT id_room FROM rooms 
+            WHERE id_org = %s::uuid AND UPPER(name) LIKE 'ОБЩ%' AND type = 'admin_group'
+            LIMIT 1
+        """, (id_org,))
         room_general = cur.fetchone()
         if room_general:
-            cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_general['id_room'], id_user))
+            cur.execute("""
+                INSERT INTO room_participants (id_room, id_user) 
+                VALUES (%s, %s) ON CONFLICT DO NOTHING
+            """, (room_general['id_room'], id_user))
             
-        # Ищем кабинет АДМИН для администраторов
         if user_role == 'admin':
             cur.execute("SELECT id_room FROM rooms WHERE name = 'АДМИН' AND id_org = %s::uuid", (id_org,))
             room_admin = cur.fetchone()
@@ -356,7 +350,6 @@ async def get_rooms_again(sid):
 async def get_users_list(sid):
     session = await sio.get_session(sid)
     id_org = session['id_org']
-    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -374,7 +367,6 @@ async def get_room_history(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
-
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -438,7 +430,6 @@ async def get_room_participants(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
-
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -463,25 +454,19 @@ async def add_user_to_room(sid, data):
     user_id = data.get('user_id')
     if not room_id or not user_id:
         return
-
     session = await sio.get_session(sid)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
+        cur.execute("SELECT type FROM rooms WHERE id_room = %s", (room_id,))
         room = cur.fetchone()
         if not room:
             return
-
         if room['type'] == 'admin_group' and session['role'] != 'admin':
-            await sio.emit('system_alert', {"message": "В официальный закрытый кабинет сотрудников добавляет только Администратор!"}, to=sid)
+            await sio.emit('system_alert', {"message": "В закрытый официальный кабинет сотрудников добавляет только Администратор!"}, to=sid)
             return
 
-        cur.execute("""
-            INSERT INTO room_participants (id_room, id_user)
-            VALUES (%s, %s)
-            ON CONFLICT (id_room, id_user) DO NOTHING
-        """, (room_id, user_id))
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_id, user_id))
         conn.commit()
         
         cur.close() 
@@ -491,7 +476,6 @@ async def add_user_to_room(sid, data):
             INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s
         """, (room_id,))
         participants = cur.fetchall()
-        
         await sio.emit('room_participants_list', {'participants': participants}, room=f"room_{room_id}")
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
@@ -506,7 +490,6 @@ async def remove_user_from_room(sid, data):
     target_user_id = data.get('target_user_id')
     if not room_id or not target_user_id:
         return
-
     session = await sio.get_session(sid)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -515,12 +498,11 @@ async def remove_user_from_room(sid, data):
         room = cur.fetchone()
         if not room:
             return
-
         if room['type'] == 'admin_group' and session['role'] != 'admin':
             await sio.emit('system_alert', {"message": "Исключать из официального кабинета может только администратор!"}, to=sid)
             return
         if room['type'] == 'group' and room['created_by'] != session['id_user'] and session['role'] != 'admin':
-            await sio.emit('system_alert', {"message": "Вы не являетесь создателем этой группы, действие отклонено."}, to=sid)
+            await sio.emit('system_alert', {"message": "Вы не создатель группы, действие отклонено."}, to=sid)
             return
 
         cur.execute("DELETE FROM room_participants WHERE id_room = %s AND id_user = %s", (room_id, target_user_id))
@@ -531,7 +513,6 @@ async def remove_user_from_room(sid, data):
             INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s
         """, (room_id,))
         participants = cur.fetchall()
-        
         await sio.emit('room_participants_list', {'participants': participants}, room=f"room_{room_id}")
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
@@ -545,7 +526,6 @@ async def delete_room(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
-
     session = await sio.get_session(sid)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -554,7 +534,6 @@ async def delete_room(sid, data):
         room = cur.fetchone()
         if not room:
             return
-
         if room['type'] == 'admin_group' and session['role'] != 'admin':
             await sio.emit('system_alert', {"message": "Удалять официальные каналы структуры может только администратор!"}, to=sid)
             return
@@ -564,7 +543,6 @@ async def delete_room(sid, data):
 
         cur.execute("DELETE FROM rooms WHERE id_room = %s", (room_id,))
         conn.commit()
-
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
         print(f"Ошибка удаления: {e}")
@@ -577,16 +555,14 @@ async def archive_room_history(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
-
     session = await sio.get_session(sid)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
+        cur.execute("SELECT type FROM rooms WHERE id_room = %s", (room_id,))
         room = cur.fetchone()
         if not room:
             return
-
         if room['type'] == 'admin_group' and session['role'] != 'admin':
             await sio.emit('system_alert', {"message": "Архивировать этот закрытый канал может только администратор!"}, to=sid)
             return
@@ -604,8 +580,6 @@ async def archive_room_history(sid, data):
 
         cur.execute("DELETE FROM messages WHERE id_room = %s", (room_id,))
         conn.commit()
-
-        # Отправляем плоский массив обратно (исправлено "в архив пока не работает")
         await sio.emit('download_archive_file', {"messages": messages}, to=sid)
     except Exception as e:
         print(f"Ошибка архивации: {e}")
@@ -621,7 +595,6 @@ async def create_group_chat(sid, data):
     session = await sio.get_session(sid)
     id_org = session['id_org']
     id_user = session['id_user']
-
     room_type = 'admin_group' if session['role'] == 'admin' else 'group'
 
     conn = get_db_connection()
@@ -633,10 +606,11 @@ async def create_group_chat(sid, data):
             RETURNING id_room
         """, (id_org, room_type, group_name, id_user))
         new_room = cur.fetchone()
-        
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (new_room['id_room'], id_user))
         conn.commit()
         
+        # Сразу возвращаем ID создателю, чтобы сфокусировать фронтенд
+        await sio.emit('private_chat_created', {'id_room': new_room['id_room']}, to=sid)
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
         conn.rollback()
