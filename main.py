@@ -525,18 +525,18 @@ async def get_admin_settings():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT key, value FROM admin_settings")
+        cur.execute("SELECT setting_key, setting_value, setting_type FROM admin_settings")
         rows = cur.fetchall()
         settings_dict = {}
         for row in rows:
-            settings_dict[row['key']] = {"value": row['value']}
+            settings_dict[row['setting_key']] = {"value": row['setting_value'], "type": row['setting_type']}
         if not settings_dict:
             return {
-                "theme_primary_color": {"value": "#2563eb"},
-                "link1_name": {"value": ""},
-                "link1_url": {"value": ""},
-                "link2_name": {"value": ""},
-                "link2_url": {"value": ""}
+                "theme_primary_color": {"value": "#2563eb", "type": "color"},
+                "link1_name": {"value": "", "type": "string"},
+                "link1_url": {"value": "", "type": "string"},
+                "link2_name": {"value": "", "type": "string"},
+                "link2_url": {"value": "", "type": "string"}
             }
         return settings_dict
     except Exception as e:
@@ -558,11 +558,19 @@ async def save_admin_settings(data: SaveSettingsRequest):
             "link2_url": data.link2_url
         }
         for key, value in settings_to_save.items():
-            cur.execute("""
-                INSERT INTO admin_settings (key, value)
-                VALUES (%s, %s)
-                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-            """, (key, value))
+            # Проверяем существует ли запись
+            cur.execute("SELECT 1 FROM admin_settings WHERE setting_key = %s", (key,))
+            exists = cur.fetchone()
+            if exists:
+                cur.execute("""
+                    UPDATE admin_settings SET setting_value = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE setting_key = %s
+                """, (value, key))
+            else:
+                cur.execute("""
+                    INSERT INTO admin_settings (setting_key, setting_value, setting_type, updated_at)
+                    VALUES (%s, %s, 'string', CURRENT_TIMESTAMP)
+                """, (key, value))
         conn.commit()
         return {"success": True}
     except Exception as e:
