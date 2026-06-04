@@ -3,6 +3,7 @@ import json
 import urllib.parse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse # Добавлено для отдачи HTML в 1С
 import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -27,6 +28,28 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
+
+# --- НОВЫЕ РОУТЫ ДЛЯ УСТРАНЕНИЯ ОШИБКИ 404 ---
+
+@app.get("/", response_class=HTMLResponse)
+async def get_chat_page():
+    # Отдаем файл index.html для 1С-обработки
+    try:
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"Ошибка загрузки index.html: {str(e)}"
+
+@app.get("/admin", response_class=HTMLResponse)
+async def get_admin_page():
+    # Отдаем файл admin.html для панели администратора
+    try:
+        with open("admin.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"Ошибка загрузки admin.html: {str(e)}"
+
+# --- ОБРАБОТЧИКИ СОБЫТИЙ SOCKET.IO ---
 
 @sio.event
 async def connect(sid, environ, auth=None):
@@ -302,5 +325,5 @@ async def create_private_chat(sid, data):
 async def disconnect(sid):
     print(f"Отключился: {sid}")
 
-# Исправлено монтирование: вешаем сокет-сервер на стандартный изолированный путь /socket.io
+# Монтируем сокет-сервер на путь /socket.io
 app.mount("/socket.io", socket_app)
