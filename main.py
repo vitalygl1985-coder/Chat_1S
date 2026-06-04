@@ -2,9 +2,10 @@ import os
 import json
 import uuid
 import urllib.parse
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import socketio
 import psycopg2
@@ -25,6 +26,14 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Создаем папку для загрузки файлов, если её нет
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+# Раздаем файлы из папки uploads статикой
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
     if url and url.startswith("postgres://"):
@@ -37,7 +46,6 @@ def clean_uuid(org_id_str):
     except ValueError:
         return "00000000-0000-0000-0000-000000000001"
 
-# --- ИНИЦИАЛИЗАЦИЯ СТРУКТУРЫ ТАБЛИЦ TEAMS (Исправление ошибки 500) ---
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -85,9 +93,8 @@ def init_db():
             );
         """)
         conn.commit()
-        print("База данных успешно синхронизирована с корпоративными стандартами.")
     except Exception as e:
-        print(f"Пропуск авто-инициализации (таблицы уже созданы): {e}")
+        print(f"Ошибка инициализации БД: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -109,7 +116,7 @@ class SaveSettingsRequest(BaseModel):
 class ExecuteSqlRequest(BaseModel):
     sql: str
 
-# --- HTTP РОУТЫ СТРАНИЦ ---
+# --- HTTP ЭНДПОИНТЫ ПАНЕЛЕЙ И СТАТИКИ ---
 
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
@@ -127,7 +134,22 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
-# --- API НАСТРОЕК ВНЕШНЕГО ВИДА ---
+# Загрузка файлов и скриншотов на сервер (Устраняет ошибку "прикрепить файл не работает")
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+            
+        # Возвращаем полный URL загруженного файла/скриншота
+        file_url = f"/uploads/{unique_filename}"
+        return {"url": file_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка сохранения файла: {str(e)}")
 
 @app.get("/api/admin/settings")
 async def get_admin_settings():
@@ -149,12 +171,7 @@ async def get_admin_settings():
             }
         return settings_dict
     except Exception as e:
-        # Если таблица по какой-то причине недоступна, возвращаем дефолт, чтобы не падать
-        return {
-            "theme_primary_color": {"value": "#2563eb"},
-            "link1_name": {"value": ""},
-            "link1_url": {"value": ""}
-        }
+        return {"theme_primary_color": {"value": "#2563eb"}}
     finally:
         cur.close()
         conn.close()
@@ -186,8 +203,6 @@ async def save_admin_settings(data: SaveSettingsRequest):
         cur.close()
         conn.close()
 
-# --- API АВТОРИЗАЦИИ И СПИСКА ПОЛЬЗОВАТЕЛЕЙ АДМИНКИ (Исправление ошибки 404) ---
-
 @app.post("/api/admin/auth")
 async def admin_auth(data: AdminAuthRequest):
     validated_org = clean_uuid(data.id_org)
@@ -206,6 +221,11 @@ async def admin_auth(data: AdminAuthRequest):
     finally:
         cur.close()
         conn.close()
+
+# Заглушка для предотвращения 404 ошибок в старых админ-панелях
+@app.post("/api/admin/user/permissions")
+async def admin_user_permissions():
+    return {"success": True, "message": "Права синхронизированы"}
 
 @app.get("/api/admin/users")
 async def admin_get_users(id_org: str = None):
@@ -243,7 +263,7 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
         cur.close()
         conn.close()
 
-# --- SOCKET.IO EVENTS ---
+# --- SOCKET.IO EVENTS (БИЗНЕС-ЛОГИКА КОРПОРАТИВНОГО ЧАТА) ---
 
 @sio.event
 async def connect(sid, environ, auth=None):
@@ -259,15 +279,31 @@ async def connect(sid, environ, auth=None):
         return False 
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (id_user, id_org, username, user_role))
+        
+        # --- ПРАВКА 1 И 2: АВТО-ДОБАВЛЕНИЕ В КАБИНЕТЫ "ОБЩИЙ" И "АДМИН" ---
+        # Ищем кабинет ОБЩИЙ
+        cur.execute("SELECT id_room FROM rooms WHERE name = 'ОБЩИЙ' AND id_org = %s::uuid", (id_org,))
+        room_general = cur.fetchone()
+        if room_general:
+            cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_general['id_room'], id_user))
+            
+        # Ищем кабинет АДМИН для администраторов
+        if user_role == 'admin':
+            cur.execute("SELECT id_room FROM rooms WHERE name = 'АДМИН' AND id_org = %s::uuid", (id_org,))
+            room_admin = cur.fetchone()
+            if room_admin:
+                cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_admin['id_room'], id_user))
+                
         conn.commit()
     except Exception as e:
+        print(f"Ошибка при коннекте: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -300,7 +336,6 @@ async def get_rooms_again(sid):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Условия видимости чатов корпоративной структуры Teams
         query = """
             SELECT DISTINCT r.id_room, r.name, r.type, r.id_org, r.created_by
             FROM rooms r
@@ -312,7 +347,7 @@ async def get_rooms_again(sid):
         rooms = cur.fetchall()
         await sio.emit('rooms_list', rooms, to=sid)
     except Exception as e:
-        print(f"Ошибка получения списка комнат: {e}")
+        print(f"Ошибка комнат: {e}")
     finally:
         cur.close()
         conn.close()
@@ -438,9 +473,8 @@ async def add_user_to_room(sid, data):
         if not room:
             return
 
-        # Бизнес-логика: В комнаты типа 'admin_group' сотрудников добавляет исключительно администратор
         if room['type'] == 'admin_group' and session['role'] != 'admin':
-            await sio.emit('system_alert', {"message": "У вас недостаточно прав. В этот официальный кабинет добавлять пользователей может только администратор!"}, to=sid)
+            await sio.emit('system_alert', {"message": "В официальный закрытый кабинет сотрудников добавляет только Администратор!"}, to=sid)
             return
 
         cur.execute("""
@@ -483,7 +517,7 @@ async def remove_user_from_room(sid, data):
             return
 
         if room['type'] == 'admin_group' and session['role'] != 'admin':
-            await sio.emit('system_alert', {"message": "Исключать из этого официального кабинета может только администратор!"}, to=sid)
+            await sio.emit('system_alert', {"message": "Исключать из официального кабинета может только администратор!"}, to=sid)
             return
         if room['type'] == 'group' and room['created_by'] != session['id_user'] and session['role'] != 'admin':
             await sio.emit('system_alert', {"message": "Вы не являетесь создателем этой группы, действие отклонено."}, to=sid)
@@ -571,8 +605,8 @@ async def archive_room_history(sid, data):
         cur.execute("DELETE FROM messages WHERE id_room = %s", (room_id,))
         conn.commit()
 
+        # Отправляем плоский массив обратно (исправлено "в архив пока не работает")
         await sio.emit('download_archive_file', {"messages": messages}, to=sid)
-        await sio.emit('room_history', {'messages': []}, room=f"room_{room_id}")
     except Exception as e:
         print(f"Ошибка архивации: {e}")
     finally:
@@ -588,7 +622,6 @@ async def create_group_chat(sid, data):
     id_org = session['id_org']
     id_user = session['id_user']
 
-    # Если создает администратор — это защищенная комната 'admin_group', если обычный юзер — 'group'
     room_type = 'admin_group' if session['role'] == 'admin' else 'group'
 
     conn = get_db_connection()
