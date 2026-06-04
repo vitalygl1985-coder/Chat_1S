@@ -87,14 +87,12 @@
 </div>
 
 <script>
-// === ПОЛНОЕ ПОДАВЛЕНИЕ ОШИБОК ДЛЯ 1С ===
 window.onerror = function() { return true; };
 
 document.onclick = function() { return true; };
 document.onfocusin = function() { return true; };
 document.onfocusout = function() { return true; };
 
-// Полифилл classList для IE
 if (!("classList" in document.documentElement)) {
     Object.defineProperty(HTMLElement.prototype, 'classList', {
         get: function() {
@@ -124,7 +122,6 @@ var currentUserRole = "";
 
 var inputMsg = document.getElementById('input-msg');
 
-// Безопасная инициализация фокуса для Trident
 try {
     if (inputMsg) {
         inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
@@ -168,7 +165,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         socket.on('new_message', function(msg) { if (msg && msg.id_room == currentRoomId) displayMessage(msg); });
         socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
         
-        // Исправление №1: Авто-переключение на созданный приватный чат
         socket.on('private_chat_created', function(data) {
             if (data && data.id_room) {
                 currentRoomId = data.id_room;
@@ -247,7 +243,6 @@ window.decryptMsg = function(cipher, id) {
 };
 
 function sendMessage() {
-    // Совместимое чтение текста для всех версий IE/Trident
     var text = "";
     if (inputMsg) {
         text = (inputMsg.textContent || inputMsg.innerText || "").trim();
@@ -329,7 +324,6 @@ inputMsg.onpaste = function(e) {
     }
 };
 
-// Исправление №2: Приведение ключей к змеиному_регистру (link1_name, link1_url)
 function loadCustomThemeAndLinks() {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/admin/settings', true);
@@ -356,7 +350,6 @@ function loadCustomThemeAndLinks() {
                 var linksZone = document.getElementById('admin-links-zone');
                 if (linksContainer && linksZone) {
                     var html = '';
-                    // Читаем корректные ключи базы данных
                     if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
                         html += '<a href="'+settings.link1_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link1_name.value+'</a>';
                     }
