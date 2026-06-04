@@ -2,7 +2,7 @@ import os
 import json
 import uuid
 import urllib.parse
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
@@ -127,32 +127,34 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
+# Измененная логика upload: формируем "чистый" путь без знаков вопроса
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
         orig_filename = file.filename
         file_extension = os.path.splitext(orig_filename)[1]
+        if not file_extension:
+            file_extension = ".png" # Фолбек для скриншотов
+            
         unique_id = str(uuid.uuid4())
-        
         saved_filename = f"{unique_id}{file_extension}"
         file_path = os.path.join(UPLOAD_DIR, saved_filename)
         
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
             
+        # Формируем URL вида /download/уникальный_ид/ОригинальноеИмя.ext
         encoded_orig_name = urllib.parse.quote(orig_filename)
-        return {"url": f"/download/{saved_filename}?filename={encoded_orig_name}"}
+        return {"url": f"/download/{saved_filename}/{encoded_orig_name}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ФИКС СКАЧИВАНИЯ: Исправлен маппинг аргументов Query для сохранения оригинального имени в 1С
-@app.get("/download/{filename}")
-async def download_file_direct(filename: str, filename_orig: str = Query(None, alias="filename")):
+# ПРАВКА СКАЧИВАНИЯ: Роут полностью избавлен от Query-параметров, мешавших 1С
+@app.get("/download/{filename}/{orig_name}")
+async def download_file_direct(filename: str, orig_name: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
-        display_name = filename
-        if filename_orig:
-            display_name = urllib.parse.unquote(filename_orig)
+        display_name = urllib.parse.unquote(orig_name)
         return FileResponse(
             file_path, 
             media_type='application/octet-stream', 

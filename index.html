@@ -566,23 +566,17 @@ function uploadFile(file) {
     } catch(e) {}
 }
 
-// ФИКС СКРИНШОТОВ (Глубокий парсинг HTML-тегов картинок буфера для IE)
 function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket) return;
     
     var cleanBase64 = rawInputString;
-    
-    // Если 1С передала полноценный тег <img src="data:image...">, вырезаем только тело Base64
     if (rawInputString.indexOf('src="') !== -1) {
         var match = rawInputString.match(/src="([^"]+)"/);
         if (match && match[1]) { cleanBase64 = match[1]; }
     }
-    
     if (cleanBase64.indexOf(",") !== -1) {
         cleanBase64 = cleanBase64.split(",")[1];
     }
-    
-    // Вырезаем остаточные HTML-теги, если они пролезли из буфера обмена ОС Windows
     cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
 
     try {
@@ -597,21 +591,17 @@ function uploadBase64Image(rawInputString) {
         
         uploadFile(file);
     } catch(e) {
-        alert("Не удалось декодировать скриншот. Скопируйте изображение и повторите попытку.");
+        alert("Не удалось декодировать скриншот.");
     }
 }
 
-// Перехват Ctrl+V во входном контейнере
 if (inputMsg) {
     inputMsg.onpaste = function(event) {
         var clipboardData = event.clipboardData || window.clipboardData;
         if (!clipboardData) return;
         
-        // Парадигма Trident (IE) в 1С: перехватываем текстовый слепок HTML
         var htmlData = "";
-        try {
-            htmlData = clipboardData.getData("HTML") || clipboardData.getData("Text");
-        } catch(e) {}
+        try { htmlData = clipboardData.getData("HTML") || clipboardData.getData("Text"); } catch(e) {}
         
         if (htmlData && htmlData.indexOf("data:image") !== -1) {
             uploadBase64Image(htmlData);
@@ -621,7 +611,7 @@ if (inputMsg) {
     };
 }
 
-// Кнопка принудительного вызова Base64 окна
+// ФИКС ОПЕЧАТКИ: Переменная base64Code теперь маппится корректно
 document.getElementById('btn-paste-screen').onclick = function() {
     openBase64Modal(function(base64Code) {
         uploadBase64Image(base64Code);
