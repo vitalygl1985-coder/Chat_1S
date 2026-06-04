@@ -302,4 +302,5 @@ async def create_private_chat(sid, data):
 async def disconnect(sid):
     print(f"Отключился: {sid}")
 
-app.mount("/", socket_app)
+# Исправлено монтирование: вешаем сокет-сервер на стандартный изолированный путь /socket.io
+app.mount("/socket.io", socket_app)
