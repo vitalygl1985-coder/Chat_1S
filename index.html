@@ -48,7 +48,7 @@
 <body>
 
 <div class="header">
-    <h1>💊 КЕЙСЕР корп.чат 💊</h1>
+    <h1>Corporate 1C Chat</h1>
     <div class="header-controls">
         <div id="custom-links-container" class="header-links"></div>
         <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
@@ -88,14 +88,19 @@
 </div>
 
 <script>
-// Тотальное подавление исключений на уровне window
+// 1. ПОЛНОЕ И РАДИКАЛЬНОЕ ПОДАВЛЕНИЕ ИСКЛЮЧЕНИЙ TRIDENT/1C
 window.onerror = function(message, url, line) { 
+    console.log("System exception masked: " + message);
     return true; 
 };
 
-// Жесткая изоляция кликов и фокусов
+// 2. ИЗОЛЯЦИЯ НАПРАВЛЕНИЯ КЛИКОВ (ЗАЩИТА ОТ КРАША ПРИ НАЖАТИИ В ЛЮБОМ МЕСТЕ ФОРМЫ)
 try {
-    document.onclick = function() { return true; };
+    document.onclick = function(e) { 
+        var ev = e || window.event;
+        if (ev.stopPropagation) ev.stopPropagation(); else ev.cancelBubble = true;
+        return true; 
+    };
     document.onfocusin = function() { return true; };
     document.onfocusout = function() { return true; };
 } catch(e) { }
@@ -161,7 +166,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         userInfoEl.innerHTML = String(username) + (currentUserRole === 'admin' ? ' 👑' : '');
     }
     
-    // Безопасное уничтожение старого сокета при переавторизации
     if (socket) {
         try {
             socket.removeAllListeners();
@@ -449,7 +453,7 @@ function loadCustomThemeAndLinks() {
 
 loadCustomThemeAndLinks();
 
-// КРИТИЧЕСКИЙ КЛЮЧ: Принудительное тотальное уничтожение подписок при закрытии окна в 1С
+// 3. ПРИНУДИТЕЛЬНОЕ ТОТАЛЬНОЕ УНИЧТОЖЕНИЕ ПОДПИСОК ПРИ ЗАКРЫТИИ ОКНА ОБРАБОТКИ
 window.onbeforeunload = function() {
     try {
         if (socket) {
