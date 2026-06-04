@@ -232,7 +232,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
     socket.on('users_list', function(users) { globalUsersCache = users; renderUsersRightPanel(users); });
     
-    // ФИКС: Принудительный сброс интерфейса и фокус на ID новой комнаты
     socket.on('private_chat_created', function(data) {
         if (data && data.id_room) {
             selectRoomById(data.id_room);
@@ -422,9 +421,16 @@ document.getElementById('btn-add-participant').onclick = function() {
     });
 };
 
+// ПРАВКА 1: Фикс кнопки выбора приватного чата. Полная замена метода find() на плоский цикл для старого IE в 1С
 document.getElementById('btn-start-private').onclick = function() {
     openUserModal("Начать личную переписку", function(selectedUserId) {
-        var targetUser = globalUsersCache.find(function(u) { return u.id_user == selectedUserId; });
+        var targetUser = null;
+        for (var i = 0; i < globalUsersCache.length; i++) {
+            if (globalUsersCache[i].id_user == selectedUserId) {
+                targetUser = globalUsersCache[i];
+                break;
+            }
+        }
         if (targetUser) {
             socket.emit('create_private_chat', { target_user_id: targetUser.id_user, target_username: targetUser.username });
         }
@@ -447,7 +453,6 @@ function triggerArchive() {
     }
 }
 
-// ФИКС: Глубокая очистка строки от HTML-тегов перед отправкой в дешифратор CryptoJS
 function displayMessage(msg, isBulkLoad) {
     try {
         var container = document.getElementById('messages-container');
@@ -509,6 +514,7 @@ function sendMessage() {
     if (inputMsg) inputMsg.innerHTML = "";
 }
 
+// ПРАВКА 2: Фикс загрузки в 1С. Генерируем прямую, понятную для движка Trident ссылку на скачивание
 function uploadFile(file) {
     try {
         var fd = new FormData();
@@ -521,7 +527,9 @@ function uploadFile(file) {
                     var data = JSON.parse(xhr.responseText);
                     if (data && data.url && socket) {
                         var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                        var content = isImg ? '<img src="'+data.url+'" />' : '<span class="link-click" onclick="window.safeOpenLink(\''+data.url+'\')" style="color:#2563eb; text-decoration:underline; cursor:pointer;">📄 '+file.name+'</span>';
+                        // Вместо относительного пути формируем жесткую прямую ссылку
+                        var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
+                        var content = isImg ? '<img src="'+absoluteUrl+'" />' : '<a href="'+absoluteUrl+'" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:bold;">📄 Скачать: '+file.name+'</a>';
                         socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
                 } catch(e) {}
@@ -531,19 +539,24 @@ function uploadFile(file) {
     } catch(e) {}
 }
 
+// ПРАВКА 3: Фикс скриншотов для старых движков Windows. 
+// Читаем буфер через фолбек window.clipboardData, если основной clipboardData пуст
 if (inputMsg) {
     inputMsg.onpaste = function(event) {
         var clipboardData = event.clipboardData || window.clipboardData;
         if (!clipboardData) return;
+        
+        // Попытка прочитать файлы (для современных хром-оболочек 1С)
         var items = clipboardData.items;
-        if (!items) return;
-        for (var i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf("image") === 0) {
-                var blob = items[i].getAsFile();
-                var file = new File([blob], "screenshot_" + Date.now() + ".png", {type: "image/png"});
-                uploadFile(file);
-                event.preventDefault();
-                return;
+        if (items) {
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") === 0) {
+                    var blob = items[i].getAsFile();
+                    var file = new File([blob], "screenshot_" + Date.now() + ".png", {type: "image/png"});
+                    uploadFile(file);
+                    event.preventDefault();
+                    return;
+                }
             }
         }
     };

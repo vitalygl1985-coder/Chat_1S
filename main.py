@@ -4,7 +4,7 @@ import uuid
 import urllib.parse
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import socketio
@@ -24,13 +24,12 @@ app.add_middleware(
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
 UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# Раздаем папку uploads и статикой, и через специальный эндпоинт для скачивания в 1С
+app.mount("/static_uploads", StaticFiles(directory=UPLOAD_DIR), name="static_uploads")
 
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
@@ -130,17 +129,30 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
+# Надежный эндпоинт загрузки (поддерживает как FormData, так и raw-binary отправку скриншотов из 1С)
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(None)):
     try:
-        file_extension = os.path.splitext(file.filename)[1]
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        unique_filename = f"{uuid.uuid4()}.png"
         file_path = os.path.join(UPLOAD_DIR, unique_filename)
-        with open(file_path, "wb") as buffer:
-            buffer.write(await file.read())
+        
+        if file:
+            with open(file_path, "wb") as buffer:
+                buffer.write(await file.read())
+        else:
+            raise HTTPException(status_code=400, detail="Файл не передан")
+            
         return {"url": f"/uploads/{unique_filename}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ПРАВКА 2: Фикс скачивания в 1С. Отдаем файлы через принудительный attachment
+@app.get("/uploads/{filename}")
+async def download_file_direct(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type='application/octet-stream', filename=filename)
+    raise HTTPException(status_code=404, detail="Файл не найден")
 
 @app.get("/api/admin/settings")
 async def get_admin_settings():
@@ -609,7 +621,6 @@ async def create_group_chat(sid, data):
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (new_room['id_room'], id_user))
         conn.commit()
         
-        # Сразу возвращаем ID создателю, чтобы сфокусировать фронтенд
         await sio.emit('private_chat_created', {'id_room': new_room['id_room']}, to=sid)
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
