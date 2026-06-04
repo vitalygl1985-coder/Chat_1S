@@ -153,10 +153,8 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     }
     
     try {
-        // Вычисляем базовый хост динамически
         var socketUrl = window.location.protocol + '//' + window.location.host;
         
-        // Исправлено: Явно передаем путь path, соответствующий монтированию в FastAPI
         socket = io(socketUrl, {
             path: '/socket.io',
             transports: ['polling', 'websocket'],
