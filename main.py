@@ -107,6 +107,320 @@ def init_db():
         conn.close()
 
 init_db()
+# --- API АВТОРИЗАЦИИ ---
+@app.post("/api/auth")
+async def auth_user(data: AuthRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        validated_org = clean_uuid(data.id_org)
+        cur.execute("""
+            INSERT INTO users (id_user, id_org, username, role, is_active)
+            VALUES (%s, %s::uuid, %s, %s, true)
+            ON CONFLICT (id_user) DO UPDATE SET 
+                username = EXCLUDED.username,
+                role = EXCLUDED.role,
+                id_org = EXCLUDED.id_org
+        """, (data.id_user, validated_org, data.username, data.role))
+        
+        # Добавляем в общий кабинет
+        cur.execute("SELECT id_room FROM rooms WHERE type='admin_group' AND UPPER(name) LIKE 'ОБЩ%' LIMIT 1")
+        general_room = cur.fetchone()
+        if general_room:
+            cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                       (general_room[0], data.id_user))
+        
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "message": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+# --- API КОМНАТ ---
+@app.get("/api/rooms")
+async def get_rooms(id_org: str, id_user: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        validated_org = clean_uuid(id_org)
+        cur.execute("""
+            SELECT DISTINCT r.id_room, r.name, r.type, r.created_by
+            FROM rooms r
+            INNER JOIN room_participants rp ON r.id_room = rp.id_room
+            WHERE r.id_org = %s::uuid AND rp.id_user = %s
+            ORDER BY 
+                CASE WHEN r.type = 'admin_group' THEN 0 ELSE 1 END,
+                r.name ASC
+        """, (validated_org, id_user))
+        rooms = cur.fetchall()
+        return {"rooms": rooms}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/api/users")
+async def get_users(id_org: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        validated_org = clean_uuid(id_org)
+        cur.execute("SELECT id_user, username, role FROM users WHERE id_org = %s::uuid AND is_active = true ORDER BY username", (validated_org,))
+        users = cur.fetchall()
+        return {"users": users}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/api/room_participants")
+async def get_room_participants(room_id: int):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT rp.id_user, u.username, u.role
+            FROM room_participants rp
+            INNER JOIN users u ON rp.id_user = u.id_user
+            WHERE rp.id_room = %s
+        """, (room_id,))
+        participants = cur.fetchall()
+        return {"participants": participants}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+# --- API СООБЩЕНИЙ ---
+@app.get("/api/messages")
+async def get_messages(room_id: int, after: Optional[int] = 0):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT m.id_message, m.id_room, m.id_user_from, 
+                   COALESCE(u.username, m.id_user_from) as username,
+                   m.encrypted_text, m.is_user_encrypted, m.created_at
+            FROM messages m
+            LEFT JOIN users u ON m.id_user_from = u.id_user
+            WHERE m.id_room = %s AND m.id_message > %s
+            ORDER BY m.created_at ASC LIMIT 100
+        """, (room_id, after))
+        messages = cur.fetchall()
+        for m in messages:
+            if m['created_at']:
+                m['created_at'] = m['created_at'].isoformat()
+        return {"messages": messages}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/send_message")
+async def send_message(data: SendMessageRequest):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id_message
+        """, (data.room_id, data.id_user_from, data.text, data.is_secret))
+        conn.commit()
+        return {"success": True, "message_id": cur.fetchone()['id_message']}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+# --- API УПРАВЛЕНИЯ ---
+@app.post("/api/add_to_room")
+async def add_to_room(data: AddToRoomRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                   (data.room_id, data.user_id))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/remove_from_room")
+async def remove_from_room(data: RemoveFromRoomRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM room_participants WHERE id_room = %s AND id_user = %s",
+                   (data.room_id, data.user_id))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/create_group")
+async def create_group(data: CreateGroupRequest):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        validated_org = clean_uuid(data.id_org)
+        room_type = 'admin_group' if data.is_admin else 'group'
+        cur.execute("""
+            INSERT INTO rooms (id_org, type, name, created_by)
+            VALUES (%s::uuid, %s, %s, %s)
+            RETURNING id_room
+        """, (validated_org, room_type, data.name, data.created_by))
+        room_id = cur.fetchone()['id_room']
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, data.created_by))
+        conn.commit()
+        return {"success": True, "room_id": room_id}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/create_private_chat")
+async def create_private_chat(data: CreatePrivateChatRequest):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        validated_org = clean_uuid(data.id_org)
+        # Проверяем существует ли уже диалог
+        cur.execute("""
+            SELECT r.id_room FROM rooms r
+            INNER JOIN room_participants p1 ON r.id_room = p1.id_room
+            INNER JOIN room_participants p2 ON r.id_room = p2.id_room
+            WHERE r.type = 'private' AND r.id_org = %s::uuid
+              AND p1.id_user = %s AND p2.id_user = %s
+        """, (validated_org, data.user1_id, data.user2_id))
+        existing = cur.fetchone()
+        if existing:
+            return {"success": True, "room_id": existing['id_room']}
+        
+        chat_name = f"{data.user1_name} ⇄ {data.user2_name}"
+        cur.execute("""
+            INSERT INTO rooms (id_org, type, name, created_by)
+            VALUES (%s::uuid, 'private', %s, %s)
+            RETURNING id_room
+        """, (validated_org, chat_name, data.user1_id))
+        room_id = cur.fetchone()['id_room']
+        
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, data.user1_id))
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, data.user2_id))
+        conn.commit()
+        return {"success": True, "room_id": room_id}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/delete_room")
+async def delete_room(data: DeleteRoomRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM rooms WHERE id_room = %s", (data.room_id,))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/api/archive_room")
+async def archive_room(data: ArchiveRoomRequest):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
+                   m.encrypted_text, m.created_at
+            FROM messages m
+            LEFT JOIN users u ON m.id_user_from = u.id_user
+            WHERE m.id_room = %s ORDER BY m.created_at ASC
+        """, (data.room_id,))
+        messages = cur.fetchall()
+        for m in messages:
+            if m['created_at']:
+                m['created_at'] = m['created_at'].isoformat()
+        
+        cur.execute("DELETE FROM messages WHERE id_room = %s", (data.room_id,))
+        conn.commit()
+        return {"success": True, "archive_data": messages}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+        
+class AuthRequest(BaseModel):
+    id_user: str
+    id_org: str
+    username: str
+    role: str = "user"
+
+class SendMessageRequest(BaseModel):
+    room_id: int
+    text: str
+    is_secret: bool = False
+    id_user_from: str
+    username: str
+
+class AddToRoomRequest(BaseModel):
+    room_id: int
+    user_id: str
+    admin_id: str
+
+class RemoveFromRoomRequest(BaseModel):
+    room_id: int
+    user_id: str
+    admin_id: str
+
+class CreateGroupRequest(BaseModel):
+    id_org: str
+    name: str
+    created_by: str
+    creator_name: str
+    is_admin: bool = False
+
+class CreatePrivateChatRequest(BaseModel):
+    id_org: str
+    user1_id: str
+    user1_name: str
+    user2_id: str
+    user2_name: str
+
+class DeleteRoomRequest(BaseModel):
+    room_id: int
+    admin_id: str
+
+class ArchiveRoomRequest(BaseModel):
+    room_id: int
+    admin_id: str
 
 class AdminAuthRequest(BaseModel):
     id_user: str
