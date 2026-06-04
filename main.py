@@ -150,18 +150,15 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ПРАВКА СКАЧИВАНИЯ: Роут полностью избавлен от Query-параметров, мешавших 1С
-@app.get("/download/{filename}/{orig_name}")
-async def download_file_direct(filename: str, orig_name: str):
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    if os.path.exists(file_path):
-        display_name = urllib.parse.unquote(orig_name)
-        return FileResponse(
-            file_path, 
-            media_type='application/octet-stream', 
-            filename=display_name,
-            headers={"Content-Disposition": f"attachment; filename=\"{display_name}\""}
-        )
-    raise HTTPException(status_code=404, detail="Файл на сервере не найден")
+@app.get("/download/{file_uuid}")
+async def download_file_direct(file_uuid: str):
+    # Ищем файл в папке по UUID (мы сохраняли их как UUID.ext)
+    for filename in os.listdir(UPLOAD_DIR):
+        if filename.startswith(file_uuid):
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            # Извлекаем оригинальное имя из базы (или передаем через заголовок)
+            return FileResponse(file_path, media_type='application/octet-stream')
+    raise HTTPException(status_code=404, detail="Файл не найден")
 
 @app.get("/api/admin/settings")
 async def get_admin_settings():

@@ -548,61 +548,35 @@ function sendMessage() {
 }
 
 function uploadFile(file) {
-    try {
-        var fd = new FormData();
-        fd.append('file', file);
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/upload', true);
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data && data.url && socket) {
-                        var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                        var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
-                        var content = isImg ? '<img src="'+absoluteUrl+'" />' : '<a href="'+absoluteUrl+'" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:bold; cursor:pointer;">📄 Скачать: '+file.name+'</a>';
-                        socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
-                    }
-                } catch(e) { alert("Ошибка парсинга ответа сервера"); }
-            } else { alert('Ошибка отправки файла.'); }
-        };
-        xhr.onerror = function() { alert('Ошибка сети при отправке файла'); };
-        xhr.send(fd);
-    } catch(e) { alert('Ошибка при вызове uploadFile: ' + e.message); }
+    var fd = new FormData();
+    fd.append('file', file);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload', true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var data = JSON.parse(xhr.responseText);
+            // Используем имя из ответа сервера
+            var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+            var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
+            var content = isImg ? '<img src="'+absoluteUrl+'" />' : '<a href="'+absoluteUrl+'" target="_blank">📄 Скачать: '+data.name+'</a>';
+            socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
+        }
+    };
+    xhr.send(fd);
 }
 
 function uploadBase64Image(rawInputString) {
-    if (!currentRoomId || !socket) return;
+    // Очистка строки
+    var base64Data = rawInputString.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
     
-    var cleanBase64 = rawInputString;
-    // Парсинг Base64 из HTML-вставки
-    if (rawInputString.indexOf('src="') !== -1) {
-        var match = rawInputString.match(/src="([^"]+)"/);
-        if (match && match[1]) { cleanBase64 = match[1]; }
-    }
-    if (cleanBase64.indexOf(",") !== -1) {
-        cleanBase64 = cleanBase64.split(",")[1];
-    }
-    cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
-
-    try {
-        // Проверка: atob работает в большинстве версий 1С 8.3.5, но если нет — используем fallback
-        if (typeof atob === 'function') {
-            var byteCharacters = atob(cleanBase64);
-            var byteNumbers = new Array(byteCharacters.length);
-            for (var i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            var byteArray = new Uint8Array(byteNumbers);
-            var blob = new Blob([byteArray], {type: 'image/png'});
-            var file = new File([blob], "screenshot_1c_" + Date.now() + ".png", {type: "image/png"});
-            uploadFile(file);
-        } else {
-            alert("Ваш браузер 1С не поддерживает декодирование Base64. Используйте кнопку 'Прикрепить файл'.");
-        }
-    } catch(e) {
-        alert("Ошибка декодирования скриншота: " + e.message);
-    }
+    // Создаем Blob из base64 для надежности в 1С
+    var binary = atob(base64Data);
+    var array = [];
+    for(var i = 0; i < binary.length; i++) array.push(binary.charCodeAt(i));
+    var blob = new Blob([new Uint8Array(array)], {type: 'image/png'});
+    
+    var file = new File([blob], "screenshot.png", {type: "image/png"});
+    uploadFile(file);
 }
 
 // ПРАВКА: Вставка скриншота через Ctrl+V
