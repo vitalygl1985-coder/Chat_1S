@@ -5,7 +5,6 @@ import urllib.parse
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import socketio
 import psycopg2
@@ -27,9 +26,6 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
-
-# Раздаем папку uploads и статикой, и через специальный эндпоинт для скачивания в 1С
-app.mount("/static_uploads", StaticFiles(directory=UPLOAD_DIR), name="static_uploads")
 
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
@@ -129,30 +125,36 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
-# Надежный эндпоинт загрузки (поддерживает как FormData, так и raw-binary отправку скриншотов из 1С)
+# Универсальный эндпоинт загрузки файлов и скриншотов из 1С
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(None)):
+async def upload_file(file: UploadFile = File(...)):
     try:
-        unique_filename = f"{uuid.uuid4()}.png"
+        # Сохраняем оригинальное расширение или принудительно ставим .png для скриншотов
+        orig_ext = os.path.splitext(file.filename)[1]
+        ext = orig_ext if orig_ext else ".png"
+        
+        unique_filename = f"{uuid.uuid4()}{ext}"
         file_path = os.path.join(UPLOAD_DIR, unique_filename)
         
-        if file:
-            with open(file_path, "wb") as buffer:
-                buffer.write(await file.read())
-        else:
-            raise HTTPException(status_code=400, detail="Файл не передан")
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
             
-        return {"url": f"/uploads/{unique_filename}"}
+        return {"url": f"/download/{unique_filename}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ПРАВКА 2: Фикс скачивания в 1С. Отдаем файлы через принудительный attachment
-@app.get("/uploads/{filename}")
+# ФИКС СКАЧИВАНИЯ ДЛЯ 1С: Прямой изолированный эндпоинт с жесткими заголовками вложения
+@app.get("/download/{filename}")
 async def download_file_direct(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
-        return FileResponse(file_path, media_type='application/octet-stream', filename=filename)
-    raise HTTPException(status_code=404, detail="Файл не найден")
+        return FileResponse(
+            file_path, 
+            media_type='application/octet-stream', 
+            filename=filename,
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    raise HTTPException(status_code=404, detail="Файл на сервере не найден")
 
 @app.get("/api/admin/settings")
 async def get_admin_settings():
