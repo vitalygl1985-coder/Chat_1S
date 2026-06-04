@@ -14,8 +14,8 @@
         .header h1 { font-size: 16px; }
         .header-controls { display: flex; align-items: center; gap: 15px; }
         .header-links { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-        .header-links a { color: white; text-decoration: underline; font-weight: bold; }
-        .header-links a:hover { text-decoration: none; }
+        .header-links span.link-click { color: white; text-decoration: underline; font-weight: bold; cursor: pointer; }
+        .header-links span.link-click:hover { text-decoration: none; }
         .user-info { font-size: 13px; }
         .main-container { flex: 1; display: flex; overflow: hidden; }
         .sidebar { width: 260px; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
@@ -48,7 +48,7 @@
 <body>
 
 <div class="header">
-    <h1>🩺КЕЙСЕР корп.чат💊</h1>
+    <h1>Corporate 1C Chat</h1>
     <div class="header-controls">
         <div id="custom-links-container" class="header-links"></div>
         <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
@@ -88,20 +88,17 @@
 </div>
 
 <script>
-// Глобальная изоляция ошибок для предотвращения падения Trident-движка 1С
 window.onerror = function(message, url, line) { 
     console.log("1C Error Suppressed: " + message + " at line " + line);
     return true; 
 };
 
-// Исправление падения при повторном открытии: безопасная очистка прототипов и обработчиков
 try {
     document.onclick = function() { return true; };
     document.onfocusin = function() { return true; };
     document.onfocusout = function() { return true; };
 } catch(e) { }
 
-// Полифилл classList с проверкой существования для IE/1C
 if (document.documentElement && !("classList" in document.documentElement)) {
     Object.defineProperty(HTMLElement.prototype, 'classList', {
         get: function() {
@@ -143,6 +140,22 @@ try {
         inputMsg.onblur = function() { this.className = 'input-msg-div'; };
     }
 } catch(e) { }
+
+// Безопасное открытие ссылок во внешнем браузере Windows, минуя Trident
+window.safeOpenLink = function(url) {
+    try {
+        // Проверка на встроенный объект 1С (если запущен внутри обработки)
+        if (window.external && typeof window.external.SelectOrg === 'unknown') {
+            window.open(url, "_blank");
+            return;
+        }
+    } catch(e) {}
+    
+    // Стандартный безопасный fallback через симуляцию клика без зависания DOM
+    setTimeout(function() {
+        window.open(url, "_blank");
+    }, 50);
+};
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
@@ -302,7 +315,7 @@ function uploadFile(file) {
                 var data = JSON.parse(xhr.responseText);
                 if (data && data.url && socket) {
                     var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                    var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<a href="'+data.url+'" target="_blank">📄 '+file.name+'</a>';
+                    var content = isImg ? '<img src="'+data.url+'" onclick="window.safeOpenLink(\''+data.url+'\')" />' : '<span class="link-click" onclick="window.safeOpenLink(\''+data.url+'\')" style="color:#2563eb; text-decoration:underline;">📄 '+file.name+'</span>';
                     socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                 }
             } catch(e) {}
@@ -419,11 +432,12 @@ function loadCustomThemeAndLinks() {
                 var linksContainer = document.getElementById('custom-links-container');
                 if (linksContainer) {
                     var html = '';
+                    // Исправление: Избавление от тегов <a> во избежание перехвата навигации ядром 1С
                     if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
-                        html += '<a href="'+settings.link1_url.value+'" target="_blank">🔗 '+settings.link1_name.value+'</a>';
+                        html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link1_url.value+'\')">🔗 '+settings.link1_name.value+'</span>';
                     }
                     if (settings.link2_name && settings.link2_name.value && settings.link2_url && settings.link2_url.value) {
-                        html += '<a href="'+settings.link2_url.value+'" target="_blank">🔗 '+settings.link2_name.value+'</a>';
+                        html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link2_url.value+'\')">🔗 '+settings.link2_name.value+'</span>';
                     }
                     if (html !== '') {
                         linksContainer.innerHTML = html;
