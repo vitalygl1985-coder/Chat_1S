@@ -626,3 +626,4 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
     finally:
         cur.close()
         conn.close()
+app.mount("/socket.io", socket_app)        
