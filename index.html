@@ -12,6 +12,10 @@
         body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
         .header { background-color: #2563eb; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 16px; }
+        .header-controls { display: flex; align-items: center; gap: 15px; }
+        .header-links { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .header-links a { color: white; text-decoration: underline; font-weight: bold; }
+        .header-links a:hover { text-decoration: none; }
         .user-info { font-size: 13px; }
         .main-container { flex: 1; display: flex; overflow: hidden; }
         .sidebar { width: 260px; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
@@ -45,8 +49,9 @@
 
 <div class="header">
     <h1>Corporate 1C Chat</h1>
-    <div>
-        <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="margin-right:12px; padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
+    <div class="header-controls">
+        <div id="custom-links-container" class="header-links"></div>
+        <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
         <span id="user-info" class="user-info">Авторизация...</span>
     </div>
 </div>
@@ -61,10 +66,6 @@
             <h3>Сотрудники</h3>
             <div id="users-list">Загрузка...</div>
         </div>     
-        <div class="sidebar-section" id="admin-links-zone" style="flex:0; min-height:60px; border-top:1px solid #e5e7eb; display:none; padding:12px;">
-            <h3>Полезные ссылки</h3>
-            <div id="custom-links-container" style="font-size:12px; display:flex; flex-direction:column; gap:4px;"></div>
-        </div>
     </div>
 
     <div class="chat-window" id="chat-window">
@@ -87,27 +88,41 @@
 </div>
 
 <script>
-window.onerror = function() { return true; };
+// Глобальная изоляция ошибок для предотвращения падения Trident-движка 1С
+window.onerror = function(message, url, line) { 
+    console.log("1C Error Suppressed: " + message + " at line " + line);
+    return true; 
+};
 
-document.onclick = function() { return true; };
-document.onfocusin = function() { return true; };
-document.onfocusout = function() { return true; };
+// Исправление падения при повторном открытии: безопасная очистка прототипов и обработчиков
+try {
+    document.onclick = function() { return true; };
+    document.onfocusin = function() { return true; };
+    document.onfocusout = function() { return true; };
+} catch(e) { }
 
-if (!("classList" in document.documentElement)) {
+// Полифилл classList с проверкой существования для IE/1C
+if (document.documentElement && !("classList" in document.documentElement)) {
     Object.defineProperty(HTMLElement.prototype, 'classList', {
         get: function() {
             var self = this;
             function update(fn) {
                 return function(v) {
-                    var c = self.className.split(/\s+/), i = c.indexOf(v);
-                    fn(c, i, v);
-                    self.className = c.join(" ");
+                    var cls = self.className ? String(self.className).split(/\s+/) : [];
+                    var i = -1;
+                    for(var j=0; j<cls.length; j++) { if(cls[j] === v) { i = j; break; } }
+                    fn(cls, i, v);
+                    self.className = cls.join(" ");
                 };
             }
             return {
                 add: update(function(c,i,v){ if(i===-1)c.push(v); }),
                 remove: update(function(c,i,v){ if(i!==-1)c.splice(i,1); }),
-                contains: function(v){ return self.className.split(/\s+/).indexOf(v) !== -1; }
+                contains: function(v){ 
+                    var cls = self.className ? String(self.className).split(/\s+/) : [];
+                    for(var j=0; j<cls.length; j++) { if(cls[j] === v) return true; }
+                    return false;
+                }
             };
         }
     });
@@ -127,7 +142,7 @@ try {
         inputMsg.onfocus = function() { this.className = 'input-msg-div input-msg-div-active'; };
         inputMsg.onblur = function() { this.className = 'input-msg-div'; };
     }
-} catch(e) { window.onerror(); }
+} catch(e) { }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
     currentUserId = id_user;
@@ -135,7 +150,7 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     
     var userInfoEl = document.getElementById('user-info');
     if (userInfoEl) {
-        userInfoEl.innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
+        userInfoEl.innerHTML = String(username) + (currentUserRole === 'admin' ? ' 👑' : '');
     }
     
     if (socket) {
@@ -173,12 +188,13 @@ function apply1CAuth(id_user, id_org, username, user_role) {
             }
         });
     } catch(err) {
-        console.log("Socket init error masked for 1C");
+        console.log("Socket init masked");
     }
 }
 
 function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
+    if (!container) return;
     container.innerHTML = "";
     if (!rooms || rooms.length === 0) { container.innerHTML = "<div>Нет чатов</div>"; return; }
     for (var i = 0; i < rooms.length; i++) {
@@ -189,9 +205,12 @@ function renderRoomsList(rooms) {
         (function(rid) {
             div.onclick = function() {
                 currentRoomId = rid;
-                document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка...</div></div>";
-                socket.emit('join_room_pool', { room_id: rid });
-                socket.emit('get_rooms_again');
+                var msgCont = document.getElementById('messages-container');
+                if (msgCont) msgCont.innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка...</div></div>";
+                if (socket) {
+                    socket.emit('join_room_pool', { room_id: rid });
+                    socket.emit('get_rooms_again');
+                }
             };
         })(room.id_room);
         container.appendChild(div);
@@ -200,6 +219,7 @@ function renderRoomsList(rooms) {
 
 function renderUsersList(users) {
     var container = document.getElementById('users-list');
+    if (!container) return;
     container.innerHTML = "";
     if (!users || users.length === 0) { container.innerHTML = "<div>Нет пользователей</div>"; return; }
     for (var i = 0; i < users.length; i++) {
@@ -209,7 +229,9 @@ function renderUsersList(users) {
         div.className = 'user-item';
         div.innerText = "👤 " + u.username;
         (function(uid, uname) {
-            div.onclick = function() { socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); };
+            div.onclick = function() { 
+                if (socket) socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); 
+            };
         })(u.id_user, u.username);
         container.appendChild(div);
     }
@@ -217,9 +239,10 @@ function renderUsersList(users) {
 
 function displayMessage(msg) {
     var container = document.getElementById('messages-container');
+    if (!container) return;
     var div = document.createElement('div');
     div.className = 'msg-block';
-    var text = msg.text;
+    var text = String(msg.text);
     if ((msg.is_secret || text.indexOf("SECRET:") === 0) && text.indexOf("SECRET:") !== -1) {
         var cipher = text.replace("SECRET:", "");
         var id = 'c_' + Math.random().toString(36).substr(2, 6);
@@ -235,9 +258,10 @@ window.decryptMsg = function(cipher, id) {
     if (!code) return;
     try {
         var dec = CryptoJS.AES.decrypt(cipher, code).toString(CryptoJS.enc.Utf8);
-        if (dec) {
-            document.getElementById(id).innerHTML = dec;
-            document.getElementById(id).style.cssText = "color:#1f2937;font-weight:bold;";
+        var targetEl = document.getElementById(id);
+        if (dec && targetEl) {
+            targetEl.innerHTML = dec;
+            targetEl.style.cssText = "color:#1f2937;font-weight:bold;";
         } else { alert("Неверный код!"); }
     } catch(e) { alert("Ошибка!"); }
 };
@@ -249,7 +273,9 @@ function sendMessage() {
     }
     
     if (!text) return;
-    if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
+    try {
+        if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
+    } catch(e) { }
     
     if (socket) {
         socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
@@ -272,57 +298,99 @@ function uploadFile(file) {
     xhr.open('POST', '/upload', true);
     xhr.onload = function() {
         if (xhr.status === 200) {
-            var data = JSON.parse(xhr.responseText);
-            if (data.url) {
-                var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<a href="'+data.url+'" target="_blank">📄 '+file.name+'</a>';
-                socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
-            }
+            try {
+                var data = JSON.parse(xhr.responseText);
+                if (data && data.url && socket) {
+                    var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+                    var content = isImg ? '<img src="'+data.url+'" onclick="window.open(\''+data.url+'\')" />' : '<a href="'+data.url+'" target="_blank">📄 '+file.name+'</a>';
+                    socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
+                }
+            } catch(e) {}
         } else { alert('Ошибка'); }
     };
     xhr.send(fd);
 }
 
-document.getElementById('btn-create-group').onclick = function() {
-    var name = prompt("Название группы:");
-    if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [] });
-};
-document.getElementById('btn-secret').onclick = function() {
-    if (!isSecretMode) {
-        var key = prompt("Ключ шифрования:");
-        if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
-    } else {
-        isSecretMode = false;
-        userSecretKey = "";
-        this.className = 'btn-secret';
-    }
-};
-document.getElementById('btn-send').onclick = sendMessage;
-document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); e.target.value = ""; };
-inputMsg.onkeydown = function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+var btnCreateGroup = document.getElementById('btn-create-group');
+if (btnCreateGroup) {
+    btnCreateGroup.onclick = function() {
+        var name = prompt("Название группы:");
+        if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [] });
+    };
+}
+
+var btnSecret = document.getElementById('btn-secret');
+if (btnSecret) {
+    btnSecret.onclick = function() {
+        if (!isSecretMode) {
+            var key = prompt("Ключ шифрования:");
+            if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
+        } else {
+            isSecretMode = false;
+            userSecretKey = "";
+            this.className = 'btn-secret';
+        }
+    };
+}
+
+var btnSend = document.getElementById('btn-send');
+if (btnSend) btnSend.onclick = sendMessage;
+
+var btnFile = document.getElementById('btn-file');
+if (btnFile) {
+    btnFile.onclick = function() { 
+        var fileInp = document.getElementById('file-input');
+        if (fileInp) fileInp.click(); 
+    };
+}
+
+var fileInput = document.getElementById('file-input');
+if (fileInput) {
+    fileInput.onchange = function(e) { 
+        if (e && e.target && e.target.files && e.target.files[0]) {
+            uploadFile(e.target.files[0]); 
+        }
+        if (this) this.value = ""; 
+    };
+}
+
+if (inputMsg) {
+    inputMsg.onkeydown = function(e) { 
+        var ev = e || window.event;
+        if (ev && ev.key === 'Enter' && !ev.shiftKey) { 
+            if (ev.preventDefault) ev.preventDefault(); else ev.returnValue = false;
+            sendMessage(); 
+        } 
+    };
+}
 
 var dropZone = document.getElementById('drop-zone');
-document.getElementById('chat-window').ondragover = function(e) { e.preventDefault(); dropZone.style.display = 'flex'; };
-dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
-document.getElementById('chat-window').ondrop = function(e) {
-    e.preventDefault();
-    dropZone.style.display = 'none';
-    if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
-};
+var chatWindow = document.getElementById('chat-window');
+if (chatWindow && dropZone) {
+    chatWindow.ondragover = function(e) { if (e.preventDefault) e.preventDefault(); dropZone.style.display = 'flex'; };
+    dropZone.ondragleave = function() { dropZone.style.display = 'none'; };
+    chatWindow.ondrop = function(e) {
+        if (e.preventDefault) e.preventDefault();
+        dropZone.style.display = 'none';
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+    };
+}
 
-inputMsg.onpaste = function(e) {
-    if (e.clipboardData && e.clipboardData.items) {
-        for (var i = 0; i < e.clipboardData.items.length; i++) {
-            var item = e.clipboardData.items[i];
-            if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
-                uploadFile(item.getAsFile());
-                e.preventDefault();
-                return;
+if (inputMsg) {
+    inputMsg.onpaste = function(e) {
+        var clipboardData = e.clipboardData || window.clipboardData;
+        if (clipboardData && clipboardData.items) {
+            for (var i = 0; i < clipboardData.items.length; i++) {
+                var item = clipboardData.items[i];
+                if (item && item.kind === 'file' && item.type && item.type.indexOf('image/') === 0) {
+                    uploadFile(item.getAsFile());
+                    if (e.preventDefault) e.preventDefault();
+                    return;
+                }
             }
         }
-    }
-};
+    };
+}
 
 function loadCustomThemeAndLinks() {
     var xhr = new XMLHttpRequest();
@@ -331,34 +399,34 @@ function loadCustomThemeAndLinks() {
         if (xhr.status === 200) {
             try {
                 var settings = JSON.parse(xhr.responseText);
+                if (!settings) return;
                 
                 if (settings.theme_primary_color && settings.theme_primary_color.value) {
                     var headerEl = document.querySelector('.header');
                     if (headerEl) headerEl.style.backgroundColor = settings.theme_primary_color.value;
-                    var btnSend = document.getElementById('btn-send');
-                    if (btnSend) btnSend.style.backgroundColor = settings.theme_primary_color.value;
+                    var btnSendEl = document.getElementById('btn-send');
+                    if (btnSendEl) btnSendEl.style.backgroundColor = settings.theme_primary_color.value;
                 }
                 
                 if (settings.custom_css && settings.custom_css.value) {
                     var style = document.createElement('style');
                     style.type = 'text/css';
                     style.innerHTML = settings.custom_css.value;
-                    document.getElementsByTagName('head')[0].appendChild(style);
+                    var head = document.getElementsByTagName('head')[0];
+                    if (head) head.appendChild(style);
                 }
 
                 var linksContainer = document.getElementById('custom-links-container');
-                var linksZone = document.getElementById('admin-links-zone');
-                if (linksContainer && linksZone) {
+                if (linksContainer) {
                     var html = '';
                     if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
-                        html += '<a href="'+settings.link1_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link1_name.value+'</a>';
+                        html += '<a href="'+settings.link1_url.value+'" target="_blank">🔗 '+settings.link1_name.value+'</a>';
                     }
                     if (settings.link2_name && settings.link2_name.value && settings.link2_url && settings.link2_url.value) {
-                        html += '<a href="'+settings.link2_url.value+'" target="_blank" style="color:#2563eb; text-decoration:none;">🔗 '+settings.link2_name.value+'</a>';
+                        html += '<a href="'+settings.link2_url.value+'" target="_blank">🔗 '+settings.link2_name.value+'</a>';
                     }
                     if (html !== '') {
                         linksContainer.innerHTML = html;
-                        linksZone.style.display = 'block';
                     }
                 }
             } catch(e) {}
@@ -370,11 +438,16 @@ function loadCustomThemeAndLinks() {
 loadCustomThemeAndLinks();
 
 window.onload = function() {
-    var hash = window.location.hash;
-    if (hash && hash.length > 1) {
-        var p = decodeURIComponent(hash.substring(1)).split("---");
-        if (p.length >= 3) apply1CAuth(p[0], p[1], p[2], p.length >= 4 ? p[3] : 'user');
-    }
+    try {
+        var hash = window.location.hash;
+        if (hash && hash.length > 1) {
+            var cleanHash = decodeURIComponent(hash.substring(1));
+            var p = cleanHash.split("---");
+            if (p && p.length >= 3) {
+                apply1CAuth(p[0], p[1], p[2], p.length >= 4 ? p[3] : 'user');
+            }
+        }
+    } catch(e) {}
 };
 </script>
 </body>
