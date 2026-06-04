@@ -10,7 +10,7 @@ from psycopg2.extras import RealDictCursor
 # Инициализируем FastAPI
 app = FastAPI()
 
-# Разрешаем CORS, чтобы 1С и браузеры могли подключаться без проблем
+# Разрешаем CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Настройка Socket.IO сервера (поддерживает polling для старых IE/1С и websocket)
+# Настройка Socket.IO сервера
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
@@ -28,7 +28,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
-# --- ОБРАБОТКА ПОДКЛЮЧЕНИЯ СОТРУДНИКА ---
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -48,23 +47,19 @@ async def connect(sid, environ, auth=None):
         'username': username,
         'role': user_role
     })
-    print(f"Пользователь {username} ({id_user}) подключился к организации {id_org}")
+    print(f"Пользователь {username} ({id_user}) подключился")
 
-# --- 1. ВХОД В КОМНАТУ СОКЕТА (Пул комнат) ---
 @sio.event
 async def join_room_pool(sid, data):
     room_id = data.get('room_id')
     if not room_id:
         return
-
     rooms = sio.rooms(sid)
     for room in list(rooms):
         if room != sid:
             await sio.leave_room(sid, room)
-            
     await sio.enter_room(sid, f"room_{room_id}")
 
-# --- 2. ПОЛУЧЕНИЕ СПИСКА ЧАТОВ ---
 @sio.event
 async def get_rooms_again(sid):
     session = await sio.get_session(sid)
@@ -85,12 +80,11 @@ async def get_rooms_again(sid):
         rooms = cur.fetchall()
         await sio.emit('rooms_list', rooms, to=sid)
     except Exception as e:
-        print(f"Ошибка получения комнат: {e}")
+        print(f"Ошибка комнат: {e}")
     finally:
         cur.close()
         conn.close()
 
-# --- 3. ПОЛУЧЕНИЕ СПИСКА ВСЕХ СОТРУДНИКОВ ОРГАНИЗАЦИИ ---
 @sio.event
 async def get_users_list(sid):
     session = await sio.get_session(sid)
@@ -103,12 +97,11 @@ async def get_users_list(sid):
         users = cur.fetchall()
         await sio.emit('users_list', users, to=sid)
     except Exception as e:
-        print(f"Ошибка получения пользователей: {e}")
+        print(f"Ошибка пользователей: {e}")
     finally:
         cur.close()
         conn.close()
 
-# --- 4. ЗАГРУЗКА ИСТОРИИ ИЗ ТАБЛИЦЫ MESSAGES ---
 @sio.event
 async def get_room_history(sid, data):
     room_id = data.get('room_id')
@@ -128,25 +121,21 @@ async def get_room_history(sid, data):
         """
         cur.execute(query, (room_id,))
         messages = cur.fetchall()
-        
         for m in messages:
             if m['created_at']:
                 m['created_at'] = m['created_at'].isoformat()
-                
         await sio.emit('room_history', {'messages': messages}, to=sid)
     except Exception as e:
-        print(f"Ошибка получения истории чата: {e}")
+        print(f"Ошибка истории: {e}")
     finally:
         cur.close()
         conn.close()
 
-# --- 5. ОТПРАВКА СООБЩЕНИЯ И ЗАПИСЬ В БАЗУ ДАННЫХ ---
 @sio.event
 async def send_message(sid, data):
     room_id = data.get('room_id')
     text = data.get('text')
     is_secret = data.get('is_secret', False)
-    
     if not room_id or not text:
         return
 
@@ -172,13 +161,12 @@ async def send_message(sid, data):
 
         await sio.emit('new_message', new_msg, room=f"room_{room_id}")
     except Exception as e:
-        print(f"Ошибка保存сообщения: {e}")
+        print(f"Ошибка отправки: {e}")
         conn.rollback()
     finally:
         cur.close()
         conn.close()
 
-# --- 6. ПОЛУЧЕНИЕ СПИСКА УЧАСТНИКОВ КАБИНЕТА ---
 @sio.event
 async def get_room_participants(sid, data):
     room_id = data.get('room_id')
@@ -198,18 +186,15 @@ async def get_room_participants(sid, data):
         participants = cur.fetchall()
         await sio.emit('room_participants_list', {'participants': participants}, to=sid)
     except Exception as e:
-        print(f"Ошибка получения списка участников: {e}")
+        print(f"Ошибка участников: {e}")
     finally:
         cur.close()
         conn.close()
 
-# --- 7. ДОБАВЛЕНИЕ СОТРУДНИКА В КАБИНЕТ (Кнопка "+ Человек") ---
 @sio.event
 async def add_user_to_room(sid, data):
     room_id = data.get('room_id')
     user_id = data.get('user_id')
-    
-    # ИСПРАВЛЕНО: Заменен оператор || на логический and
     if not room_id or not user_id:
         return
 
@@ -231,22 +216,19 @@ async def add_user_to_room(sid, data):
             INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s
         """, (room_id,))
         participants = cur.fetchall()
-        
         await sio.emit('room_participants_list', {'participants': participants}, room=f"room_{room_id}")
     except Exception as e:
-        print(f"Ошибка добавления участника в базу: {e}")
+        print(f"Ошибка добавления: {e}")
         conn.rollback()
     finally:
         cur.close()
         conn.close()
 
-# --- 8. СОЗДАНИЕ ГРУППОВОГО КАБИНЕТА ---
 @sio.event
 async def create_group_chat(sid, data):
     group_name = data.get('group_name')
     if not group_name:
         return
-
     session = await sio.get_session(sid)
     id_org = session['id_org']
     id_user = session['id_user']
@@ -260,27 +242,20 @@ async def create_group_chat(sid, data):
             RETURNING id_room, name, type
         """, (id_org, group_name, id_user))
         new_room = cur.fetchone()
-        
-        cur.execute("""
-            INSERT INTO room_participants (id_room, id_user)
-            VALUES (%s, %s)
-        """, (new_room['id_room'], id_user))
-        
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (new_room['id_room'], id_user))
         conn.commit()
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
-        print(f"Ошибка создания группового кабинета: {e}")
+        print(f"Ошибка кабинета: {e}")
         conn.rollback()
     finally:
         cur.close()
         conn.close()
 
-# --- 9. СОЗДАНИЕ ПРИВАТНОГО ЧАТА (Клик по сотруднику) ---
 @sio.event
 async def create_private_chat(sid, data):
     target_user_id = data.get('target_user_id')
     target_username = data.get('target_username')
-    
     session = await sio.get_session(sid)
     id_user = session['id_user']
     username = session['username']
@@ -298,7 +273,6 @@ async def create_private_chat(sid, data):
         """
         cur.execute(query_check, (id_org, id_user, target_user_id))
         existing = cur.fetchone()
-        
         if existing:
             await sio.emit('private_chat_created', {'id_room': existing['id_room']}, to=sid)
             return
@@ -315,11 +289,10 @@ async def create_private_chat(sid, data):
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, id_user))
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (room_id, target_user_id))
         conn.commit()
-
         await sio.emit('private_chat_created', {'id_room': room_id}, to=sid)
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
-        print(f"Ошибка создания приватного чата: {e}")
+        print(f"Ошибка приватного чата: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -327,6 +300,6 @@ async def create_private_chat(sid, data):
 
 @sio.event
 async def disconnect(sid):
-    print(f"Клиент отключился: {sid}")
+    print(f"Отключился: {sid}")
 
 app.mount("/", socket_app)
