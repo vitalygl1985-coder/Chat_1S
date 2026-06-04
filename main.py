@@ -1,9 +1,10 @@
 import os
 import json
 import urllib.parse
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -29,6 +30,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
+# Модель данных для авторизации админа
+class AdminAuthRequest(BaseModel):
+    id_user: str
+    id_org: str
+
 # --- РОУТЫ ДЛЯ СТАТИКИ И СТРАНИЦ ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -46,6 +52,37 @@ async def get_admin_page():
             return f.read()
     except Exception as e:
         return f"Ошибка загрузки admin.html: {str(e)}"
+
+# --- НОВЫЙ РОУТ: АВТОРИЗАЦИЯ АДМИНИСТРАТОРА (Устраняет 404) ---
+@app.post("/api/admin/auth")
+async def admin_auth(data: AdminAuthRequest):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Проверяем, существует ли пользователь, активен ли он и является ли админом
+        query = """
+            SELECT id_user, username, role, id_org 
+            FROM users 
+            WHERE id_user = %s AND id_org = %s::uuid AND is_active = true
+        """
+        cur.execute(query, (data.id_user, data.id_org))
+        user = cur.fetchone()
+        
+        if not user:
+            return JSONResponse(status_code=403, content={"success": False, "message": "Пользователь не найден в данной организации"})
+        
+        if user['role'] != 'admin':
+            return JSONResponse(status_code=403, content={"success": False, "message": "Недостаточно прав. Требуется роль admin"})
+        
+        # Если всё ок — пускаем в панель
+        return {"success": True, "user": user}
+        
+    except Exception as e:
+        print(f"Ошибка авторизации админа: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "message": "Внутренняя ошибка сервера"})
+    finally:
+        cur.close()
+        conn.close()
 
 # --- ОБРАБОТЧИКИ СОБЫТИЙ SOCKET.IO ---
 
