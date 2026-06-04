@@ -30,8 +30,8 @@
         .chat-header { padding: 6px 10px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: bold; flex-shrink: 0; }
         .chat-actions { display: flex; gap: 4px; }
         
-        .messages-container { flex: 1; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; }
-        .msg-block { background-color: white; padding: 5px 8px; border-radius: 5px; max-width: 80%; margin-bottom: 5px; align-self: flex-start; }
+        .messages-container { flex: 1; padding: 8px; overflow-y: auto; }
+        .msg-block { background-color: white; padding: 5px 8px; border-radius: 5px; max-width: 80%; margin-bottom: 5px; }
         .msg-author { font-size: 8px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
         .msg-text { font-size: 10px; color: #1f2937; word-break: break-word; }
         
@@ -63,8 +63,6 @@
         .modal-buttons button { padding: 3px 10px; font-size: 9px; cursor: pointer; border: none; border-radius: 3px; }
         
         .toast-msg { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 4px 10px; border-radius: 15px; font-size: 10px; z-index: 2000; display: none; }
-        .loading { display: inline-block; width: 12px; height: 12px; border: 2px solid #ccc; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.6s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -342,14 +340,18 @@ function selectRoomById(roomId) {
     loadRoomHistory(roomId);
     loadRoomParticipants(roomId);
     
-    // Обновляем активный класс
-    var rooms = document.querySelectorAll('.room-item');
-    for (var i = 0; i < rooms.length; i++) {
-        var room = rooms[i];
-        if (room.getAttribute('data-id') == roomId) {
-            room.classList.add('active');
-        } else {
-            room.classList.remove('active');
+    // Обновляем активный класс (без classList)
+    var rooms = document.getElementById('rooms-list');
+    if (rooms) {
+        var items = rooms.getElementsByClassName('room-item');
+        for (var i = 0; i < items.length; i++) {
+            var room = items[i];
+            var rid = room.getAttribute('data-id');
+            if (rid == roomId) {
+                room.className = 'room-item active';
+            } else {
+                room.className = 'room-item';
+            }
         }
     }
 }
@@ -366,7 +368,8 @@ function renderRoomsList(rooms) {
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         var div = document.createElement('div');
-        div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
+        var isActive = (room.id_room == currentRoomId);
+        div.className = isActive ? 'room-item active' : 'room-item';
         div.setAttribute('data-id', room.id_room);
         var icon = (room.type === 'private') ? '💬 ' : ((room.type === 'admin_group') ? '👑 ' : '👥 ');
         div.textContent = icon + room.name;
@@ -379,7 +382,8 @@ function renderRoomsList(rooms) {
             
             var mgtActions = document.getElementById('chat-management-actions');
             if (mgtActions) {
-                mgtActions.style.display = (room.type !== 'private' && (currentUserRole === 'admin' || room.created_by == currentUserId)) ? 'flex' : 'none';
+                var showActions = (room.type !== 'private' && (currentUserRole === 'admin' || room.created_by == currentUserId));
+                mgtActions.style.display = showActions ? 'flex' : 'none';
             }
             
             var btnAdd = document.getElementById('btn-add-participant');
@@ -390,8 +394,8 @@ function renderRoomsList(rooms) {
             }
         }
         
-        (function(r) {
-            div.onclick = function() { if (!isUnloading) selectRoomById(r.id_room); };
+        div.onclick = (function(r) {
+            return function() { if (!isUnloading) selectRoomById(r.id_room); };
         })(room);
         container.appendChild(div);
     }
@@ -485,6 +489,11 @@ function sendMessage() {
 
 function uploadFile(file) {
     if (isUnloading) return;
+    // Проверяем поддержку FormData (в IE8 нет)
+    if (typeof FormData === 'undefined') {
+        showToast("Ваш браузер не поддерживает загрузку файлов", true);
+        return;
+    }
     var fd = new FormData();
     fd.append('file', file);
     var xhr = new XMLHttpRequest();
@@ -563,11 +572,14 @@ if (screenshotField) {
         }, 50);
     };
 }
-document.getElementById('screenshot-submit-btn').onclick = function() {
-    var val = screenshotField ? screenshotField.value.trim() : "";
-    if (val) { sendScreenshot(val); closeScreenshotModal(); }
-    else showToast("Вставьте скриншот", true);
-};
+var screenshotSubmitBtn = document.getElementById('screenshot-submit-btn');
+if (screenshotSubmitBtn) {
+    screenshotSubmitBtn.onclick = function() {
+        var val = screenshotField ? screenshotField.value.trim() : "";
+        if (val) { sendScreenshot(val); closeScreenshotModal(); }
+        else showToast("Вставьте скриншот", true);
+    };
+}
 
 function displayMessage(msg, isBulkLoad) {
     if (isUnloading || !messagesContainer) return;
@@ -613,108 +625,150 @@ function openUserModal(title, callback) {
         opt.textContent = globalUsersCache[i].username;
         dropdown.appendChild(opt);
     }
-    document.getElementById('user-select-modal').style.display = 'flex';
-    document.getElementById('modal-submit-btn').onclick = function() { callback(dropdown.value); closeUserModal(); };
+    var modal = document.getElementById('user-select-modal');
+    if (modal) modal.style.display = 'flex';
+    var submitBtn = document.getElementById('modal-submit-btn');
+    if (submitBtn) {
+        submitBtn.onclick = function() { callback(dropdown.value); closeUserModal(); };
+    }
 }
-function closeUserModal() { document.getElementById('user-select-modal').style.display = 'none'; }
+function closeUserModal() { var modal = document.getElementById('user-select-modal'); if (modal) modal.style.display = 'none'; }
 
 function openSecretModal(callback) {
     var field = document.getElementById('modal-secret-field');
     if (field) field.value = "";
-    document.getElementById('secret-input-modal').style.display = 'flex';
-    document.getElementById('secret-modal-submit-btn').onclick = function() {
-        var val = document.getElementById('modal-secret-field').value.trim();
-        if (val) callback(val);
-        closeSecretModal();
-    };
+    var modal = document.getElementById('secret-input-modal');
+    if (modal) modal.style.display = 'flex';
+    var submitBtn = document.getElementById('secret-modal-submit-btn');
+    if (submitBtn) {
+        submitBtn.onclick = function() {
+            var val = document.getElementById('modal-secret-field').value.trim();
+            if (val) callback(val);
+            closeSecretModal();
+        };
+    }
 }
-function closeSecretModal() { document.getElementById('secret-input-modal').style.display = 'none'; }
+function closeSecretModal() { var modal = document.getElementById('secret-input-modal'); if (modal) modal.style.display = 'none'; }
 
 function openTextModal(title, callback) {
     var titleEl = document.getElementById('text-modal-title');
     if (titleEl) titleEl.textContent = title;
     var field = document.getElementById('modal-text-field');
     if (field) field.value = "";
-    document.getElementById('text-input-modal').style.display = 'flex';
-    document.getElementById('text-modal-submit-btn').onclick = function() {
-        var val = document.getElementById('modal-text-field').value.trim();
-        if (val) callback(val);
-        closeTextModal();
-    };
+    var modal = document.getElementById('text-input-modal');
+    if (modal) modal.style.display = 'flex';
+    var submitBtn = document.getElementById('text-modal-submit-btn');
+    if (submitBtn) {
+        submitBtn.onclick = function() {
+            var val = document.getElementById('modal-text-field').value.trim();
+            if (val) callback(val);
+            closeTextModal();
+        };
+    }
 }
-function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
+function closeTextModal() { var modal = document.getElementById('text-input-modal'); if (modal) modal.style.display = 'none'; }
 
 // Обработчики
-document.getElementById('btn-send').onclick = sendMessage;
-document.getElementById('btn-screenshot').onclick = openScreenshotModal;
-document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) {
-    if (e.target.files && e.target.files[0]) uploadFile(e.target.files[0]);
-    this.value = "";
-};
-document.getElementById('btn-add-participant').onclick = function() {
-    if (!currentRoomId) return;
-    openUserModal("Добавить сотрудника", function(uid) {
-        ajax('POST', '/api/add_to_room', { room_id: currentRoomId, user_id: uid, admin_id: currentUserId }, function(err, res) {
-            if (!err && res && res.success) { loadRoomParticipants(currentRoomId); loadRooms(); }
+var sendBtn = document.getElementById('btn-send');
+if (sendBtn) sendBtn.onclick = sendMessage;
+
+var screenshotBtn = document.getElementById('btn-screenshot');
+if (screenshotBtn) screenshotBtn.onclick = openScreenshotModal;
+
+var fileBtn = document.getElementById('btn-file');
+if (fileBtn) {
+    fileBtn.onclick = function() { document.getElementById('file-input').click(); };
+}
+var fileInput = document.getElementById('file-input');
+if (fileInput) {
+    fileInput.onchange = function(e) {
+        if (e.target.files && e.target.files[0]) uploadFile(e.target.files[0]);
+        this.value = "";
+    };
+}
+
+var addParticipantBtn = document.getElementById('btn-add-participant');
+if (addParticipantBtn) {
+    addParticipantBtn.onclick = function() {
+        if (!currentRoomId) return;
+        openUserModal("Добавить сотрудника", function(uid) {
+            ajax('POST', '/api/add_to_room', { room_id: currentRoomId, user_id: uid, admin_id: currentUserId }, function(err, res) {
+                if (!err && res && res.success) { loadRoomParticipants(currentRoomId); loadRooms(); }
+            });
         });
-    });
-};
-document.getElementById('btn-start-private').onclick = function() {
-    openUserModal("Начать диалог", function(uid) {
-        var target = null;
-        for (var i = 0; i < globalUsersCache.length; i++) {
-            if (globalUsersCache[i].id_user == uid) { target = globalUsersCache[i]; break; }
-        }
-        if (target) {
-            ajax('POST', '/api/create_private_chat', {
+    };
+}
+
+var startPrivateBtn = document.getElementById('btn-start-private');
+if (startPrivateBtn) {
+    startPrivateBtn.onclick = function() {
+        openUserModal("Начать диалог", function(uid) {
+            var target = null;
+            for (var i = 0; i < globalUsersCache.length; i++) {
+                if (globalUsersCache[i].id_user == uid) { target = globalUsersCache[i]; break; }
+            }
+            if (target) {
+                ajax('POST', '/api/create_private_chat', {
+                    id_org: currentOrgId,
+                    user1_id: currentUserId,
+                    user1_name: currentUserName,
+                    user2_id: target.id_user,
+                    user2_name: target.username
+                }, function(err, res) {
+                    if (!err && res && res.room_id) { loadRooms(); selectRoomById(res.room_id); }
+                });
+            }
+        });
+    };
+}
+
+var createGroupBtn = document.getElementById('btn-create-group');
+if (createGroupBtn) {
+    createGroupBtn.onclick = function() {
+        openTextModal("Название кабинета", function(name) {
+            ajax('POST', '/api/create_group', {
                 id_org: currentOrgId,
-                user1_id: currentUserId,
-                user1_name: currentUserName,
-                user2_id: target.id_user,
-                user2_name: target.username
+                name: name,
+                created_by: currentUserId,
+                creator_name: currentUserName,
+                is_admin: (currentUserRole === 'admin')
             }, function(err, res) {
                 if (!err && res && res.room_id) { loadRooms(); selectRoomById(res.room_id); }
             });
+        });
+    };
+}
+
+var secretBtn = document.getElementById('btn-secret');
+if (secretBtn) {
+    secretBtn.onclick = function() {
+        if (!isSecretMode) {
+            openSecretModal(function(key) {
+                userSecretKey = key;
+                isSecretMode = true;
+                var btn = document.getElementById('btn-secret');
+                if (btn) btn.className = 'btn-secret active';
+                showToast("Шифрование включено");
+            });
+        } else {
+            isSecretMode = false;
+            userSecretKey = "";
+            var btn = document.getElementById('btn-secret');
+            if (btn) btn.className = 'btn-secret';
+            showToast("Шифрование выключено");
         }
-    });
-};
-document.getElementById('btn-create-group').onclick = function() {
-    openTextModal("Название кабинета", function(name) {
-        ajax('POST', '/api/create_group', {
-            id_org: currentOrgId,
-            name: name,
-            created_by: currentUserId,
-            creator_name: currentUserName,
-            is_admin: (currentUserRole === 'admin')
-        }, function(err, res) {
-            if (!err && res && res.room_id) { loadRooms(); selectRoomById(res.room_id); }
-        });
-    });
-};
-document.getElementById('btn-secret').onclick = function() {
-    if (!isSecretMode) {
-        openSecretModal(function(key) {
-            userSecretKey = key;
-            isSecretMode = true;
-            document.getElementById('btn-secret').className = 'btn-secret active';
-            showToast("Шифрование включено");
-        });
-    } else {
-        isSecretMode = false;
-        userSecretKey = "";
-        document.getElementById('btn-secret').className = 'btn-secret';
-        showToast("Шифрование выключено");
-    }
-};
+    };
+}
 
 function triggerDeleteRoom() {
     if (!currentRoomId || !confirm("Удалить кабинет?")) return;
     ajax('POST', '/api/delete_room', { room_id: currentRoomId, admin_id: currentUserId }, function(err, res) {
         if (!err && res && res.success) {
             if (messagesContainer) messagesContainer.innerHTML = "";
-            document.getElementById('current-chat-title').textContent = "Выберите чат";
-            document.getElementById('chat-management-actions').style.display = 'none';
+            var titleEl = document.getElementById('current-chat-title');
+            if (titleEl) titleEl.textContent = "Выберите чат";
+            var mgtActions = document.getElementById('chat-management-actions');
+            if (mgtActions) mgtActions.style.display = 'none';
             currentRoomId = null;
             loadRooms();
         }
@@ -735,7 +789,7 @@ function triggerArchive() {
                 a.download = "archive_room_" + currentRoomId + ".json";
                 document.body.appendChild(a);
                 a.click();
-                setTimeout(function() { a.remove(); }, 100);
+                setTimeout(function() { if (a.parentNode) a.parentNode.removeChild(a); }, 100);
             }
             loadRoomHistory(currentRoomId);
             showToast("История выгружена");
