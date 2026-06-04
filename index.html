@@ -61,6 +61,7 @@
         .modal-body input, .modal-body textarea { width: 100%; padding: 6px; font-size: 11px; margin-bottom: 10px; outline: none; border: 1px solid #d1d5db; }
         .modal-body textarea { height: 100px; font-family: monospace; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+        .modal-buttons button { padding: 4px 12px; font-size: 11px; cursor: pointer; border: none; border-radius: 4px; }
         
         .toast-msg { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 6px 12px; border-radius: 20px; font-size: 11px; z-index: 2000; display: none; }
     </style>
@@ -70,7 +71,7 @@
 <div class="header">
     <h1>1C Corporate Chat</h1>
     <div class="header-controls">
-        <div id="custom-links-container" class="header-links" style="display:flex; gap:8px;"></div>
+        <div id="custom-links-container" style="display:flex; gap:8px;"></div>
         <button onclick="quickLogin('Admin', '00000000-0000-0000-0000-000000000001', 'Администратор', 'admin')" style="padding:2px 6px; font-size:10px; background:#eab308; border:none; border-radius:3px; cursor:pointer;">Админ</button>
         <button onclick="quickLogin('User1', '00000000-0000-0000-0000-000000000001', 'Сотрудник', 'user')" style="padding:2px 6px; font-size:10px; background:#10b981; border:none; border-radius:3px; cursor:pointer;">Пользователь</button>
         <span id="user-info" class="user-info">Не авторизован</span>
@@ -101,7 +102,7 @@
         <div class="input-panel">
             <div class="secret-row">
                 <button id="btn-secret" class="btn-secret">🔒 Шифровать</button>
-                <button id="btn-screenshot" class="btn-screenshot">📸 Вставить скриншот (Ctrl+V)</button>
+                <button id="btn-screenshot" class="btn-screenshot">📸 Вставить скриншот</button>
             </div>
             <div class="controls-row">
                 <input type="file" id="file-input" style="display:none">
@@ -128,14 +129,14 @@
     <div class="modal-body">
         <h4>📸 Вставка скриншота</h4>
         <p style="font-size:10px; color:#666; margin-bottom:8px;">
-            1. Нажмите PrintScreen (или Alt+PrintScreen)<br>
+            1. Нажмите PrintScreen<br>
             2. Нажмите Ctrl+V в поле ниже<br>
             3. Нажмите "Отправить"
         </p>
         <textarea id="screenshot-field" placeholder="Нажмите Ctrl+V для вставки скриншота..."></textarea>
         <div class="modal-buttons">
-            <button onclick="closeScreenshotModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="screenshot-submit-btn" class="btn-small" style="background:#2563eb;">Отправить</button>
+            <button onclick="closeScreenshotModal()" style="background:#9ca3af;">Отмена</button>
+            <button id="screenshot-submit-btn" style="background:#2563eb; color:white;">Отправить</button>
         </div>
     </div>
 </div>
@@ -146,8 +147,8 @@
         <h4 id="modal-action-title">Выберите сотрудника</h4>
         <select id="modal-user-dropdown"></select>
         <div class="modal-buttons">
-            <button onclick="closeUserModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="modal-submit-btn" class="btn-small">Выбрать</button>
+            <button onclick="closeUserModal()" style="background:#9ca3af;">Отмена</button>
+            <button id="modal-submit-btn" style="background:#2563eb; color:white;">Выбрать</button>
         </div>
     </div>
 </div>
@@ -158,8 +159,8 @@
         <h4>🔑 Введите ключ шифрования</h4>
         <input type="password" id="modal-secret-field" placeholder="Ключ..." />
         <div class="modal-buttons">
-            <button onclick="closeSecretModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="secret-modal-submit-btn" class="btn-small" style="background:#eab308;">Применить</button>
+            <button onclick="closeSecretModal()" style="background:#9ca3af;">Отмена</button>
+            <button id="secret-modal-submit-btn" style="background:#eab308;">Применить</button>
         </div>
     </div>
 </div>
@@ -170,8 +171,8 @@
         <h4>📝 Название нового кабинета</h4>
         <input type="text" id="modal-text-field" placeholder="Название..." />
         <div class="modal-buttons">
-            <button onclick="closeTextModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="text-modal-submit-btn" class="btn-small" style="background:#10b981;">Создать</button>
+            <button onclick="closeTextModal()" style="background:#9ca3af;">Отмена</button>
+            <button id="text-modal-submit-btn" style="background:#10b981; color:white;">Создать</button>
         </div>
     </div>
 </div>
@@ -240,11 +241,6 @@ function cleanupResources() {
             socket.disconnect();
         } catch(e) {}
         socket = null;
-    }
-    // Очищаем таймеры
-    var highestTimeoutId = setTimeout(function(){}, 0);
-    for (var i = 0; i < highestTimeoutId; i++) {
-        clearTimeout(i);
     }
 }
 
@@ -382,7 +378,6 @@ function renderRoomsList(rooms) {
         var div = document.createElement('div');
         div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
         var icon = (room.type === 'private') ? '💬 ' : ((room.type === 'admin_group') ? '👑 ' : '👥 ');
-        // ИСПРАВЛЕНО: используем textContent вместо innerText (лучше для IE)
         div.textContent = icon + room.name;
         
         if (room.id_room == currentRoomId) {
@@ -478,7 +473,7 @@ function sendMessage() {
             finalText = "SECRET:" + encrypted;
         }
     } catch(e) {
-        showToast("Ошибка шифрования: " + e.message, true);
+        showToast("Ошибка шифрования", true);
     }
     
     if (socket) {
@@ -582,8 +577,9 @@ if (screenshotField) {
     };
 }
 
-if (document.getElementById('screenshot-submit-btn')) {
-    document.getElementById('screenshot-submit-btn').onclick = function() {
+var screenshotSubmitBtn = document.getElementById('screenshot-submit-btn');
+if (screenshotSubmitBtn) {
+    screenshotSubmitBtn.onclick = function() {
         var val = screenshotField ? screenshotField.value.trim() : "";
         if (val) {
             sendScreenshotFromBase64(val);
@@ -594,6 +590,7 @@ if (document.getElementById('screenshot-submit-btn')) {
     };
 }
 
+// Модальные окна
 function openUserModal(title, submitCallback) {
     if (isUnloading) return;
     var titleEl = document.getElementById('modal-action-title');
@@ -632,8 +629,8 @@ function openSecretModal(callback) {
     var submitBtn = document.getElementById('secret-modal-submit-btn');
     if (submitBtn) {
         submitBtn.onclick = function() {
-            var field = document.getElementById('modal-secret-field');
-            var val = field ? field.value.trim() : "";
+            var fieldEl = document.getElementById('modal-secret-field');
+            var val = fieldEl ? fieldEl.value.trim() : "";
             if (val !== "") {
                 callback(val);
             }
@@ -658,8 +655,8 @@ function openTextModal(title, callback) {
     var submitBtn = document.getElementById('text-modal-submit-btn');
     if (submitBtn) {
         submitBtn.onclick = function() {
-            var field = document.getElementById('modal-text-field');
-            var val = field ? field.value.trim() : "";
+            var fieldEl = document.getElementById('modal-text-field');
+            var val = fieldEl ? fieldEl.value.trim() : "";
             if (val !== "") {
                 callback(val);
             }
