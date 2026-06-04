@@ -127,7 +127,6 @@ async def get_admin_page():
     except Exception as e:
         return f"Ошибка admin.html: {str(e)}"
 
-# Обновленный роут загрузки: принимает оригинальное имя файла
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -135,26 +134,25 @@ async def upload_file(file: UploadFile = File(...)):
         file_extension = os.path.splitext(orig_filename)[1]
         unique_id = str(uuid.uuid4())
         
-        # Сохраняем под уникальным ID, чтобы избежать затирания файлов
         saved_filename = f"{unique_id}{file_extension}"
         file_path = os.path.join(UPLOAD_DIR, saved_filename)
         
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
             
-        # Кодируем оригинальное имя, чтобы передать его в URL для 1С
         encoded_orig_name = urllib.parse.quote(orig_filename)
         return {"url": f"/download/{saved_filename}?filename={encoded_orig_name}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ФИКС СКАЧИВАНИЯ: Подставляем оригинальное имя файла в заголовки Content-Disposition
+# ФИКС СКАЧИВАНИЯ: Исправлен маппинг аргументов Query для сохранения оригинального имени в 1С
 @app.get("/download/{filename}")
 async def download_file_direct(filename: str, filename_orig: str = Query(None, alias="filename")):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
-        # Если оригинальное имя передано, декодируем его, иначе берем имя файла с диска
-        display_name = urllib.parse.unquote(filename_orig) if filename_orig else filename
+        display_name = filename
+        if filename_orig:
+            display_name = urllib.parse.unquote(filename_orig)
         return FileResponse(
             file_path, 
             media_type='application/octet-stream', 

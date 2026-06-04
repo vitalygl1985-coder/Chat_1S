@@ -158,8 +158,8 @@
 <div class="modal-overlay" id="base64-image-modal">
     <div class="modal-body">
         <h4>Вставка скриншота</h4>
-        <p style="font-size:11px; color:#6b7280; margin-bottom:8px;">Вставьте base64-код изображения из буфера обмена:</p>
-        <input type="text" id="modal-base64-field" placeholder="data:image/png;base64,..." />
+        <p style="font-size:11px; color:#6b7280; margin-bottom:8px;">Вставьте скриншот (Ctrl+V) прямо в поле ниже:</p>
+        <input type="text" id="modal-base64-field" placeholder="Ожидание вставки..." />
         <div class="modal-buttons">
             <button onclick="closeBase64Modal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
             <button id="base64-modal-submit-btn" class="btn-small" style="background:#2563eb;">Отправить</button>
@@ -556,7 +556,7 @@ function uploadFile(file) {
                     if (data && data.url && socket) {
                         var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                         var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
-                        var content = isImg ? '<img src="'+absoluteUrl+'" onclick="window.safeOpenLink(\''+absoluteUrl+'\')" />' : '<a href="'+absoluteUrl+'" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:bold; cursor:pointer;">📄 Скачать: '+file.name+'</a>';
+                        var content = isImg ? '<img src="'+absoluteUrl+'" />' : '<a href="'+absoluteUrl+'" target="_blank" style="color:#2563eb; text-decoration:underline; font-weight:bold; cursor:pointer;">📄 Скачать: '+file.name+'</a>';
                         socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
                 } catch(e) {}
@@ -566,18 +566,26 @@ function uploadFile(file) {
     } catch(e) {}
 }
 
-// ПРАВКА 2: Отправка сырых Base64 скриншотов для 1С 8.3.5
-function uploadBase64Image(base64Data) {
+// ФИКС СКРИНШОТОВ (Глубокий парсинг HTML-тегов картинок буфера для IE)
+function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket) return;
     
-    // Если строка содержит префикс data:image, очищаем его для формирования чистого файла
-    var cleanBase64 = base64Data;
-    if (base64Data.indexOf(",") !== -1) {
-        cleanBase64 = base64Data.split(",")[1];
+    var cleanBase64 = rawInputString;
+    
+    // Если 1С передала полноценный тег <img src="data:image...">, вырезаем только тело Base64
+    if (rawInputString.indexOf('src="') !== -1) {
+        var match = rawInputString.match(/src="([^"]+)"/);
+        if (match && match[1]) { cleanBase64 = match[1]; }
     }
     
+    if (cleanBase64.indexOf(",") !== -1) {
+        cleanBase64 = cleanBase64.split(",")[1];
+    }
+    
+    // Вырезаем остаточные HTML-теги, если они пролезли из буфера обмена ОС Windows
+    cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
+
     try {
-        // Конвертируем Base64 в байты, понятные для бэкенда FastAPI
         var byteCharacters = atob(cleanBase64);
         var byteNumbers = new Array(byteCharacters.length);
         for (var i = 0; i < byteCharacters.length; i++) {
@@ -589,34 +597,34 @@ function uploadBase64Image(base64Data) {
         
         uploadFile(file);
     } catch(e) {
-        alert("Ошибка разбора кода скриншота. Убедитесь, что скопировано именно изображение.");
+        alert("Не удалось декодировать скриншот. Скопируйте изображение и повторите попытку.");
     }
 }
 
+// Перехват Ctrl+V во входном контейнере
 if (inputMsg) {
     inputMsg.onpaste = function(event) {
         var clipboardData = event.clipboardData || window.clipboardData;
         if (!clipboardData) return;
         
-        var items = clipboardData.items;
-        if (items) {
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf("image") === 0) {
-                    var blob = items[i].getAsFile();
-                    var file = new File([blob], "screenshot_" + Date.now() + ".png", {type: "image/png"});
-                    uploadFile(file);
-                    event.preventDefault();
-                    return;
-                }
-            }
+        // Парадигма Trident (IE) в 1С: перехватываем текстовый слепок HTML
+        var htmlData = "";
+        try {
+            htmlData = clipboardData.getData("HTML") || clipboardData.getData("Text");
+        } catch(e) {}
+        
+        if (htmlData && htmlData.indexOf("data:image") !== -1) {
+            uploadBase64Image(htmlData);
+            if (event.preventDefault) event.preventDefault();
+            return false;
         }
     };
 }
 
-// ПРАВКА: Принудительный вызов немодального окна для ввода Base64 скриншота в 1С
+// Кнопка принудительного вызова Base64 окна
 document.getElementById('btn-paste-screen').onclick = function() {
     openBase64Modal(function(base64Code) {
-        uploadBase64Image(baseCode);
+        uploadBase64Image(base64Code);
     });
 };
 
