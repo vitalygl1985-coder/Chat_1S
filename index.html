@@ -454,6 +454,7 @@ document.getElementById('btn-add-participant').onclick = function() {
 document.getElementById('btn-start-private').onclick = function() {
     openUserModal("Начать личную переписку", function(selectedUserId) {
         var targetUser = null;
+        // КЛАССИЧЕСКИЙ ЦИКЛ ДЛЯ 1С 8.3.5
         for (var i = 0; i < globalUsersCache.length; i++) {
             if (globalUsersCache[i].id_user == selectedUserId) {
                 targetUser = globalUsersCache[i];
@@ -461,7 +462,10 @@ document.getElementById('btn-start-private').onclick = function() {
             }
         }
         if (targetUser) {
-            socket.emit('create_private_chat', { target_user_id: targetUser.id_user, target_username: targetUser.username });
+            socket.emit('create_private_chat', { 
+                target_user_id: targetUser.id_user, 
+                target_username: targetUser.username 
+            });
         }
     });
 };

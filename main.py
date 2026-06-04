@@ -290,31 +290,37 @@ async def connect(sid, environ, auth=None):
         return False 
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
     try:
+        # Упрощенный, безопасный запрос создания пользователя
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
-            ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
+            ON CONFLICT (id_user) DO UPDATE SET 
+            username = EXCLUDED.username, 
+            role = EXCLUDED.role, 
+            id_org = EXCLUDED.id_org
         """, (id_user, id_org, username, user_role))
         
+        # Авто-вход в кабинет "ОБЩИЙ" (admin_group)
         cur.execute("""
             SELECT id_room FROM rooms 
-            WHERE id_org = %s::uuid AND UPPER(name) LIKE 'ОБЩ%' AND type = 'admin_group'
+            WHERE id_org = %s::uuid AND UPPER(name) LIKE 'ОБЩ%%' AND type = 'admin_group'
             LIMIT 1
         """, (id_org,))
         room_general = cur.fetchone()
         if room_general:
-            cur.execute("""
-                INSERT INTO room_participants (id_room, id_user) 
-                VALUES (%s, %s) ON CONFLICT DO NOTHING
-            """, (room_general['id_room'], id_user))
+            # Исправлено: передача id_room как списка с одним элементом (кортеж)
+            cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+                        (room_general[0], id_user))
             
+        # Авто-вход админов в АДМИН
         if user_role == 'admin':
             cur.execute("SELECT id_room FROM rooms WHERE name = 'АДМИН' AND id_org = %s::uuid", (id_org,))
             room_admin = cur.fetchone()
             if room_admin:
-                cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_admin['id_room'], id_user))
+                cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+                            (room_admin[0], id_user))
                 
         conn.commit()
     except Exception as e:
