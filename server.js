@@ -1,352 +1,450 @@
-﻿const Fastify = require('fastify');
-const { Server } = require('socket.io');
-const { Pool } = require('pg');
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-const multipart = require('@fastify/multipart');
-const fastifyStatic = require('@fastify/static');
-const fastifyCors = require('@fastify/cors');
-require('dotenv').config();
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta charset="UTF-8">
+    <title>1C Chat Client</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
+        .header { background-color: #2563eb; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 16px; }
+        .header-controls { display: flex; align-items: center; gap: 15px; }
+        .header-links { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .header-links span.link-click { color: white; text-decoration: underline; font-weight: bold; cursor: pointer; }
+        .header-links span.link-click:hover { text-decoration: none; }
+        .user-info { font-size: 13px; }
+        
+        .main-container { flex: 1; display: flex; overflow: hidden; }
+        .sidebar { width: 240px; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+        .sidebar-section { flex: 1; padding: 12px; overflow-y: auto; }
+        .sidebar-section.users-zone { border-top: 1px solid #e5e7eb; background-color: #fafafa; }
+        .sidebar h3 { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 10px; }
+        
+        .room-item, .user-item { padding: 6px 8px; margin-bottom: 4px; cursor: pointer; font-size: 12px; border-radius: 4px; }
+        .room-item:hover, .user-item:hover { background-color: #f3f4f6; }
+        .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
+        
+        .btn-small { padding: 2px 6px; font-size: 10px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; float: right; }
+        
+        .chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; border-right: 1px solid #e5e7eb; }
+        .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
+        .msg-block { background-color: white; padding: 8px 12px; border-radius: 8px; max-width: 70%; margin-bottom: 8px; align-self: flex-start; }
+        .msg-author { font-size: 10px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
+        .msg-text { font-size: 12px; color: #1f2937; word-break: break-word; }
+        
+        .participants-panel { width: 220px; background-color: white; display: flex; flex-direction: column; padding: 12px; overflow-y: auto; }
+        .participants-panel h3 { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+        .participant-item { padding: 4px 6px; font-size: 12px; color: #4b5563; }
 
-console.log("=== Инициализация Fastify сервера (Production JS) ===");
+        .input-panel { padding: 12px; background-color: white; border-top: 1px solid #e5e7eb; }
+        .secret-row { margin-bottom: 6px; }
+        .btn-secret { padding: 3px 10px; font-size: 11px; background-color: #e5e7eb; border: none; border-radius: 9999px; cursor: pointer; }
+        .btn-secret.active { background-color: #eab308; color: white; }
+        .controls-row { display: flex; gap: 8px; align-items: center; }
+        .btn-file { background-color: #e5e7eb; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+        .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 12px; min-height: 34px; max-height: 80px; overflow-y: auto; background: white; outline: none; }
+        .input-msg-div-active { border-color: #2563eb !important; }
+        .btn-send { background-color: #2563eb; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; }
+        img { max-width: 100%; max-height: 150px; border-radius: 4px; cursor: pointer; }
+        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.1); border: 4px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; }
+        .drop-box { background: white; padding: 16px; border-radius: 8px; font-weight: bold; color: #2563eb; }
+    </style>
+</head>
+<body>
 
-const fastify = Fastify({ logger: true, bodyLimit: 100 * 1024 * 1024 });
+<div class="header">
+    <h1>Corporate 1C Chat (Teams Mode)</h1>
+    <div class="header-controls">
+        <div id="custom-links-container" class="header-links"></div>
+        <button onclick="apply1CAuth('Admin', '00001', 'Администратор', 'admin')" style="padding:2px 8px; font-size:11px; background:#eab308; border:none; border-radius:4px; cursor:pointer;">Войти</button>
+        <span id="user-info" class="user-info">Авторизация...</span>
+    </div>
+</div>
 
-// Хранилище логов в памяти для вкладки "Логи"
-const systemLogs = [];
-const originalLog = console.log;
-console.log = function(...args) {
-    const msg = `[${new Date().toISOString()}] ${args.join(' ')}`;
-    systemLogs.push(msg);
-    if (systemLogs.length > 500) systemLogs.shift(); // Храним последние 500 строк
-    originalLog.apply(console, args);
+<div class="main-container">
+    <div class="sidebar">
+        <div class="sidebar-section">
+            <h3>Кабинеты <button id="btn-create-group" class="btn-small">+ Кабинет</button></h3>
+            <div id="rooms-list">Загрузка...</div>
+        </div>
+        <div class="sidebar-section users-zone">
+            <h3>Сотрудники (1С)</h3>
+            <div id="users-list">Загрузка...</div>
+        </div>     
+    </div>
+
+    <div class="chat-window" id="chat-window">
+        <div id="drop-zone" class="drop-zone"><div class="drop-box">📎 Перетащите файлы</div></div>
+        <div id="messages-container" class="messages-container">
+            <div class="msg-block"><span class="msg-author">Система</span><div class="msg-text">Выберите кабинет или сотрудника для начала общения.</div></div>
+        </div>
+        <div class="input-panel">
+            <div class="secret-row">
+                <button id="btn-secret" class="btn-secret">🔒 Шифровать</button>
+            </div>
+            <div class="controls-row">
+                <input type="file" id="file-input" style="display:none">
+                <button id="btn-file" class="btn-file">📎</button>
+                <div id="input-msg" class="input-msg-div" contenteditable="true"></div>
+                <button id="btn-send" class="btn-send">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="participants-panel">
+        <h3>В кабинете: <button id="btn-add-participant" class="btn-small" style="display:none;">+ Человек</button></h3>
+        <div id="participants-list">Не выбран чат</div>
+    </div>
+</div>
+
+<script>
+window.onerror = function(message, url, line) { 
+    console.log("System exception masked: " + message);
+    return true; 
 };
 
-fastify.register(fastifyCors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"] });
+try {
+    document.onclick = function(e) { 
+        var ev = e || window.event;
+        if (ev.stopPropagation) ev.stopPropagation(); else ev.cancelBubble = true;
+        return true; 
+    };
+} catch(e) { }
 
-const PORT = process.env.PORT || 3000;
-const SERVER_SECRET = process.env.BACKEND_SECRET_KEY || 'default_secret_key_32_chars_long!!';
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) { fs.mkdirSync(UPLOADS_DIR); }
+var socket = null;
+var currentRoomId = null;
+var isSecretMode = false;
+var userSecretKey = "";
+var currentUserId = "";
+var currentUserRole = "";
+var globalUsersCache = []; 
 
-fastify.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
-fastify.register(fastifyStatic, { root: UPLOADS_DIR, prefix: '/uploads/' });
+var inputMsg = document.getElementById('input-msg');
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT || 5432),
-    database: process.env.DB_NAME,
-    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
-});
-
-// Инициализация структуры таблиц при старте и автоматическая накатка недостающих колонок
-async function initDB() {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS organizations (id_org VARCHAR(50) PRIMARY KEY, name VARCHAR(100));
-        CREATE TABLE IF NOT EXISTS users (
-            id_user VARCHAR(50) PRIMARY KEY, id_org VARCHAR(50), username VARCHAR(100), 
-            role VARCHAR(20) DEFAULT 'user', can_manage_themes BOOLEAN DEFAULT false, 
-            can_manage_users BOOLEAN DEFAULT false, can_view_logs BOOLEAN DEFAULT false
-        );
-        CREATE TABLE IF NOT EXISTS rooms (id_room SERIAL PRIMARY KEY, id_org VARCHAR(50), type VARCHAR(20), name VARCHAR(100));
-        CREATE TABLE IF NOT EXISTS room_participants (id_room INT, id_user VARCHAR(50), PRIMARY KEY(id_room, id_user));
-        CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, id_room INT, id_user_from VARCHAR(50), encrypted_text TEXT, is_user_encrypted BOOLEAN, created_at TIMESTAMP DEFAULT NOW());
-        CREATE TABLE IF NOT EXISTS settings (key VARCHAR(50) PRIMARY KEY, value TEXT);
-    `);
-
-    // Принудительно добавляем колонки админки, если таблица users была создана в старых версиях билда
-    await pool.query(`
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_themes BOOLEAN DEFAULT false;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_users BOOLEAN DEFAULT false;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_logs BOOLEAN DEFAULT false;
-    `);
-
-    // Делаем первого пользователя или дефолтного админа 1С полноценным администратором в БД
-    await pool.query(`INSERT INTO users (id_user, id_org, username, role, can_manage_themes, can_manage_users, can_view_logs) 
-                      VALUES ('Admin', '00001', 'Администратор', 'admin', true, true, true) ON CONFLICT DO NOTHING`);
-}
-
-function encryptForDB(text) {
-    const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(SERVER_SECRET, 'salt', 32);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return `${iv.toString('hex')}:${encrypted}`;
-}
-
-// Загрузка файлов/картинок из чата
-fastify.post('/upload', async (request, reply) => {
+window.safeOpenLink = function(url) {
     try {
-        const data = await request.file();
-        if (!data) return reply.status(400).send({ error: 'Файл не прикреплен' });
-        const fileExt = path.extname(data.filename);
-        const uniqueFileName = `${crypto.randomUUID()}${fileExt}`;
-        const saveTo = path.join(UPLOADS_DIR, uniqueFileName);
-        
-        await new Promise((resolve, reject) => {
-            const out = fs.createWriteStream(saveTo);
-            data.file.pipe(out);
-            out.on('finish', resolve);
-            out.on('error', reject);
-        });
-        return { url: `${request.protocol}://${request.hostname}/uploads/${uniqueFileName}`, originalName: data.filename };
-    } catch (err) { return reply.status(500).send({ error: 'Ошибка загрузки файла' }); }
-});
-
-// Загрузка кастомного логотипа из админки
-fastify.post('/api/admin/upload-logo', async (request, reply) => {
-    try {
-        const data = await request.file();
-        if (!data) return reply.status(400).send({ error: 'Файл логотипа не найден' });
-        const saveTo = path.join(UPLOADS_DIR, 'custom_logo.png');
-        await new Promise((resolve, reject) => {
-            const out = fs.createWriteStream(saveTo);
-            data.file.pipe(out);
-            out.on('finish', resolve);
-            out.on('error', reject);
-        });
-        await pool.query(`INSERT INTO settings (key, value) VALUES ('logo_url', '/uploads/custom_logo.png') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
-        return { success: true };
-    } catch (err) { return reply.status(500).send({ error: 'Ошибка сохранения логотипа' }); }
-});
-
-// Роуты статических страниц
-fastify.get('/', async (request, reply) => {
-    return reply.type('text/html').send(fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8'));
-});
-
-fastify.get('/admin', async (request, reply) => {
-    return reply.type('text/html').send(fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8'));
-});
-
-fastify.get('/favicon.ico', async (req, res) => { res.status(204).send(); });
-
-
-// === API ДЛЯ АДМИН-ПАНЕЛИ ===
-
-// 1. Авторизация в админке
-fastify.post('/api/admin/auth', async (request, reply) => {
-    const { id_user, id_org } = request.body;
-    try {
-        const res = await pool.query('SELECT * FROM users WHERE id_user = $1 AND id_org = $2', [id_user, id_org]);
-        if (res.rows.length > 0) {
-            const user = res.rows[0];
-            if (user.role === 'admin') {
-                return { success: true, admin: user };
-            }
+        if (window.external && typeof window.external.SelectOrg === 'unknown') {
+            window.open(url, "_blank");
+            return;
         }
-        return { success: false, error: 'Недостаточно прав' };
-    } catch (err) { return reply.status(500).send({ success: false, error: err.message }); }
-});
+    } catch(e) {}
+    setTimeout(function() { window.open(url, "_blank"); }, 50);
+};
 
-// 2. Получение текущих настроек внешнего вида и ссылок
-fastify.get('/api/admin/settings', async (request, reply) => {
-    try {
-        const res = await pool.query('SELECT * FROM settings');
-        const settingsMap = {};
-        res.rows.forEach(row => { settingsMap[row.key] = { value: row.value }; });
-        return settingsMap;
-    } catch (err) { return reply.status(500).send(err); }
-});
-
-// 3. Сохранение отдельной настройки
-fastify.post('/api/admin/settings', async (request, reply) => {
-    const { key, value } = request.body;
-    try {
-        await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value]);
-        return { success: true };
-    } catch (err) { return reply.status(500).send(err); }
-});
-
-// 4. Получение списка пользователей чата
-fastify.get('/api/admin/users', async (request, reply) => {
-    try {
-        const res = await pool.query('SELECT id_user, username, role, can_manage_themes, can_manage_users, can_view_logs FROM users ORDER BY username');
-        return res.rows;
-    } catch (err) { return reply.status(500).send(err); }
-});
-
-// 5. Изменение прав доступа администратора (Безопасный роут)
-fastify.post('/api/admin/user/permissions', async (request, reply) => {
-    const { target_user, permissions } = request.body;
-    try {
-        if ('can_manage_themes' in permissions) {
-            await pool.query('UPDATE users SET can_manage_themes = $1 WHERE id_user = $2', [permissions.can_manage_themes, target_user]);
-        }
-        if ('can_manage_users' in permissions) {
-            await pool.query('UPDATE users SET can_manage_users = $1 WHERE id_user = $2', [permissions.can_manage_users, target_user]);
-        }
-        if ('can_view_logs' in permissions) {
-            await pool.query('UPDATE users SET can_view_logs = $1 WHERE id_user = $2', [permissions.can_view_logs, target_user]);
-        }
-        return { success: true };
-    } catch (err) { return reply.status(500).send({ error: err.message }); }
-});
-
-// 6. Выполнение SQL-запросов напрямую из админки
-fastify.post('/api/admin/sql', async (request, reply) => {
-    const { sql } = request.body;
-    try {
-        const res = await pool.query(sql);
-        return { rows: res.rows || [] };
-    } catch (err) { return { error: err.message }; }
-});
-
-// 7. Сохранение ссылок главного экрана
-fastify.post('/api/admin/links', async (request, reply) => {
-    const { links } = request.body;
-    try {
-        for (const [key, value] of Object.entries(links)) {
-            await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [key, value]);
-        }
-        return { success: true };
-    } catch (err) { return reply.status(500).send(err); }
-});
-
-// 8. Получение логов сервера
-fastify.get('/api/admin/logs', async (request, reply) => {
-    return { logs: systemLogs };
-});
-
-
-// === WEB-SOCKET И ЛОГИКА ЧАТА ===
-
-const start = async () => {
-    try {
+function apply1CAuth(id_user, id_org, username, user_role) {
+    currentUserId = id_user;
+    currentUserRole = user_role || 'user';
+    
+    var userInfoEl = document.getElementById('user-info');
+    if (userInfoEl) {
+        userInfoEl.innerHTML = String(username) + (currentUserRole === 'admin' ? ' 👑' : '');
+    }
+    
+    if (socket) {
         try {
-            console.log("Пробуем подключиться к PostgreSQL...");
-            await initDB();
-            console.log("Успешное подключение и проверка структуры таблиц PostgreSQL.");
-        } catch (dbErr) {
-            console.log("!!! ОШИБКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ !!!");
-            console.log(dbErr.message);
-            console.log("Сервер продолжит работу, но запросы к БД будут вызывать ошибки. Проверьте переменные окружения.");
-        }
+            socket.removeAllListeners();
+            socket.disconnect();
+        } catch(e) {}
+        socket = null;
+    }
+    
+    try {
+        socket = io('/', {
+            transports: ['polling', 'websocket'],
+            query: { id_user: id_user, id_org: id_org, username: username, user_role: currentUserRole }
+        });
 
-        const io = new Server(fastify.server, { cors: { origin: "*" }, maxHttpBufferSize: 1e8 });
-
-        io.use(async (socket, next) => {
-            let { id_user, id_org, username, user_role } = socket.handshake.query;
-            if (!id_user || !id_org || !username) return next(new Error("Ошибка авторизации"));
-            
-            let cleanOrgId = String(id_org).toLowerCase().trim();
-            if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(cleanOrgId)) {
-                const hash = crypto.createHash('md5').update(cleanOrgId).digest('hex');
-                cleanOrgId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+        socket.on('connect', function() {
+            if (socket) {
+                socket.emit('get_users_list');
+                socket.emit('get_rooms_again');
             }
-            socket.data = { 
-                id_user: String(id_user).trim(), 
-                id_org: cleanOrgId, 
-                username: username,
-                role: user_role || 'user'
-            };
-            next();
         });
 
-        io.on('connection', async (socket) => {
-            const { id_org, id_user, username, role } = socket.data;
-            
-            try {
-                await pool.query('INSERT INTO organizations (id_org, name) VALUES ($1, $2) ON CONFLICT (id_org) DO NOTHING', [id_org, 'Организация из 1С']);
-                
-                // Безопасный UPSERT
-                await pool.query(`
-                    INSERT INTO users (id_user, id_org, username, role) 
-                    VALUES ($1, $2, $3, $4) 
-                    ON CONFLICT (id_user) 
-                    DO UPDATE SET 
-                        username = EXCLUDED.username, 
-                        role = CASE WHEN EXCLUDED.role = 'admin' THEN 'admin' ELSE users.role END
-                `, [id_user, id_org, username, role]);
-                
-                const checkGeneral = await pool.query(`SELECT id_room FROM rooms WHERE id_org = $1 AND type = 'general'`, [id_org]);
-                if (checkGeneral.rows.length === 0) {
-                    await pool.query(`INSERT INTO rooms (id_org, type, name) VALUES ($1, 'general', 'Общий чат')`, [id_org]);
+        socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
+        socket.on('users_list', function(users) { globalUsersCache = users; renderUsersList(users); });
+        
+        socket.on('room_history', function(data) {
+            var container = document.getElementById('messages-container');
+            if (!container) return;
+            container.innerHTML = "";
+            if (data && data.messages) {
+                for (var i = 0; i < data.messages.length; i++) {
+                    displayMessage(data.messages[i], true);
                 }
-            } catch (err) { console.error("Ошибка при connection сокета:", err.message); }
-
-            socket.join(`org_${id_org}`);
-
-            const sendRoomsList = async () => {
-                try {
-                    const roomsResult = await pool.query(`
-                        SELECT r.id_room, r.name, r.type FROM rooms r WHERE r.type = 'general' AND r.id_org = $1
-                        UNION
-                        SELECT r.id_room, r.name, r.type FROM rooms r
-                        JOIN room_participants rp ON r.id_room = rp.id_room WHERE r.id_org = $1 AND rp.id_user = $2
-                    `, [id_org, id_user]);
-                    
-                    roomsResult.rows.forEach(room => {
-                        socket.join(`room_${room.id_room}`);
-                    });
-
-                    socket.emit('rooms_list', roomsResult.rows);
-                } catch (err) { console.error("Ошибка при получении списка комнат:", err.message); }
-            };
-            await sendRoomsList();
-
-            socket.on('get_users_list', async () => {
-                try {
-                    const usersResult = await pool.query('SELECT id_user, username FROM users WHERE id_org = $1 AND id_user != $2', [id_org, id_user]);
-                    socket.emit('users_list', usersResult.rows);
-                } catch (err) { console.error(err.message); }
-            });
-
-            socket.on('create_private_chat', async (data) => {
-                try {
-                    const checkChat = await pool.query(`
-                        SELECT rp1.id_room FROM room_participants rp1 JOIN room_participants rp2 ON rp1.id_room = rp2.id_room
-                        JOIN rooms r ON r.id_room = rp1.id_room WHERE r.type = 'private' AND r.id_org = $1 AND rp1.id_user = $2 AND rp2.id_user = $3
-                    `, [id_org, id_user, data.target_user_id]);
-                    
-                    if (checkChat.rows.length > 0) { 
-                        socket.emit('private_chat_created', { id_room: checkChat.rows[0].id_room }); 
-                        return; 
-                    }
-                    const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'private', `${username} ⇄ ${data.target_username}`]);
-                    const newRoomId = newRoom.rows[0].id_room;
-                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2), ($1, $3)', [newRoomId, id_user, data.target_user_id]);
-                    
-                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err.message); }
-            });
-
-            socket.on('create_group_chat', async (data) => {
-                try {
-                    const newRoom = await pool.query('INSERT INTO rooms (id_org, type, name) VALUES ($1, $2, $3) RETURNING id_room', [id_org, 'group', data.group_name]);
-                    const nrId = newRoom.rows[0].id_room;
-                    await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2)', [nrId, id_user]);
-                    
-                    if (data.user_ids && Array.isArray(data.user_ids)) {
-                        for (const tId of data.user_ids) { 
-                            await pool.query('INSERT INTO room_participants (id_room, id_user) VALUES ($1, $2) ON CONFLICT DO NOTHING', [nrId, tId]); 
-                        }
-                    }
-                    io.to(`org_${id_org}`).emit('refresh_rooms_trigger');
-                } catch (err) { console.error(err.message); }
-            });
-
-            socket.on('join_room_pool', (data) => { socket.join(`room_${data.room_id}`); });
-            socket.on('get_rooms_again', async () => { await sendRoomsList(); });
-
-            socket.on('send_message', async (data) => {
-                try {
-                    await pool.query(`INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted) VALUES ($1, $2, $3, $4)`, [data.room_id, id_user, encryptForDB(data.text), data.is_secret]);
-                    io.to(`room_${data.room_id}`).emit('new_message', { id_room: data.room_id, id_user_from: id_user, username: username, text: data.text, is_secret: data.is_secret, created_at: new Date() });
-                } catch (err) { console.error(err.message); }
-            });
+            }
+            container.scrollTop = container.scrollHeight;
         });
 
-        const listenAddress = await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
-        console.log(`=== МЕССЕНДЖЕР И АДМИНКА УСПЕШНО ЗАПУЩЕНЫ НА: ${listenAddress} ===`);
-    } catch (err) { 
-        console.error("Критическая ошибка запуска Fastify:", err); 
-        process.exit(1); 
+        socket.on('room_participants_list', function(data) {
+            renderParticipantsList(data.participants);
+        });
+
+        socket.on('new_message', function(msg) { 
+            if (msg && msg.id_room == currentRoomId) displayMessage(msg, false); 
+        });
+        
+        socket.on('refresh_rooms_trigger', function() { if (socket) socket.emit('get_rooms_again'); });
+    } catch(err) { }
+}
+
+function renderRoomsList(rooms) {
+    try {
+        var container = document.getElementById('rooms-list');
+        if (!container) return;
+        container.innerHTML = "";
+        if (!rooms || rooms.length === 0) { container.innerHTML = "<div>Нет чатов</div>"; return; }
+        for (var i = 0; i < rooms.length; i++) {
+            var room = rooms[i];
+            var div = document.createElement('div');
+            div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
+            div.innerText = (room.type === 'private' ? '💬 ' : '👥 ') + room.name;
+            
+            (function(r) {
+                div.onclick = function() {
+                    currentRoomId = r.id_room;
+                    
+                    var btnAdd = document.getElementById('btn-add-participant');
+                    if (btnAdd) btnAdd.style.display = r.type === 'group' ? 'inline-block' : 'none';
+
+                    document.getElementById('messages-container').innerHTML = "<div class='msg-block'><span class='msg-author'>Система</span><div class='msg-text'>Загрузка истории...</div></div>";
+                    
+                    if (socket) {
+                        socket.emit('join_room_pool', { room_id: r.id_room });
+                        socket.emit('get_room_history', { room_id: r.id_room });
+                        socket.emit('get_room_participants', { room_id: r.id_room });
+                    }
+                    socket.emit('get_rooms_again');
+                };
+            })(room);
+            container.appendChild(div);
+        }
+    } catch(e) { }
+}
+
+function renderUsersList(users) {
+    try {
+        var container = document.getElementById('users-list');
+        if (!container) return;
+        container.innerHTML = "";
+        if (!users || users.length === 0) { container.innerHTML = "<div>Нет сотрудников</div>"; return; }
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            if (u.id_user == currentUserId) continue;
+            var div = document.createElement('div');
+            div.className = 'user-item';
+            div.innerText = "👤 " + u.username;
+            (function(uid, uname) {
+                div.onclick = function() { 
+                    if (socket) socket.emit('create_private_chat', { target_user_id: uid, target_username: uname }); 
+                };
+            })(u.id_user, u.username);
+            container.appendChild(div);
+        }
+    } catch(e) { }
+}
+
+function renderParticipantsList(list) {
+    var container = document.getElementById('participants-list');
+    if (!container) return;
+    container.innerHTML = "";
+    if (!list || list.length === 0) { container.innerHTML = "<div>Только вы</div>"; return; }
+    for (var i = 0; i < list.length; i++) {
+        var div = document.createElement('div');
+        div.className = 'participant-item';
+        div.innerText = "• " + list[i].username;
+        container.appendChild(div);
+    }
+}
+
+document.getElementById('btn-add-participant').onclick = function() {
+    if (!currentRoomId || !socket) return;
+    
+    var userText = "Выберите ID сотрудника для добавления:\n";
+    for (var i = 0; i < globalUsersCache.length; i++) {
+        userText += globalUsersCache[i].id_user + " - " + globalUsersCache[i].username + "\n";
+    }
+    
+    var targetId = prompt(userText);
+    if (targetId) {
+        var foundUser = null;
+        for (var j = 0; j < globalUsersCache.length; j++) {
+            if (globalUsersCache[j].id_user == targetId) { foundUser = globalUsersCache[j]; break; }
+        }
+        if (foundUser) {
+            socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: foundUser.id_user });
+            setTimeout(function() {
+                socket.emit('get_room_participants', { room_id: currentRoomId });
+            }, 300);
+        } else { alert("Неверный ID!"); }
     }
 };
 
-start();
+function displayMessage(msg, isBulkLoad) {
+    try {
+        var container = document.getElementById('messages-container');
+        if (!container) return;
+        var div = document.createElement('div');
+        div.className = 'msg-block';
+        
+        // Корректно маппим под схему таблицы messages (encrypted_text и username)
+        var text = String(msg.encrypted_text || msg.text || "");
+        var author = String(msg.username || "Сотрудник");
+        var isUserEncrypted = msg.is_user_encrypted || msg.is_secret || false;
+
+        if ((isUserEncrypted || text.indexOf("SECRET:") === 0) && text.indexOf("SECRET:") !== -1) {
+            var cipher = text.replace("SECRET:", "");
+            var id = 'c_' + Math.random().toString(36).substr(2, 6);
+            text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+id+'">[Скрыто]</div><button onclick="decryptMsg(\''+cipher+'\',\''+id+'\')">Ввести код</button>';
+        }
+        div.innerHTML = '<span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div>';
+        container.appendChild(div);
+        if (!isBulkLoad) container.scrollTop = container.scrollHeight;
+    } catch(e) { }
+}
+
+window.decryptMsg = function(cipher, id) {
+    var code = prompt("Введите код:");
+    if (!code) return;
+    try {
+        var dec = CryptoJS.AES.decrypt(cipher, code).toString(CryptoJS.enc.Utf8);
+        var targetEl = document.getElementById(id);
+        if (dec && targetEl) {
+            targetEl.innerHTML = dec;
+            targetEl.style.cssText = "color:#1f2937;font-weight:bold;";
+        } else { alert("Неверный код!"); }
+    } catch(e) { alert("Ошибка!"); }
+};
+
+function sendMessage() {
+    var text = "";
+    if (inputMsg) { text = (inputMsg.textContent || inputMsg.innerText || "").trim(); }
+    if (!text || !currentRoomId) return;
+    try {
+        if (isSecretMode) text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString();
+    } catch(e) { }
+    
+    if (socket) {
+        try {
+            socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode });
+        } catch(e) {}
+    }
+    if (inputMsg) inputMsg.innerHTML = "";
+}
+
+function uploadFile(file) {
+    try {
+        var fd = new FormData();
+        fd.append('file', file);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data && data.url && socket) {
+                        var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+                        var content = isImg ? '<img src="'+data.url+'" onclick="window.safeOpenLink(\''+data.url+'\')" />' : '<span class="link-click" onclick="window.safeOpenLink(\''+data.url+'\')" style="color:#2563eb; text-decoration:underline;">📄 '+file.name+'</span>';
+                        socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
+                    }
+                } catch(e) {}
+            } else { alert('Ошибка'); }
+        };
+        xhr.send(fd);
+    } catch(e) {}
+}
+
+document.getElementById('btn-create-group').onclick = function() {
+    var name = prompt("Название нового кабинета:");
+    if (name && socket) socket.emit('create_group_chat', { group_name: name, user_ids: [currentUserId] });
+};
+
+document.getElementById('btn-secret').onclick = function() {
+    if (!isSecretMode) {
+        var key = prompt("Ключ шифрования:");
+        if (key) { userSecretKey = key; isSecretMode = true; this.className = 'btn-secret active'; }
+    } else {
+        isSecretMode = false;
+        userSecretKey = "";
+        this.className = 'btn-secret';
+    }
+};
+
+document.getElementById('btn-send').onclick = sendMessage;
+document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
+document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); this.value = ""; };
+
+if (inputMsg) {
+    inputMsg.onkeydown = function(e) { 
+        var ev = e || window.event;
+        if (ev && ev.key === 'Enter' && !ev.shiftKey) { 
+            if (ev.preventDefault) ev.preventDefault(); else ev.returnValue = false;
+            sendMessage(); 
+        } 
+    };
+}
+
+function loadCustomThemeAndLinks() {
+    try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/admin/settings', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var settings = JSON.parse(xhr.responseText);
+                    if (!settings) return;
+                    if (settings.theme_primary_color && settings.theme_primary_color.value) {
+                        var headerEl = document.querySelector('.header');
+                        if (headerEl) headerEl.style.backgroundColor = settings.theme_primary_color.value;
+                        var btnSendEl = document.getElementById('btn-send');
+                        if (btnSendEl) btnSendEl.style.backgroundColor = settings.theme_primary_color.value;
+                    }
+                    var linksContainer = document.getElementById('custom-links-container');
+                    if (linksContainer) {
+                        var html = '';
+                        if (settings.link1_name && settings.link1_name.value && settings.link1_url && settings.link1_url.value) {
+                            html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link1_url.value+'\')">🔗 '+settings.link1_name.value+'</span>';
+                        }
+                        if (settings.link2_name && settings.link2_name.value && settings.link2_url && settings.link2_url.value) {
+                            html += '<span class="link-click" onclick="window.safeOpenLink(\''+settings.link2_url.value+'\')">🔗 '+settings.link2_name.value+'</span>';
+                        }
+                        if (html !== '') { linksContainer.innerHTML = html; }
+                    }
+                } catch(e) {}
+            }
+        };
+        xhr.send();
+    } catch(e) {}
+}
+
+loadCustomThemeAndLinks();
+
+window.onbeforeunload = function() {
+    try {
+        if (socket) {
+            socket.removeAllListeners();
+            socket.disconnect();
+            socket = null;
+        }
+    } catch(e) {}
+};
+
+window.onload = function() {
+    try {
+        var hash = window.location.hash;
+        if (hash && hash.length > 1) {
+            var cleanHash = decodeURIComponent(hash.substring(1));
+            var p = cleanHash.split("---");
+            if (p && p.length >= 3) {
+                apply1CAuth(p[0], p[1], p[2], p.length >= 4 ? p[3] : 'user');
+            }
+        }
+    } catch(e) {}
+};
+</script>
+</body>
+</html>

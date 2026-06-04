@@ -1,11 +1,11 @@
+[providers]
+python = {}
+
 [phases.setup]
-nixPkgs = ["nodejs_18"]
+nixPkgs = ["python3", "gcc"]
 
 [phases.install]
-cmds = ["npm install"]
-
-[phases.build]
-cmds = []
+cmds = ["python -m venv /cpv && /cpv/bin/pip install -r requirements.txt"]
 
 [start]
-cmd = "node server.js"
+cmd = "/cpv/bin/uvicorn main_chat:app --host 0.0.0.0 --port $PORT"
