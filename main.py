@@ -28,7 +28,11 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
+    url = os.getenv("DATABASE_URL")
+    # Если Railway отдал URL, начинающийся с postgres://, заменяем на postgresql:// для psycopg2
+    if url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    return psycopg2.connect(url)
 
 # Модель данных для авторизации админа
 class AdminAuthRequest(BaseModel):
