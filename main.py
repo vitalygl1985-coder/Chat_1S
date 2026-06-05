@@ -171,11 +171,28 @@ class ExecuteSqlRequest(BaseModel):
 
 # ========== HTML СТРАНИЦЫ ==========
 
-@app.get("/", response_class=HTMLResponse)
-async def get_chat_page():
+@app.get("/")
+async def get_chat_page(
+    id_user: Optional[str] = None,
+    id_org: Optional[str] = None,
+    username: Optional[str] = None,
+    role: Optional[str] = None
+):
     try:
         with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
+            html = f.read()
+        
+        # Если параметры переданы, вставим скрипт, который вызовет applyAuth сразу
+        if id_user and id_org and username:
+            # Экранируем кавычки
+            id_user_esc = id_user.replace("'", "\\'")
+            username_esc = username.replace("'", "\\'")
+            role_esc = role if role else "user"
+            script = f"<script>window.addEventListener('load', function() {{ applyAuth('{id_user_esc}', '{id_org}', '{username_esc}', '{role_esc}'); }});</script>"
+            # Вставляем перед закрывающим </body>
+            html = html.replace("</body>", script + "</body>")
+        
+        return HTMLResponse(content=html)
     except Exception as e:
         return f"Ошибка загрузки index.html: {str(e)}"
 
@@ -248,7 +265,7 @@ async def get_rooms(id_org: str, id_user: str):
     finally:
         cur.close()
         conn.close()
-        
+
 @app.get("/api/users")
 async def get_users(id_org: str):
     conn = get_db_connection()
