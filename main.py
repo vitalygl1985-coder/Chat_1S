@@ -2,10 +2,12 @@ import os
 import json
 import uuid
 import urllib.parse
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
+from typing import Optional
 import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -103,6 +105,48 @@ def init_db():
         conn.close()
 
 init_db()
+
+# ─── REST-сессии для 1С ───────────────────────────────────────────────────────
+def init_sessions_table():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS api_sessions (
+                token VARCHAR(64) PRIMARY KEY,
+                id_user VARCHAR(100) NOT NULL,
+                id_org UUID NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                role VARCHAR(50) DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+    except Exception as e:
+        print(f"Ошибка создания таблицы сессий: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+init_sessions_table()
+
+def get_session_by_token(token: str):
+    """Проверяет токен и возвращает данные пользователя или None."""
+    if not token:
+        return None
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM api_sessions WHERE token = %s", (token,))
+        return cur.fetchone()
+    except Exception:
+        return None
+    finally:
+        cur.close()
+        conn.close()
+
+# ─── Pydantic-модели ──────────────────────────────────────────────────────────
 
 class AdminAuthRequest(BaseModel):
     id_user: str
@@ -306,6 +350,314 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
         cur.close()
         conn.close()
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# REST API для 1С (без Socket.IO, работает в любом браузере/HTTPЗапрос)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class OneCAuthRequest(BaseModel):
+    id_user: str
+    id_org: str
+    username: str
+    role: str = "user"
+
+class OneCMessageRequest(BaseModel):
+    room_id: int
+    text: str
+    is_secret: bool = False
+
+@app.post("/api/1c/auth")
+async def onec_auth(data: OneCAuthRequest):
+    """
+    Авторизация из 1С. Принимает данные пользователя, регистрирует/обновляет
+    запись в users и возвращает токен сессии.
+    """
+    validated_org = clean_uuid(data.id_org)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Upsert пользователя (то же что делает Socket.IO connect)
+        cur.execute("""
+            INSERT INTO users (id_user, id_org, username, role, is_active)
+            VALUES (%s, %s::uuid, %s, %s, true)
+            ON CONFLICT (id_user) DO UPDATE SET
+                username = EXCLUDED.username,
+                role     = EXCLUDED.role,
+                id_org   = EXCLUDED.id_org
+        """, (data.id_user, validated_org, data.username, data.role))
+
+        # Добавляем в ОБЩИЙ КАБИНЕТ если он есть
+        cur.execute("""
+            SELECT id_room FROM rooms
+            WHERE id_org = %s::uuid AND UPPER(name) LIKE 'ОБЩ%%' AND type = 'admin_group'
+            LIMIT 1
+        """, (validated_org,))
+        room_general = cur.fetchone()
+        if room_general:
+            cur.execute(
+                "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                (room_general[0], data.id_user)
+            )
+
+        # Создаём токен
+        token = str(uuid.uuid4()).replace("-", "")
+        # Удаляем старый токен этого пользователя (один пользователь — один токен)
+        cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (data.id_user,))
+        cur.execute("""
+            INSERT INTO api_sessions (token, id_user, id_org, username, role)
+            VALUES (%s, %s, %s::uuid, %s, %s)
+        """, (token, data.id_user, validated_org, data.username, data.role))
+
+        conn.commit()
+        return {"success": True, "token": token}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/1c/rooms")
+async def onec_get_rooms(x_token: Optional[str] = Header(None)):
+    """Список комнат текущего пользователя."""
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT DISTINCT r.id_room, r.name, r.type, r.created_by
+            FROM rooms r
+            INNER JOIN room_participants rp ON r.id_room = rp.id_room
+            WHERE r.id_org = %s::uuid AND rp.id_user = %s
+            ORDER BY r.name ASC
+        """, (str(session['id_org']), session['id_user']))
+        return cur.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/1c/messages")
+async def onec_get_messages(
+    room_id: int,
+    since_id: int = 0,
+    x_token: Optional[str] = Header(None)
+):
+    """
+    История сообщений комнаты.
+    since_id — ID последнего известного сообщения; если передан,
+    возвращаются только новые (для polling из фонового задания 1С).
+    """
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Проверяем, что пользователь — участник комнаты
+        cur.execute("""
+            SELECT 1 FROM room_participants
+            WHERE id_room = %s AND id_user = %s
+        """, (room_id, session['id_user']))
+        if not cur.fetchone():
+            raise HTTPException(status_code=403, detail="Нет доступа к этой комнате")
+
+        if since_id > 0:
+            cur.execute("""
+                SELECT m.id_message, m.id_room, m.id_user_from,
+                       COALESCE(u.username, m.id_user_from) AS username,
+                       m.encrypted_text, m.is_user_encrypted,
+                       m.created_at
+                FROM messages m
+                LEFT JOIN users u ON m.id_user_from = u.id_user
+                WHERE m.id_room = %s AND m.id_message > %s
+                ORDER BY m.created_at ASC
+            """, (room_id, since_id))
+        else:
+            cur.execute("""
+                SELECT m.id_message, m.id_room, m.id_user_from,
+                       COALESCE(u.username, m.id_user_from) AS username,
+                       m.encrypted_text, m.is_user_encrypted,
+                       m.created_at
+                FROM messages m
+                LEFT JOIN users u ON m.id_user_from = u.id_user
+                WHERE m.id_room = %s
+                ORDER BY m.created_at ASC LIMIT 100
+            """, (room_id,))
+
+        messages = cur.fetchall()
+        for m in messages:
+            if m['created_at']:
+                m['created_at'] = m['created_at'].isoformat()
+        return messages
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/api/1c/messages")
+async def onec_send_message(
+    data: OneCMessageRequest,
+    x_token: Optional[str] = Header(None)
+):
+    """Отправка сообщения из 1С."""
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Проверяем участие
+        cur.execute("""
+            SELECT 1 FROM room_participants
+            WHERE id_room = %s AND id_user = %s
+        """, (data.room_id, session['id_user']))
+        if not cur.fetchone():
+            raise HTTPException(status_code=403, detail="Нет доступа к этой комнате")
+
+        cur.execute("""
+            INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id_message, created_at
+        """, (data.room_id, session['id_user'], data.text, data.is_secret))
+        new_msg = cur.fetchone()
+        conn.commit()
+
+        # Уведомляем подключённых через Socket.IO участников (если есть онлайн)
+        try:
+            await sio.emit('new_message', {
+                "id_message": new_msg['id_message'],
+                "id_room": data.room_id,
+                "id_user_from": session['id_user'],
+                "username": session['username'],
+                "encrypted_text": data.text,
+                "is_user_encrypted": data.is_secret,
+                "created_at": new_msg['created_at'].isoformat() if new_msg['created_at'] else None
+            }, room=f"room_{data.room_id}")
+        except Exception:
+            pass  # Socket.IO не обязателен
+
+        return {"success": True, "id_message": new_msg['id_message']}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/1c/users")
+async def onec_get_users(x_token: Optional[str] = Header(None)):
+    """Список сотрудников организации."""
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id_user, username, role
+            FROM users
+            WHERE id_org = %s::uuid AND is_active = true
+            ORDER BY username ASC
+        """, (str(session['id_org']),))
+        return cur.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/1c/participants")
+async def onec_get_participants(
+    room_id: int,
+    x_token: Optional[str] = Header(None)
+):
+    """Участники комнаты."""
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT rp.id_user, u.username, u.role
+            FROM room_participants rp
+            INNER JOIN users u ON rp.id_user = u.id_user
+            WHERE rp.id_room = %s
+        """, (room_id,))
+        return cur.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/1c/new_messages")
+async def onec_new_messages(
+    since_id: int = 0,
+    x_token: Optional[str] = Header(None)
+):
+    """
+    Все новые сообщения по всем комнатам пользователя после since_id.
+    Используется фоновым заданием 1С для уведомлений.
+    Возвращает: список сообщений + max_id для следующего запроса.
+    """
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT m.id_message, m.id_room, r.name AS room_name,
+                   COALESCE(u.username, m.id_user_from) AS username,
+                   m.encrypted_text, m.is_user_encrypted,
+                   m.created_at
+            FROM messages m
+            INNER JOIN rooms r ON m.id_room = r.id_room
+            INNER JOIN room_participants rp ON m.id_room = rp.id_room
+            LEFT JOIN users u ON m.id_user_from = u.id_user
+            WHERE rp.id_user = %s
+              AND m.id_user_from != %s
+              AND m.id_message > %s
+            ORDER BY m.id_message ASC
+            LIMIT 50
+        """, (session['id_user'], session['id_user'], since_id))
+
+        messages = cur.fetchall()
+        for m in messages:
+            if m['created_at']:
+                m['created_at'] = m['created_at'].isoformat()
+
+        max_id = messages[-1]['id_message'] if messages else since_id
+        return {"messages": messages, "max_id": max_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+# ─── конец REST API для 1С ───────────────────────────────────────────────────
+
 # --- SOCKET.IO EVENTS ---
 
 @sio.event
@@ -316,7 +668,7 @@ async def connect(sid, environ, auth=None):
     id_user = urllib.parse.unquote(params.get('id_user', ''))
     id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
     username = urllib.parse.unquote(params.get('username', ''))
-    user_role = urllib.parse.unquote(params.get('user_role', 'user'))
+    user_role = urllib.parse.unquote(params.get('role', 'user'))
 
     if not id_user:
         return False 

@@ -7,66 +7,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
-        .header { background-color: #2563eb; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { font-size: 16px; }
-        .header-controls { display: flex; align-items: center; gap: 15px; }
-        .header-links { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-        .header-links span.link-click { color: white; text-decoration: underline; font-weight: bold; cursor: pointer; }
-        .header-links span.link-click:hover { text-decoration: none; }
-        .user-info { font-size: 13px; }
-        
-        .main-container { flex: 1; display: flex; overflow: hidden; }
-        .sidebar { width: 240px; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
-        .sidebar-section { flex: 1; padding: 12px; overflow-y: auto; }
-        .sidebar h3 { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 10px; }
-        
-        .room-item { padding: 6px 8px; margin-bottom: 4px; cursor: pointer; font-size: 12px; border-radius: 4px; }
-        .room-item:hover { background-color: #f3f4f6; }
-        .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
-        
-        .btn-small { padding: 2px 6px; font-size: 10px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; float: right; }
-        .btn-danger-xs { padding: 1px 4px; font-size: 9px; background-color: #ef4444; color: white; border: none; border-radius: 3px; cursor: pointer; float: right; }
-        
-        .chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; border-right: 1px solid #e5e7eb; }
-        .chat-header { padding: 10px 16px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; color: #374151; }
-        .chat-actions { display: flex; gap: 6px; }
-        
-        .messages-container { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; }
-        .msg-block { background-color: white; padding: 8px 12px; border-radius: 8px; max-width: 70%; margin-bottom: 8px; align-self: flex-start; }
-        .msg-author { font-size: 10px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
-        .msg-text { font-size: 12px; color: #1f2937; word-break: break-word; }
-        
-        .participants-panel { width: 240px; background-color: white; display: flex; flex-direction: column; padding: 12px; overflow-y: auto; }
-        .participants-panel h3 { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-        .participants-panel h3.employees-title { margin-top: 15px; }
-        .participant-item { padding: 4px 6px; font-size: 12px; color: #4b5563; line-height: 18px; clear: both; }
-
-        .input-panel { padding: 12px; background-color: white; border-top: 1px solid #e5e7eb; }
-        .secret-row { margin-bottom: 6px; }
-        .btn-secret { padding: 3px 10px; font-size: 11px; background-color: #e5e7eb; border: none; border-radius: 9999px; cursor: pointer; }
-        .btn-secret.active { background-color: #eab308; color: white; }
-        .controls-row { display: flex; gap: 8px; align-items: center; }
-        .btn-file { background-color: #e5e7eb; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-        
-        .input-msg-div { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 12px; min-height: 34px; max-height: 80px; overflow-y: auto; background: white; outline: none; color: #1f2937; }
-        .input-msg-div:empty:before { content: attr(data-placeholder); color: #9ca3af; }
-        
-        .btn-send { background-color: #2563eb; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; }
-        .file-link { color: #2563eb; text-decoration: underline; font-weight: bold; cursor: pointer; }
-        .file-link:hover { text-decoration: none; }
-        img { max-width: 100%; max-height: 150px; border-radius: 4px; cursor: pointer; display: block; margin-top: 4px; }
-        .drop-zone { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.05); border: 3px dashed #2563eb; z-index: 50; display: none; align-items: center; justify-content: center; }
-        .drop-box { background: white; padding: 12px; border-radius: 6px; font-weight: bold; color: #2563eb; font-size: 12px; }
-        
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 100; }
-        .modal-body { background: white; padding: 16px; border-radius: 8px; width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .modal-body h4 { font-size: 13px; margin-bottom: 10px; }
-        .modal-body select, .modal-body input { width: 100%; padding: 6px; font-size: 12px; margin-bottom: 12px; outline: none; border: 1px solid #d1d5db; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; }
-    </style>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
@@ -229,8 +170,13 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         userInfoEl.innerHTML = String(username) + (currentUserRole === 'admin' ? ' 👑' : '');
     }
     
+    // ИСПРАВЛЕНО: Принудительный сброс сокета при повторных открытиях формы 1С
     if (socket) {
-        try { socket.removeAllListeners(); socket.disconnect(); } catch(e) {}
+        try { 
+            socket.emit('disconnect');
+            socket.removeAllListeners(); 
+            socket.disconnect(); 
+        } catch(e) {}
         socket = null;
     }
     
@@ -238,7 +184,7 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     socket = io(socketUrl, {
         path: '/socket.io',
         transports: ['polling', 'websocket'],
-        query: { id_user: id_user, id_org: id_org, username: username, user_role: currentUserRole }
+        query: { id_user: id_user, id_org: id_org, username: username, role: currentUserRole } // ИСПРАВЛЕНО: параметр role соответствует измененному get('role') в Python
     });
 
     socket.on('connect', function() {
@@ -482,6 +428,16 @@ function triggerDeleteRoom() {
     }
 }
 
+function triggerDeleteRoom() {
+    if (currentRoomId && confirm("Удалить этот кабинет и всю историю переписки?")) {
+        socket.emit('delete_room', { room_id: currentRoomId });
+        document.getElementById('messages-container').innerHTML = "";
+        document.getElementById('current-chat-title').innerText = "Выберите кабинет или сотрудника";
+        document.getElementById('chat-management-actions').style.display = 'none';
+        currentRoomId = null;
+    }
+}
+
 function triggerArchive() {
     if (currentRoomId && confirm("Выгрузить лог переписки на устройство и очистить базу данных?")) {
         socket.emit('archive_room_history', { room_id: currentRoomId });
@@ -492,8 +448,12 @@ function displayMessage(msg, isBulkLoad) {
     try {
         var container = document.getElementById('messages-container');
         if (!container) return;
+        
+        // Определение направления сообщения для бабблов (style.css)
+        var isMyMessage = (msg.id_user_from == currentUserId);
+        
         var div = document.createElement('div');
-        div.className = 'msg-block';
+        div.className = 'message' + (isMyMessage ? ' my' : '');
         
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
@@ -508,7 +468,7 @@ function displayMessage(msg, isBulkLoad) {
                    'onclick="decryptMsg(\''+uniqueId+'\')">Расшифровать</button>';
         }
         
-        div.innerHTML = '<span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div>';
+        div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div></div>';
         container.appendChild(div);
         if (!isBulkLoad) container.scrollTop = container.scrollHeight;
     } catch(e) { }
@@ -562,10 +522,10 @@ function uploadFile(file) {
                     if (data && data.url && socket) {
                         var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                         var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
-                        // ИСПРАВЛЕНО: ссылка для скачивания с правильным обработчиком
+                        
                         var content = isImg ? 
-                            '<img src="'+absoluteUrl+'" onclick="window.open(\''+absoluteUrl+'\')" />' : 
-                            '<a href="'+absoluteUrl+'" class="file-link" onclick="downloadFile(\''+data.url+'\', \''+file.name+'\'); return false;">📄 Скачать: '+file.name+'</a>';
+                            '<img src="'+absoluteUrl+'" class="chat-image" onclick="window.open(\''+absoluteUrl+'\')" />' : 
+                            '<a href="'+absoluteUrl+'" class="file-attachment" onclick="downloadFile(\''+data.url+'\', \''+file.name+'\'); return false;">📄 Скачать: '+file.name+'</a>';
                         socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
                     }
                 } catch(e) { alert("Ошибка парсинга ответа сервера"); }
@@ -576,10 +536,8 @@ function uploadFile(file) {
     } catch(e) { alert('Ошибка при вызове uploadFile: ' + e.message); }
 }
 
-// ИСПРАВЛЕНО: функция для принудительного скачивания файла в 1С
 function downloadFile(url, filename) {
     var fullUrl = window.location.protocol + '//' + window.location.host + url;
-    // Для IE/1С используем создание iframe для скачивания
     var iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = fullUrl;
@@ -590,12 +548,10 @@ function downloadFile(url, filename) {
     return false;
 }
 
-// ИСПРАВЛЕНО: функция для отправки скриншота из буфера обмена
 function handlePasteEvent(event) {
     var clipboardData = event.clipboardData || window.clipboardData;
     if (!clipboardData) return true;
     
-    // Проверяем наличие изображения в буфере
     if (clipboardData.items) {
         for (var i = 0; i < clipboardData.items.length; i++) {
             var item = clipboardData.items[i];
@@ -610,7 +566,6 @@ function handlePasteEvent(event) {
         }
     }
     
-    // Fallback: пытаемся получить HTML с data:image
     var htmlData = "";
     try { 
         htmlData = clipboardData.getData("HTML") || clipboardData.getData("Text"); 
@@ -621,7 +576,6 @@ function handlePasteEvent(event) {
         if (event.preventDefault) event.preventDefault();
         return false;
     }
-    
     return true;
 }
 
@@ -639,7 +593,7 @@ function uploadBase64Image(rawInputString) {
     cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
 
     try {
-        // Декодируем base64 в бинарные данные
+        // ИСПРАВЛЕНО: Безопасное приведение base64 к Blob для Internet Explorer/Trident
         var binaryString = atob(cleanBase64);
         var len = binaryString.length;
         var bytes = new Uint8Array(len);
@@ -647,14 +601,13 @@ function uploadBase64Image(rawInputString) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         var blob = new Blob([bytes], {type: 'image/png'});
-        var file = new File([blob], "screenshot_" + Date.now() + ".png", {type: "image/png"});
-        uploadFile(file);
+        blob.name = "screenshot_" + Date.now() + ".png"; 
+        uploadFile(blob);
     } catch(e) {
         alert("Ошибка декодирования скриншота: " + e.message);
     }
 }
 
-// Навешиваем обработчик paste на всё окно
 window.onpaste = handlePasteEvent;
 
 document.getElementById('btn-paste-screen').onclick = function() {
@@ -721,18 +674,24 @@ function loadCustomThemeAndLinks() {
 
 loadCustomThemeAndLinks();
 
-window.onload = function() {
+// ИСПРАВЛЕНО: Безопасный парсинг хэша вручную без использования URLSearchParams для IE
+function parseHashAndAuthorize() {
     try {
         var hash = window.location.hash;
         if (hash && hash.length > 1) {
             var cleanHash = decodeURIComponent(hash.substring(1));
             var p = cleanHash.split("---");
             if (p && p.length >= 3) {
+                // p[0]=id_user, p[1]=id_org, p[2]=username, p[3]=role
                 apply1CAuth(p[0], p[1], p[2], p.length >= 4 ? p[3] : 'user');
             }
         }
     } catch(e) {}
-};
+}
+
+// ИСПРАВЛЕНО: Слушаем как onload, так и динамическое изменение хэша 1С
+window.onload = parseHashAndAuthorize;
+window.onhashchange = parseHashAndAuthorize;
 </script>
 </body>
 </html>

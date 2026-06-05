@@ -1,0 +1,51 @@
+/* Красивые бабблы сообщений */
+.message {
+    display: flex;
+    margin-bottom: 12px;
+    animation: fadeIn 0.2s ease;
+}
+.message.my { justify-content: flex-end; }
+.message-content {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.message.my .message-content {
+    background: #d9fdd3; /* Светло-зеленый как в WhatsApp */
+}
+
+/* Статусы пользователей "В сети" */
+.user-row { display: flex; align-items: center; padding: 8px; position: relative; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: #ccc; position: relative; }
+.status-online {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background-color: #22c55e; /* Зеленый круг */
+    border: 2px solid white;
+    border-radius: 50%;
+}
+
+/* Инлайновые скриншоты и файлы */
+.chat-image {
+    max-width: 250px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 5px;
+    transition: transform 0.2s;
+}
+.chat-image:hover { transform: scale(1.02); }
+.file-attachment {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.05);
+    padding: 8px;
+    border-radius: 6px;
+    text-decoration: none;
+    color: #2563eb;
+}
