@@ -273,17 +273,20 @@
         async function saveTheme() {
             const primaryColor = document.getElementById('primary-color').value;
             
+            // ИСПРАВЛЕНО: Подтягиваем также текущие значения полей ссылок, чтобы они не затирались пустой строкой при сохранении цвета
+            const links = {
+                theme_primary_color: primaryColor,
+                link1_name: String(document.getElementById('link1-name').value || ''),
+                link1_url: String(document.getElementById('link1-url').value || ''),
+                link2_name: String(document.getElementById('link2-name').value || ''),
+                link2_url: String(document.getElementById('link2-url').value || '')
+            };
+            
             try {
                 const response = await fetch('/api/admin/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        theme_primary_color: primaryColor,
-                        link1_name: '',
-                        link1_url: '',
-                        link2_name: '',
-                        link2_url: ''
-                    })
+                    body: JSON.stringify(links)
                 });
                 
                 const result = await response.json();
@@ -320,12 +323,14 @@
         }
         
         async function saveLinks() {
+            // ИСПРАВЛЕНО: Динамически считываем текущее значение цвета из input, вместо хардкода синего #2563eb
+            // ИСПРАВЛЕНО: Безопасное приведение к строке, исключающее отправку пустых или неопределенных объектов
             const links = {
-                theme_primary_color: '#2563eb',
-                link1_name: document.getElementById('link1-name').value,
-                link1_url: document.getElementById('link1-url').value,
-                link2_name: document.getElementById('link2-name').value,
-                link2_url: document.getElementById('link2-url').value
+                theme_primary_color: document.getElementById('primary-color').value || '#2563eb',
+                link1_name: String(document.getElementById('link1-name').value || ''),
+                link1_url: String(document.getElementById('link1-url').value || ''),
+                link2_name: String(document.getElementById('link2-name').value || ''),
+                link2_url: String(document.getElementById('link2-url').value || '')
             };
             
             try {
