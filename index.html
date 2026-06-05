@@ -75,7 +75,7 @@
 
 <div class="modal-overlay" id="secret-input-modal">
     <div class="modal-body">
-        <h4 id="secret-modal-title">Клич шифрования</h4>
+        <h4 id="secret-modal-title">Ключ шифрования</h4>
         <input type="password" id="modal-secret-field" placeholder="Ключ..." />
         <div class="modal-buttons">
             <button onclick="closeSecretModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
@@ -96,18 +96,19 @@
 </div>
 
 <div class="modal-overlay" id="base64-image-modal">
-    <div class="modal-body">
-        <h4>Вставка скриншота</h4>
-        <input type="text" id="modal-base64-field" placeholder="Вставьте строку base64..." />
-        <div class="modal-buttons">
+    <div class="modal-body" style="width: 400px;">
+        <h4>📋 Вставка скриншота (Base64)</h4>
+        <p style="font-size: 11px; color:#6b7280; margin-bottom: 8px;">Вставьте base64-код картинки в поле ниже:</p>
+        <textarea id="modal-base64-field" rows="8" style="width:100%; font-family: monospace; font-size:11px; border:1px solid #d1d5db; border-radius:6px; padding:6px; outline:none;" placeholder="data:image/png;base64,..."></textarea>
+        <div class="modal-buttons" style="margin-top: 10px;">
             <button onclick="closeBase64Modal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="base64-modal-submit-btn" class="btn-small">Отправить</button>
+            <button id="base64-modal-submit-btn" class="btn-small" style="background:#2563eb;">Отправить в чат</button>
         </div>
     </div>
 </div>
 
 <script>
-window.onerror = function() { return true; };
+window.onerror = function(m, u, l) { return true; };
 
 var socket = null;
 var currentRoomId = null;
@@ -119,6 +120,7 @@ var currentUserId = "";
 var currentUserRole = "";
 var globalUsersCache = [];
 var activeOnlineIds = []; 
+var lastLoadedUrl = window.location.href;
 
 var inputMsg = document.getElementById('input-msg');
 
@@ -132,6 +134,12 @@ function selectRoomById(roomId) {
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
+    // ИСПРАВЛЕНО: Полная защита от зависания контекста 0x800a01b6
+    if (currentUserId && currentUserId !== id_user) {
+        window.location.reload(true);
+        return;
+    }
+    
     currentUserId = id_user;
     currentUserRole = user_role || 'user';
     
@@ -154,11 +162,7 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     });
 
     socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
-    
-    socket.on('users_list', function(users) { 
-        globalUsersCache = users; 
-        renderUsersRightPanel(users); 
-    });
+    socket.on('users_list', function(users) { globalUsersCache = users; renderUsersRightPanel(users); });
     
     socket.on('online_status_update', function(onlineIds) {
         activeOnlineIds = onlineIds || [];
@@ -219,23 +223,18 @@ function renderUsersRightPanel(users) {
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
         if (u.id_user == currentUserId) continue;
-        
         var div = document.createElement('div');
         div.className = 'user-row';
-        
         var firstLetter = u.username ? u.username.charAt(0).toUpperCase() : '?';
         var isOnline = (u.id_user === 'Admin' || u.role === 'admin'); 
         if (isOnline) div.className += ' online';
-
         div.innerHTML = '<div class="avatar-container"><div class="avatar">' + firstLetter + '</div><div class="status-online"></div></div>' +
                         '<div class="user-name-text">' + u.username + '</div>';
-        
         (function(target) {
             div.onclick = function() {
                 socket.emit('create_private_chat', { target_user_id: target.id_user, target_username: target.username });
             };
         })(u);
-        
         container.appendChild(div);
     }
 }
@@ -251,7 +250,6 @@ function renderParticipantsList(list) {
         var firstLetter = p.username ? p.username.charAt(0).toUpperCase() : '?';
         div.innerHTML = '<div class="avatar-container"><div class="avatar" style="background:#10b981">' + firstLetter + '</div></div>' +
                         '<div class="user-name-text">' + p.username + '</div>';
-        
         if (currentRoomType !== 'private' && p.id_user != currentUserId && (currentUserRole === 'admin' || currentRoomCreator == currentUserId)) {
             var btnKick = document.createElement('button');
             btnKick.className = 'btn-danger-xs';
@@ -273,25 +271,18 @@ function displayMessage(msg, isBulkLoad) {
         var container = document.getElementById('messages-container');
         if (!container) return;
         var isMyMessage = (msg.id_user_from == currentUserId);
-        
         var div = document.createElement('div');
         div.className = 'message' + (isMyMessage ? ' my' : '');
-        
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
-
-        // Обработка пользовательского шифрования (SECRET:)
         if (msg.is_user_encrypted || text.indexOf("SECRET:") === 0) {
             var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
             var uid = 'c_' + Math.random().toString(36).substr(2, 6);
             text = '<div style="color:#ef4444; font-weight:bold;">🔒 Шифрованное сообщение</div><div id="'+uid+'" data-cipher="'+cipher+'">[Текст скрыт]</div>' +
                    '<button class="btn-small" style="background:#eab308; margin-top:4px;" onclick="decryptMsg(\''+uid+'\')">Расшифровать</button>';
         }
-        
-        // Рендерим баббл сообщения
         div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div></div>';
         container.appendChild(div);
-        
         if (!isBulkLoad) container.scrollTop = container.scrollHeight;
     } catch(e) {}
 }
@@ -317,24 +308,16 @@ function sendMessage() {
 }
 
 function uploadFile(file) {
-    var fd = new FormData(); 
-    fd.append('file', file);
-    var xhr = new XMLHttpRequest(); 
-    xhr.open('POST', '/upload', true);
+    var fd = new FormData(); fd.append('file', file);
+    var xhr = new XMLHttpRequest(); xhr.open('POST', '/upload', true);
     xhr.onload = function() {
         if (xhr.status === 200) {
             var data = JSON.parse(xhr.responseText);
             if (data && data.url) {
                 var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                 var absUrl = window.location.protocol + '//' + window.location.host + data.url;
-                
-                // ИСПРАВЛЕНО: Генерируем "непробиваемую" для IE ссылку с javascript:void(0);
-                var content = isImg ? 
-                    '<img src="'+absUrl+'" class="chat-image" onclick="window.open(\''+absUrl+'\')" />' : 
-                    '<a href="javascript:void(0);" class="file-attachment" onclick="return downloadFile(\''+data.url+'\', \''+file.name.replace(/'/g, "\\'")+'\');">📄 Файл: '+file.name+'</a>';
-                    
-                
-                // Отправляем готовый HTML-контент в сокет
+                var content = isImg ? '<img src="'+absUrl+'" class="chat-image" onclick="window.open(\''+absUrl+'\')" />' : 
+                                      '<a href="javascript:void(0);" class="file-attachment" onclick="return downloadFile(\''+data.url+'\', \''+file.name.replace(/'/g, "\\'")+'\');">📄 Файл: '+file.name+'</a>';
                 socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
         }
@@ -344,13 +327,9 @@ function uploadFile(file) {
 
 function downloadFile(url, filename) {
     var fullUrl = window.location.protocol + '//' + window.location.host + url;
-    
     try {
-        // Открываем эндпоинт скачивания в отдельном изолированном микро-окне.
-        // Это на 100% защищает главное окно чата 1С от навигации на страницы ошибок.
         window.open(fullUrl, '_blank', 'width=1,height=1,left=9999,top=9999,resizable=no,scrollbars=no,status=no');
     } catch(e) {
-        // Резервный вариант (ваш код), если window.open жестко заблокирован политиками безопасности системы
         var downloadAnchor = document.createElement('a');
         downloadAnchor.href = fullUrl;
         downloadAnchor.download = filename;
@@ -359,21 +338,41 @@ function downloadFile(url, filename) {
         downloadAnchor.click();
         document.body.removeChild(downloadAnchor);
     }
-    
-    return false; // Жестко блокирует дефолтный переход по ссылке в основном окне 1С
+    return false; 
 }
 
-function handlePasteEvent(e) {
-    var cbd = e.clipboardData || window.clipboardData;
-    if (!cbd || !cbd.items) return true;
-    for (var i = 0; i < cbd.items.length; i++) {
-        if (cbd.items[i].type.indexOf('image') !== -1) {
-            var file = cbd.items[i].getAsFile();
-            if (file) { uploadFile(file); e.preventDefault(); return false; }
-        }
+// ИСПРАВЛЕНО: Безопасная отправка скриншотов из диалогового окна
+function uploadBase64Image(rawInputString) {
+    if (!currentRoomId || !socket || !rawInputString) return;
+    
+    var cleanBase64 = rawInputString.trim();
+    if (cleanBase64.indexOf(",") !== -1) {
+        cleanBase64 = cleanBase64.split(",")[1];
     }
+    cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/1c/upload-base64', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var response = JSON.parse(xhr.responseText);
+            if (response.success && response.url) {
+                var absoluteUrl = window.location.protocol + '//' + window.location.host + response.url;
+                var content = '<img src="' + absoluteUrl + '" class="chat-image" onclick="window.open(\'' + absoluteUrl + '\')" />';
+                socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
+                closeBase64Modal();
+            }
+        } else {
+            alert("Ошибка скриншота: " + xhr.status);
+        }
+    };
+    xhr.send(JSON.stringify({
+        room_id: parseInt(currentRoomId),
+        base64_data: cleanBase64,
+        filename: "screenshot_" + Date.now() + ".png"
+    }));
 }
-window.onpaste = handlePasteEvent;
 
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;
@@ -388,6 +387,18 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
+// ИСПРАВЛЕНО: Открытие красивого модального окна для скриншотов
+document.getElementById('btn-paste-screen').onclick = function() {
+    if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
+    document.getElementById('modal-base64-field').value = "";
+    document.getElementById('base64-image-modal').style.display = 'flex';
+};
+function closeBase64Modal() { document.getElementById('base64-image-modal').style.display = 'none'; }
+document.getElementById('base64-modal-submit-btn').onclick = function() {
+    var code = document.getElementById('modal-base64-field').value;
+    uploadBase64Image(code);
+};
+
 document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
 document.getElementById('btn-create-group').onclick = function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); };
 document.getElementById('btn-secret').onclick = function() {
@@ -399,17 +410,30 @@ document.getElementById('btn-file').onclick = function() { document.getElementBy
 document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); };
 if (inputMsg) { inputMsg.onkeydown = function(e) { if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { e.preventDefault(); sendMessage(); } }; }
 
-function parseHashAndAuthorize() {
+function getQueryParam(paramName) {
+    var searchString = window.location.search.substring(1);
+    var params = searchString.split("&");
+    for (var i = 0; i < params.length; i++) {
+        var pair = params[i].split("=");
+        if (pair[0] == paramName) { return decodeURIComponent(pair[1].replace(/\+/g, " ")); }
+    }
+    return null;
+}
+
+function parseUrlAndAuthorize() {
     try {
-        var hash = window.location.hash;
-        if (hash && hash.length > 1) {
-            var p = decodeURIComponent(hash.substring(1)).split("---");
-            if (p && p.length >= 3) apply1CAuth(p[0], p[1], p[2], p[3] || 'user');
+        var id_user  = getQueryParam('id_user');
+        var id_org   = getQueryParam('id_org');
+        var username = getQueryParam('username');
+        var role     = getQueryParam('role') || 'user';
+        
+        if (id_user && id_org && username) {
+            apply1CAuth(id_user, id_org, username, role);
         }
     } catch(e) {}
 }
-window.onload = parseHashAndAuthorize;
-window.onhashchange = parseHashAndAuthorize;
+
+window.onload = parseUrlAndAuthorize;
 </script>
 </body>
 </html>
