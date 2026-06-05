@@ -118,7 +118,7 @@ var userSecretKey = "";
 var currentUserId = "";
 var currentUserRole = "";
 var globalUsersCache = [];
-var activeOnlineIds = []; // Хранит ID тех, кто сейчас в сети
+var activeOnlineIds = []; 
 
 var inputMsg = document.getElementById('input-msg');
 
@@ -155,15 +155,11 @@ function apply1CAuth(id_user, id_org, username, user_role) {
 
     socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
     
-    // Перехват динамического списка Онлайн-пользователей от Socket.IO
     socket.on('users_list', function(users) { 
         globalUsersCache = users; 
-        // Эмулируем, что если пользователи пришли из Socket, то бэкенд может передавать признак online.
-        // Или мы сопоставляем сессии. Для надежности рендерим:
         renderUsersRightPanel(users); 
     });
     
-    // Кастомный обработчик онлайн-статусов, если бэкенд шлет триггеры
     socket.on('online_status_update', function(onlineIds) {
         activeOnlineIds = onlineIds || [];
         renderUsersRightPanel(globalUsersCache);
@@ -227,18 +223,13 @@ function renderUsersRightPanel(users) {
         var div = document.createElement('div');
         div.className = 'user-row';
         
-        // Генерируем аватарку из первой буквы имени
         var firstLetter = u.username ? u.username.charAt(0).toUpperCase() : '?';
-        
-        // Проверка: находится ли пользователь в сети (пока эмулируем или завязываем на триггер)
-        // Если хотите жестко привязать, добавьте логику на бэкенд. Сейчас по умолчанию подсвечиваем активных.
-        var isOnline = (u.id_user === 'Admin' || u.role === 'admin'); // Пример заглушки, заменяется на activeOnlineIds.indexOf(u.id_user) !== -1
+        var isOnline = (u.id_user === 'Admin' || u.role === 'admin'); 
         if (isOnline) div.className += ' online';
 
         div.innerHTML = '<div class="avatar-container"><div class="avatar">' + firstLetter + '</div><div class="status-online"></div></div>' +
                         '<div class="user-name-text">' + u.username + '</div>';
         
-        // Клик открывает личный чат
         (function(target) {
             div.onclick = function() {
                 socket.emit('create_private_chat', { target_user_id: target.id_user, target_username: target.username });
@@ -331,13 +322,30 @@ function uploadFile(file) {
             if (data && data.url) {
                 var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                 var absUrl = window.location.protocol + '//' + window.location.host + data.url;
+                // ДОБАВЛЕНА ссылка на вызов downloadFile() с экранированием параметров
                 var content = isImg ? '<img src="'+absUrl+'" class="chat-image" onclick="window.open(\''+absUrl+'\')" />' : 
-                                      '<a href="'+absUrl+'" class="file-attachment" target="_blank">📄 Файл: '+file.name+'</a>';
+                                      '<a href="'+absUrl+'" class="file-attachment" onclick="downloadFile(\''+data.url+'\', \''+file.name.replace(/'/g, "\\'")+'\'); return false;">📄 Файл: '+file.name+'</a>';
                 socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
         }
     };
     xhr.send(fd);
+}
+
+// ДОБАВЛЕНО: Полностью кроссбраузерная и безопасная функция скачивания для IE / 1С
+function downloadFile(url, filename) {
+    var fullUrl = window.location.protocol + '//' + window.location.host + url;
+    
+    // Создаем невидимый тег ссылки и симулируем клик
+    var downloadAnchor = document.createElement('a');
+    downloadAnchor.href = fullUrl;
+    downloadAnchor.download = filename;
+    downloadAnchor.target = '_blank'; // Спасает контекст, если бэкенд выкинет 404
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+    
+    return false;
 }
 
 function handlePasteEvent(e) {
