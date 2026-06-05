@@ -70,8 +70,8 @@
 <div class="header">
     <h1>1C Corporate Chat</h1>
     <div class="header-controls">
-        <button onclick="quickLogin('Администратор', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Администратор', 'admin')" ...>Админ</button>
-        <button onclick="quickLogin('БутенкоТатьяна', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Бутенко Татьяна', 'user')" ...>Пользователь</button>
+        <button onclick="quickLogin('Администратор', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Администратор', 'admin')" style="padding:1px 5px; font-size:9px; background:#eab308; border:none; border-radius:3px; cursor:pointer;">Админ</button>
+        <button onclick="quickLogin('БутенкоТатьяна', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Бутенко Татьяна', 'user')" style="padding:1px 5px; font-size:9px; background:#10b981; border:none; border-radius:3px; cursor:pointer;">Пользователь</button>
         <span id="user-info" class="user-info">Не авторизован</span>
     </div>
 </div>
@@ -819,20 +819,19 @@ ajax('GET', '/api/admin/settings', null, function(err, settings) {
     }
 });
 
-// Автовход из хэша
+// Автовход из хэша (без console.log)
 window.onload = function() {
     var hash = window.location.hash;
-    console.log("hash:", hash);
     if (hash && hash.length > 1) {
         var parts = decodeURIComponent(hash.substring(1)).split("---");
-        console.log("parts:", parts);
         if (parts.length >= 3) {
             applyAuth(parts[0], parts[1], parts[2], parts[3] || 'user');
         }
     }
 };
+
+// Функция для прямого вызова из 1С (если потребуется)
 window.authorizeFrom1C = function(id_user, id_org, username, role) {
-    console.log("authorizeFrom1C called", id_user, id_org, username, role);
     applyAuth(id_user, id_org, username, role);
 };
 </script>
