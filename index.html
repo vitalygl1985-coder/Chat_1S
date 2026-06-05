@@ -821,11 +821,8 @@ ajax('GET', '/api/admin/settings', null, function(err, settings) {
 
 // Автовход из хэша
 window.onload = function() {
-    var hash = window.location.hash;
-    if (hash && hash.length > 1) {
-        var parts = decodeURIComponent(hash.substring(1)).split("---");
-        if (parts.length >= 3) applyAuth(parts[0], parts[1], parts[2], parts[3] || 'user');
-    }
+    // Для теста – захардкодить админа
+    applyAuth('Администратор', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Администратор', 'admin');
 };
 </script>
 </body>
