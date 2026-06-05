@@ -36,7 +36,7 @@
         </div>
 
         <div id="messages-container" class="messages-container">
-            <div class="message"><div class="message-content"><span class="msg-author">Система</span><div class="msg-text">Выберите чат слева или сотрудника справа для начала переписки.</div></div></div>
+            <div class="message"><div class="message-content"><span class="msg-author">Система</span><div class="msg-text">Выберите чат для начала общения.</div></div></div>
         </div>
         
         <div class="input-panel">
@@ -86,7 +86,7 @@
 
 <div class="modal-overlay" id="text-input-modal">
     <div class="modal-body">
-        <h4 id="text-modal-title">Имя кабинета</h4>
+        <h4 id="text-modal-title">Имя нового кабинета</h4>
         <input type="text" id="modal-text-field" placeholder="Название..." />
         <div class="modal-buttons">
             <button onclick="closeTextModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
@@ -96,19 +96,19 @@
 </div>
 
 <div class="modal-overlay" id="base64-image-modal">
-    <div class="modal-body" style="width: 400px;">
+    <div class="modal-body" style="width: 380px;">
         <h4>📋 Вставка скриншота (Base64)</h4>
-        <p style="font-size: 11px; color:#6b7280; margin-bottom: 8px;">Вставьте base64-код картинки в поле ниже:</p>
-        <textarea id="modal-base64-field" rows="8" style="width:100%; font-family: monospace; font-size:11px; border:1px solid #d1d5db; border-radius:6px; padding:6px; outline:none;" placeholder="data:image/png;base64,..."></textarea>
+        <p style="font-size: 11px; color:#6b7280; margin-bottom: 6px;">Вставьте base64-код скриншота в поле ниже:</p>
+        <textarea id="modal-base64-field" rows="8" style="width:100%; font-family:monospace; font-size:11px; border:1px solid #d1d5db; padding:6px; border-radius:6px;" placeholder="Вставьте код (начинается на iVBORw0KGgo...)"></textarea>
         <div class="modal-buttons" style="margin-top: 10px;">
             <button onclick="closeBase64Modal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="base64-modal-submit-btn" class="btn-small" style="background:#2563eb;">Отправить в чат</button>
+            <button id="base64-modal-submit-btn" class="btn-small">Отправить</button>
         </div>
     </div>
 </div>
 
 <script>
-window.onerror = function(m, u, l) { return true; };
+window.onerror = function() { return true; };
 
 var socket = null;
 var currentRoomId = null;
@@ -120,7 +120,6 @@ var currentUserId = "";
 var currentUserRole = "";
 var globalUsersCache = [];
 var activeOnlineIds = []; 
-var lastLoadedUrl = window.location.href;
 
 var inputMsg = document.getElementById('input-msg');
 
@@ -134,12 +133,6 @@ function selectRoomById(roomId) {
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
-    // ИСПРАВЛЕНО: Полная защита от зависания контекста 0x800a01b6
-    if (currentUserId && currentUserId !== id_user) {
-        window.location.reload(true);
-        return;
-    }
-    
     currentUserId = id_user;
     currentUserRole = user_role || 'user';
     
@@ -223,13 +216,16 @@ function renderUsersRightPanel(users) {
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
         if (u.id_user == currentUserId) continue;
+        
         var div = document.createElement('div');
         div.className = 'user-row';
         var firstLetter = u.username ? u.username.charAt(0).toUpperCase() : '?';
         var isOnline = (u.id_user === 'Admin' || u.role === 'admin'); 
         if (isOnline) div.className += ' online';
+
         div.innerHTML = '<div class="avatar-container"><div class="avatar">' + firstLetter + '</div><div class="status-online"></div></div>' +
                         '<div class="user-name-text">' + u.username + '</div>';
+        
         (function(target) {
             div.onclick = function() {
                 socket.emit('create_private_chat', { target_user_id: target.id_user, target_username: target.username });
@@ -250,6 +246,7 @@ function renderParticipantsList(list) {
         var firstLetter = p.username ? p.username.charAt(0).toUpperCase() : '?';
         div.innerHTML = '<div class="avatar-container"><div class="avatar" style="background:#10b981">' + firstLetter + '</div></div>' +
                         '<div class="user-name-text">' + p.username + '</div>';
+        
         if (currentRoomType !== 'private' && p.id_user != currentUserId && (currentUserRole === 'admin' || currentRoomCreator == currentUserId)) {
             var btnKick = document.createElement('button');
             btnKick.className = 'btn-danger-xs';
@@ -275,12 +272,14 @@ function displayMessage(msg, isBulkLoad) {
         div.className = 'message' + (isMyMessage ? ' my' : '');
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
+
         if (msg.is_user_encrypted || text.indexOf("SECRET:") === 0) {
             var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
             var uid = 'c_' + Math.random().toString(36).substr(2, 6);
             text = '<div style="color:#ef4444; font-weight:bold;">🔒 Шифрованное сообщение</div><div id="'+uid+'" data-cipher="'+cipher+'">[Текст скрыт]</div>' +
                    '<button class="btn-small" style="background:#eab308; margin-top:4px;" onclick="decryptMsg(\''+uid+'\')">Расшифровать</button>';
         }
+        
         div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div></div>';
         container.appendChild(div);
         if (!isBulkLoad) container.scrollTop = container.scrollHeight;
@@ -338,10 +337,10 @@ function downloadFile(url, filename) {
         downloadAnchor.click();
         document.body.removeChild(downloadAnchor);
     }
-    return false; 
+    return false;
 }
 
-// ИСПРАВЛЕНО: Безопасная отправка скриншотов из диалогового окна
+// Отправка скриншота base64 на выделенный REST-эндпоинт
 function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket || !rawInputString) return;
     
@@ -364,7 +363,7 @@ function uploadBase64Image(rawInputString) {
                 closeBase64Modal();
             }
         } else {
-            alert("Ошибка скриншота: " + xhr.status);
+            alert("Ошибка сохранения скриншота на сервере: " + xhr.status);
         }
     };
     xhr.send(JSON.stringify({
@@ -387,7 +386,6 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-// ИСПРАВЛЕНО: Открытие красивого модального окна для скриншотов
 document.getElementById('btn-paste-screen').onclick = function() {
     if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
     document.getElementById('modal-base64-field').value = "";
