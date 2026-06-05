@@ -1,388 +1,122 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>1C Chat Client</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <title>1C Chat Debug</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
-        .header { background-color: #2563eb; color: white; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .header h1 { font-size: 12px; }
-        .header-controls { display: flex; align-items: center; gap: 8px; }
-        .user-info { font-size: 11px; }
-        .main-container { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-        .sidebar { width: 200px; background-color: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow: hidden; }
-        .sidebar-section { flex: 1; padding: 6px; overflow-y: auto; }
-        .sidebar h3 { font-size: 10px; font-weight: bold; color: #374151; margin-bottom: 6px; }
-        .room-item { padding: 4px 5px; margin-bottom: 2px; cursor: pointer; font-size: 10px; border-radius: 3px; }
-        .room-item:hover { background-color: #f3f4f6; }
-        .room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
-        .btn-small { padding: 1px 4px; font-size: 9px; background-color: #10b981; color: white; border: none; border-radius: 3px; cursor: pointer; float: right; }
-        .btn-danger-xs { padding: 1px 4px; font-size: 8px; background-color: #ef4444; color: white; border: none; border-radius: 2px; cursor: pointer; float: right; margin-left: 4px; }
-        .chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; overflow: hidden; }
-        .chat-header { padding: 6px 10px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: bold; flex-shrink: 0; }
-        .chat-actions { display: flex; gap: 4px; }
-        .messages-container { flex: 1; padding: 8px; overflow-y: auto; }
-        .msg-block { background-color: white; padding: 5px 8px; border-radius: 5px; max-width: 80%; margin-bottom: 5px; }
-        .msg-author { font-size: 8px; color: #6b7280; font-weight: bold; display: block; margin-bottom: 2px; }
-        .msg-text { font-size: 10px; color: #1f2937; word-break: break-word; }
-        .participants-panel { width: 180px; background-color: white; display: flex; flex-direction: column; padding: 6px; overflow-y: auto; border-left: 1px solid #e5e7eb; }
-        .participants-panel h3 { font-size: 10px; font-weight: bold; color: #374151; margin-bottom: 4px; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; }
-        .participants-panel h3.employees-title { margin-top: 8px; }
-        .participant-item { padding: 2px 3px; font-size: 9px; color: #4b5563; line-height: 14px; clear: both; }
-        .user-item { padding: 2px 3px; font-size: 9px; border-bottom: 1px dashed #f3f4f6; }
-        .input-panel { padding: 6px; background-color: white; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
-        .secret-row { margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
-        .btn-secret { padding: 2px 6px; font-size: 9px; background-color: #e5e7eb; border: none; border-radius: 9999px; cursor: pointer; }
-        .btn-secret.active { background-color: #eab308; color: white; }
-        .controls-row { display: flex; gap: 5px; align-items: center; }
-        .btn-file, .btn-screenshot { background-color: #e5e7eb; border: none; padding: 4px 6px; border-radius: 3px; cursor: pointer; font-size: 10px; }
-        .input-msg-textarea { flex: 1; border: 1px solid #d1d5db; border-radius: 3px; padding: 4px; font-size: 10px; resize: none; font-family: Arial, sans-serif; background: white; outline: none; height: 40px; }
-        .btn-send { background-color: #2563eb; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 10px; height: 40px; }
-        .file-link { color: #2563eb; text-decoration: underline; cursor: pointer; }
-        img { max-width: 100%; max-height: 100px; border-radius: 3px; cursor: pointer; display: block; margin-top: 3px; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-body { background: white; padding: 12px; border-radius: 6px; width: 350px; max-width: 90%; }
-        .modal-body h4 { font-size: 12px; margin-bottom: 8px; }
-        .modal-body input, .modal-body textarea { width: 100%; padding: 5px; font-size: 10px; margin-bottom: 8px; outline: none; border: 1px solid #d1d5db; }
-        .modal-body textarea { height: 80px; font-family: monospace; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
-        .modal-buttons button { padding: 3px 10px; font-size: 9px; cursor: pointer; border: none; border-radius: 3px; }
-        .toast-msg { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 4px 10px; border-radius: 15px; font-size: 10px; z-index: 2000; display: none; }
+        body { font-family: Arial; margin: 20px; }
+        #log { background: #f0f0f0; padding: 10px; height: 300px; overflow: auto; font-family: monospace; white-space: pre-wrap; }
+        button { margin: 5px; padding: 5px 10px; }
+        #rooms { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+        .room { cursor: pointer; padding: 3px; }
+        .room:hover { background: #ddd; }
     </style>
 </head>
 <body>
-
-<div class="header">
-    <h1>1C Corporate Chat</h1>
-    <div class="header-controls">
-        <button onclick="quickLogin('Администратор', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Администратор', 'admin')" style="padding:1px 5px; font-size:9px; background:#eab308; border:none; border-radius:3px; cursor:pointer;">Админ</button>
-        <button onclick="quickLogin('БутенкоТатьяна', '3d933d37-ebc8-11e3-80d5-001cc046e2ac', 'Бутенко Татьяна', 'user')" style="padding:1px 5px; font-size:9px; background:#10b981; border:none; border-radius:3px; cursor:pointer;">Пользователь</button>
-        <span id="user-info" class="user-info">Не авторизован</span>
-    </div>
+<h2>1C Chat Debug</h2>
+<div>
+    <button onclick="login('Администратор','3d933d37-ebc8-11e3-80d5-001cc046e2ac','Администратор','admin')">Войти как Админ</button>
+    <button onclick="login('БутенкоТатьяна','3d933d37-ebc8-11e3-80d5-001cc046e2ac','Бутенко Татьяна','user')">Войти как Пользователь</button>
+    <span id="userLabel"></span>
 </div>
-
-<div class="main-container">
-    <div class="sidebar">
-        <div class="sidebar-section">
-            <h3>📁 Кабинеты <button id="btn-create-group" class="btn-small">+</button></h3>
-            <div id="rooms-list">Загрузка...</div>
-        </div>
-    </div>
-    <div class="chat-window">
-        <div class="chat-header">
-            <span id="current-chat-title">Выберите чат</span>
-            <div class="chat-actions" id="chat-management-actions" style="display: none;">
-                <button onclick="triggerArchive()" class="btn-small" style="background:#eab308; float:none;">📦</button>
-                <button onclick="triggerDeleteRoom()" class="btn-small" style="background:#ef4444; float:none;">🗑</button>
-            </div>
-        </div>
-        <div id="messages-container" class="messages-container">
-            <div class="msg-block"><span class="msg-author">Система</span><div class="msg-text">Выберите чат</div></div>
-        </div>
-        <div class="input-panel">
-            <div class="secret-row">
-                <button id="btn-secret" class="btn-secret">🔒 Шифровать</button>
-                <button id="btn-screenshot" class="btn-screenshot">📸 Скриншот</button>
-            </div>
-            <div class="controls-row">
-                <input type="file" id="file-input" style="display:none">
-                <button id="btn-file" class="btn-file">📎</button>
-                <textarea id="input-msg" class="input-msg-textarea" placeholder="Сообщение..."></textarea>
-                <button id="btn-send" class="btn-send">📤</button>
-            </div>
-        </div>
-    </div>
-    <div class="participants-panel">
-        <h3>👥 В кабинете <button id="btn-add-participant" class="btn-small" style="display:none;">+</button></h3>
-        <div id="participants-list">Не выбран чат</div>
-        <h3 class="employees-title">👤 Сотрудники <button id="btn-start-private" class="btn-small" style="background:#2563eb;">💬</button></h3>
-        <div id="users-list-right">Загрузка...</div>
-    </div>
-</div>
-<div id="toast" class="toast-msg"></div>
-
-<div class="modal-overlay" id="screenshot-modal"><div class="modal-body"><h4>📸 Вставка скриншота</h4><p style="font-size:9px; color:#666;">1. PrintScreen<br>2. Ctrl+V в поле ниже<br>3. Отправить</p><textarea id="screenshot-field" placeholder="Нажмите Ctrl+V..."></textarea><div class="modal-buttons"><button onclick="closeScreenshotModal()" style="background:#9ca3af;">Отмена</button><button id="screenshot-submit-btn" style="background:#2563eb; color:white;">Отправить</button></div></div></div>
-<div class="modal-overlay" id="user-select-modal"><div class="modal-body"><h4 id="modal-action-title">Выберите сотрудника</h4><select id="modal-user-dropdown"></select><div class="modal-buttons"><button onclick="closeUserModal()" style="background:#9ca3af;">Отмена</button><button id="modal-submit-btn" style="background:#2563eb; color:white;">Выбрать</button></div></div></div>
-<div class="modal-overlay" id="secret-input-modal"><div class="modal-body"><h4>🔑 Ключ шифрования</h4><input type="password" id="modal-secret-field" placeholder="Ключ" /><div class="modal-buttons"><button onclick="closeSecretModal()" style="background:#9ca3af;">Отмена</button><button id="secret-modal-submit-btn" style="background:#eab308;">Применить</button></div></div></div>
-<div class="modal-overlay" id="text-input-modal"><div class="modal-body"><h4>📝 Название кабинета</h4><input type="text" id="modal-text-field" placeholder="Название" /><div class="modal-buttons"><button onclick="closeTextModal()" style="background:#9ca3af;">Отмена</button><button id="text-modal-submit-btn" style="background:#10b981; color:white;">Создать</button></div></div></div>
+<hr>
+<div id="log">Лог действий:<br></div>
+<div id="rooms">Комнаты: не загружены</div>
 
 <script>
-var currentRoomId = null, currentRoomType = "", currentRoomCreator = "";
-var isSecretMode = false, userSecretKey = "";
-var currentUserId = "", currentUserRole = "", currentUserName = "", currentOrgId = "";
-var globalUsersCache = [], lastMessageId = 0, pollingInterval = null, isUnloading = false;
-var inputMsg = document.getElementById('input-msg'), messagesContainer = document.getElementById('messages-container');
-
-function showToast(msg, isError) {
-    var toast = document.getElementById('toast');
-    if (!toast) return;
-    toast.textContent = msg;
-    toast.style.background = isError ? '#ef4444' : '#333';
-    toast.style.display = 'block';
-    setTimeout(function() { if (toast) toast.style.display = 'none'; }, 2000);
+function log(msg) {
+    var logDiv = document.getElementById('log');
+    logDiv.innerHTML += new Date().toLocaleTimeString() + ' ' + msg + '<br>';
+    logDiv.scrollTop = logDiv.scrollHeight;
+    alert(msg); // временно для наглядности в 1С
 }
-function cleanup() { isUnloading = true; if (pollingInterval) clearInterval(pollingInterval); pollingInterval = null; }
-window.onbeforeunload = function() { cleanup(); };
-function quickLogin(id_user, id_org, username, user_role) { applyAuth(id_user, id_org, username, user_role); }
 
 function ajax(method, url, data, callback) {
-    try {
-        var xhr = new XMLHttpRequest();
-        xhr.open(method, url, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4 && !isUnloading) {
-                if (xhr.status === 200) {
-                    try { var resp = JSON.parse(xhr.responseText); callback(null, resp); } catch(e) { callback(e, null); }
-                } else { callback(new Error('HTTP ' + xhr.status), null); }
-            }
-        };
-        xhr.onerror = function() { callback(new Error('Network error'), null); };
-        xhr.send(data ? JSON.stringify(data) : null);
-    } catch(e) { callback(e, null); }
-}
-
-function applyAuth(id_user, id_org, username, user_role) {
-    cleanup();
-    currentUserId = id_user;
-    currentUserRole = user_role || 'user';
-    currentUserName = username;
-    currentOrgId = id_org;
-    var userInfoEl = document.getElementById('user-info');
-    if (userInfoEl) userInfoEl.innerHTML = username + (currentUserRole === 'admin' ? ' 👑' : '');
-    ajax('POST', '/api/auth', { id_user: id_user, id_org: id_org, username: username, role: currentUserRole }, function(err, res) {
-        if (err) { showToast("Ошибка авторизации: " + err.message, true); return; }
-        if (res && res.success) {
-            loadRooms();
-            loadUsers();
-            startPolling();
-        } else { showToast("Ошибка авторизации", true); }
-    });
-}
-function startPolling() {
-    if (pollingInterval) clearInterval(pollingInterval);
-    pollingInterval = setInterval(function() {
-        if (!isUnloading) { if (currentRoomId) checkNewMessages(); loadRooms(); }
-    }, 3000);
-}
-function checkNewMessages() {
-    if (!currentRoomId) return;
-    ajax('GET', '/api/messages?room_id=' + currentRoomId + '&after=' + lastMessageId, null, function(err, res) {
-        if (!err && res && res.messages && res.messages.length) {
-            for (var i = 0; i < res.messages.length; i++) {
-                displayMessage(res.messages[i], false);
-                if (res.messages[i].id_message > lastMessageId) lastMessageId = res.messages[i].id_message;
-            }
-        }
-    });
-}
-function loadRooms() {
-    ajax('GET', '/api/rooms?id_org=' + encodeURIComponent(currentOrgId) + '&id_user=' + encodeURIComponent(currentUserId), null, function(err, res) {
-        if (!err && res && res.rooms) renderRoomsList(res.rooms);
-        else if (err) showToast("Ошибка загрузки комнат: " + err.message, true);
-    });
-}
-function loadUsers() {
-    ajax('GET', '/api/users?id_org=' + encodeURIComponent(currentOrgId), null, function(err, res) {
-        if (!err && res && res.users) { globalUsersCache = res.users; renderUsersRightPanel(res.users); }
-    });
-}
-function loadRoomParticipants(roomId) {
-    ajax('GET', '/api/room_participants?room_id=' + roomId, null, function(err, res) {
-        if (!err && res && res.participants) renderParticipantsList(res.participants);
-    });
-}
-function loadRoomHistory(roomId) {
-    ajax('GET', '/api/messages?room_id=' + roomId, null, function(err, res) {
-        if (!err && res && res.messages && messagesContainer) {
-            messagesContainer.innerHTML = "";
-            lastMessageId = 0;
-            for (var i = 0; i < res.messages.length; i++) { displayMessage(res.messages[i], true); if (res.messages[i].id_message > lastMessageId) lastMessageId = res.messages[i].id_message; }
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-    });
-}
-function selectRoomById(roomId) {
-    if (isUnloading) return;
-    currentRoomId = roomId;
-    loadRoomHistory(roomId);
-    loadRoomParticipants(roomId);
-    var roomsDiv = document.getElementById('rooms-list');
-    if (roomsDiv) {
-        var items = roomsDiv.getElementsByClassName('room-item');
-        for (var i = 0; i < items.length; i++) {
-            if (items[i].getAttribute('data-id') == roomId) items[i].className = 'room-item active';
-            else items[i].className = 'room-item';
-        }
-    }
-}
-function renderRoomsList(rooms) {
-    if (isUnloading) return;
-    var container = document.getElementById('rooms-list');
-    if (!container) return;
-    container.innerHTML = "";
-    if (!rooms || rooms.length === 0) { container.innerHTML = "<div style='font-size:10px; color:#999;'>Нет чатов</div>"; return; }
-    for (var i = 0; i < rooms.length; i++) {
-        var room = rooms[i], div = document.createElement('div');
-        div.className = (room.id_room == currentRoomId) ? 'room-item active' : 'room-item';
-        div.setAttribute('data-id', room.id_room);
-        var icon = (room.type === 'private') ? '💬 ' : ((room.type === 'admin_group') ? '👑 ' : '👥 ');
-        div.textContent = icon + room.name;
-        if (room.id_room == currentRoomId) {
-            currentRoomType = room.type; currentRoomCreator = room.created_by;
-            var titleEl = document.getElementById('current-chat-title'); if (titleEl) titleEl.textContent = room.name;
-            var mgtActions = document.getElementById('chat-management-actions');
-            if (mgtActions) mgtActions.style.display = (room.type !== 'private' && (currentUserRole === 'admin' || room.created_by == currentUserId)) ? 'flex' : 'none';
-            var btnAdd = document.getElementById('btn-add-participant');
-            if (btnAdd) {
-                if (room.type === 'private') btnAdd.style.display = 'none';
-                else if (room.type === 'admin_group') btnAdd.style.display = (currentUserRole === 'admin') ? 'inline-block' : 'none';
-                else btnAdd.style.display = 'inline-block';
-            }
-        }
-        div.onclick = (function(r) { return function() { if (!isUnloading) selectRoomById(r.id_room); }; })(room);
-        container.appendChild(div);
-    }
-}
-function renderUsersRightPanel(users) {
-    if (isUnloading) return;
-    var container = document.getElementById('users-list-right');
-    if (!container) return;
-    container.innerHTML = "";
-    for (var i = 0; i < users.length; i++) {
-        if (users[i].id_user == currentUserId) continue;
-        var div = document.createElement('div');
-        div.className = 'user-item';
-        div.textContent = "• " + users[i].username + (users[i].role === 'admin' ? ' (Админ)' : '');
-        container.appendChild(div);
-    }
-}
-function renderParticipantsList(list) {
-    if (isUnloading) return;
-    var container = document.getElementById('participants-list');
-    if (!container) return;
-    container.innerHTML = "";
-    if (!list || list.length === 0) { container.innerHTML = "<div style='font-size:9px; color:#999;'>Только вы</div>"; return; }
-    for (var i = 0; i < list.length; i++) {
-        var p = list[i];
-        var div = document.createElement('div');
-        div.className = 'participant-item';
-        div.textContent = "• " + p.username;
-        if (currentRoomType !== 'private' && p.id_user != currentUserId && (currentUserRole === 'admin' || currentRoomCreator == currentUserId)) {
-            var btnKick = document.createElement('button');
-            btnKick.className = 'btn-danger-xs';
-            btnKick.textContent = 'Выгнать';
-            (function(targetId) {
-                btnKick.onclick = function() {
-                    if (!isUnloading && confirm("Исключить?")) {
-                        ajax('POST', '/api/remove_from_room', { room_id: currentRoomId, user_id: targetId, admin_id: currentUserId }, function(err, res) {
-                            if (!err && res && res.success) { loadRoomParticipants(currentRoomId); loadRooms(); }
-                        });
-                    }
-                };
-            })(p.id_user);
-            div.appendChild(btnKick);
-        }
-        container.appendChild(div);
-    }
-}
-function sendMessage() {
-    if (isUnloading) return;
-    var text = inputMsg ? inputMsg.value.trim() : "";
-    if (!text || !currentRoomId) return;
-    var finalText = text;
-    try { if (isSecretMode && userSecretKey) finalText = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString(); } catch(e) {}
-    ajax('POST', '/api/send_message', { room_id: currentRoomId, text: finalText, is_secret: isSecretMode, id_user_from: currentUserId, username: currentUserName }, function(err, res) {
-        if (!err && res && res.success) { inputMsg.value = ""; checkNewMessages(); } else showToast("Ошибка отправки", true);
-    });
-}
-function uploadFile(file) {
-    if (isUnloading) return;
-    if (typeof FormData === 'undefined') { showToast("Ваш браузер не поддерживает загрузку файлов", true); return; }
-    var fd = new FormData(); fd.append('file', file);
+    log('AJAX ' + method + ' ' + url);
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/upload', true);
-    xhr.onload = function() {
-        if (xhr.status === 200 && !isUnloading) {
-            try {
-                var data = JSON.parse(xhr.responseText);
-                if (data && data.url && currentRoomId) {
-                    var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                    var absoluteUrl = window.location.protocol + '//' + window.location.host + data.url;
-                    var content = isImg ? '<img src="'+absoluteUrl+'" onclick="window.open(\''+absoluteUrl+'\')" />' : '<a href="#" onclick="downloadFile(\''+data.url+'\', \''+file.name+'\'); return false;" style="color:#2563eb;">📄 '+file.name+'</a>';
-                    ajax('POST', '/api/send_message', { room_id: currentRoomId, text: content, is_secret: false, id_user_from: currentUserId, username: currentUserName }, function(err, res) { if (!err && res && res.success) checkNewMessages(); });
-                    showToast("Файл отправлен");
+    xhr.open(method, url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            log('Ответ ' + url + ': статус ' + xhr.status);
+            if (xhr.status === 200) {
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    log('Данные: ' + JSON.stringify(resp).substring(0, 200));
+                    callback(null, resp);
+                } catch(e) {
+                    log('Ошибка парсинга JSON: ' + e.message);
+                    callback(e, null);
                 }
-            } catch(e) { showToast("Ошибка", true); }
-        } else { showToast('Ошибка', true); }
+            } else {
+                callback(new Error('HTTP ' + xhr.status), null);
+            }
+        }
     };
-    xhr.onerror = function() { showToast('Ошибка сети', true); };
-    xhr.send(fd);
+    xhr.send(data ? JSON.stringify(data) : null);
 }
-function downloadFile(url, filename) { var fullUrl = window.location.protocol + '//' + window.location.host + url; window.open(fullUrl, '_blank'); return false; }
 
-var screenshotModal = document.getElementById('screenshot-modal'), screenshotField = document.getElementById('screenshot-field');
-function openScreenshotModal() { if (screenshotField) screenshotField.value = ""; if (screenshotModal) screenshotModal.style.display = 'flex'; if (screenshotField) screenshotField.focus(); }
-function closeScreenshotModal() { if (screenshotModal) screenshotModal.style.display = 'none'; }
-function sendScreenshot(base64) {
-    if (!currentRoomId) { showToast("Выберите чат", true); return; }
-    var imgHtml = '<img src="'+base64+'" style="max-width:100%; max-height:120px;" onclick="window.open(this.src)" />';
-    ajax('POST', '/api/send_message', { room_id: currentRoomId, text: imgHtml, is_secret: false, id_user_from: currentUserId, username: currentUserName }, function(err, res) { if (!err && res && res.success) { checkNewMessages(); showToast("Скриншот отправлен"); } else showToast("Ошибка", true); });
-}
-if (screenshotField) {
-    screenshotField.onpaste = function() { setTimeout(function() { var val = screenshotField.value; if (val && val.indexOf('data:image') !== -1) { sendScreenshot(val); closeScreenshotModal(); } }, 50); };
-}
-document.getElementById('screenshot-submit-btn').onclick = function() { var val = screenshotField ? screenshotField.value.trim() : ""; if (val) { sendScreenshot(val); closeScreenshotModal(); } else showToast("Вставьте скриншот", true); };
+var currentUserId = null;
+var currentOrgId = '3d933d37-ebc8-11e3-80d5-001cc046e2ac';
 
-function displayMessage(msg, isBulkLoad) {
-    if (isUnloading || !messagesContainer) return;
-    var div = document.createElement('div'); div.className = 'msg-block';
-    var text = msg.encrypted_text || msg.text || "";
-    var author = msg.username || "Сотрудник";
-    if (text.indexOf("SECRET:") === 0) {
-        var cipher = text.replace("SECRET:", "");
-        var uid = 'c_' + Math.random().toString(36).substr(2, 6);
-        text = '<div style="color:#eab308;">🔒 Зашифровано</div><div id="'+uid+'" data-cipher="'+cipher+'">[Скрыто]</div><button class="btn-small" onclick="decryptMsg(\''+uid+'\')">Расшифровать</button>';
+function login(uid, oid, name, role) {
+    log('Вход: ' + uid + ' (' + name + ')');
+    currentUserId = uid;
+    document.getElementById('userLabel').innerHTML = 'Вы вошли как ' + name;
+    ajax('POST', '/api/auth', {
+        id_user: uid,
+        id_org: oid,
+        username: name,
+        role: role
+    }, function(err, res) {
+        if (err) {
+            log('Ошибка авторизации: ' + err.message);
+            return;
+        }
+        log('Авторизация успешна: ' + JSON.stringify(res));
+        // Теперь загружаем комнаты
+        loadRooms();
+        loadUsers();
+    });
+}
+
+function loadRooms() {
+    if (!currentUserId) {
+        log('loadRooms: нет пользователя');
+        return;
     }
-    div.innerHTML = '<span class="msg-author">'+author+'</span><div class="msg-text">'+text+'</div>';
-    messagesContainer.appendChild(div);
-    if (!isBulkLoad) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    log('Запрос комнат для ' + currentUserId);
+    ajax('GET', '/api/rooms?id_org=' + currentOrgId + '&id_user=' + currentUserId, null, function(err, res) {
+        if (err) {
+            log('Ошибка загрузки комнат: ' + err.message);
+            return;
+        }
+        log('Получено комнат: ' + (res.rooms ? res.rooms.length : 0));
+        if (res && res.rooms) {
+            var html = '<h3>Комнаты:</h3>';
+            for (var i = 0; i < res.rooms.length; i++) {
+                var r = res.rooms[i];
+                html += '<div class="room" onclick="selectRoom(' + r.id_room + ')">' + (r.type == 'private' ? '💬' : '👥') + ' ' + r.name + '</div>';
+            }
+            document.getElementById('rooms').innerHTML = html;
+        } else {
+            document.getElementById('rooms').innerHTML = 'Нет комнат или ошибка';
+        }
+    });
 }
-window.decryptMsg = function(id) {
-    var el = document.getElementById(id); if (!el) return;
-    var cipher = el.getAttribute('data-cipher');
-    openSecretModal(function(key) { try { var decrypted = CryptoJS.AES.decrypt(cipher, key).toString(CryptoJS.enc.Utf8); if (decrypted) { el.innerHTML = decrypted; el.style.cssText = "color:#1f2937;"; } else showToast("Неверный ключ", true); } catch(e) { showToast("Ошибка", true); } });
-};
 
-function openUserModal(title, callback) {
-    var titleEl = document.getElementById('modal-action-title'); if (titleEl) titleEl.textContent = title;
-    var dropdown = document.getElementById('modal-user-dropdown'); if (!dropdown) return;
-    dropdown.innerHTML = "";
-    for (var i = 0; i < globalUsersCache.length; i++) { var opt = document.createElement('option'); opt.value = globalUsersCache[i].id_user; opt.textContent = globalUsersCache[i].username; dropdown.appendChild(opt); }
-    document.getElementById('user-select-modal').style.display = 'flex';
-    document.getElementById('modal-submit-btn').onclick = function() { callback(dropdown.value); closeUserModal(); };
+function loadUsers() {
+    ajax('GET', '/api/users?id_org=' + currentOrgId, null, function(err, res) {
+        if (!err && res && res.users) {
+            log('Пользователей: ' + res.users.length);
+        }
+    });
 }
-function closeUserModal() { document.getElementById('user-select-modal').style.display = 'none'; }
-function openSecretModal(callback) { var field = document.getElementById('modal-secret-field'); if (field) field.value = ""; document.getElementById('secret-input-modal').style.display = 'flex'; document.getElementById('secret-modal-submit-btn').onclick = function() { var val = document.getElementById('modal-secret-field').value.trim(); if (val) callback(val); closeSecretModal(); }; }
-function closeSecretModal() { document.getElementById('secret-input-modal').style.display = 'none'; }
-function openTextModal(title, callback) { var titleEl = document.getElementById('text-modal-title'); if (titleEl) titleEl.textContent = title; var field = document.getElementById('modal-text-field'); if (field) field.value = ""; document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { var val = document.getElementById('modal-text-field').value.trim(); if (val) callback(val); closeTextModal(); }; }
-function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-document.getElementById('btn-send').onclick = sendMessage;
-document.getElementById('btn-screenshot').onclick = openScreenshotModal;
-document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) { if (e.target.files && e.target.files[0]) uploadFile(e.target.files[0]); this.value = ""; };
-document.getElementById('btn-add-participant').onclick = function() { if (!currentRoomId) return; openUserModal("Добавить сотрудника", function(uid) { ajax('POST', '/api/add_to_room', { room_id: currentRoomId, user_id: uid, admin_id: currentUserId }, function(err, res) { if (!err && res && res.success) { loadRoomParticipants(currentRoomId); loadRooms(); } }); }); };
-document.getElementById('btn-start-private').onclick = function() { openUserModal("Начать диалог", function(uid) { var target = null; for (var i = 0; i < globalUsersCache.length; i++) { if (globalUsersCache[i].id_user == uid) { target = globalUsersCache[i]; break; } } if (target) { ajax('POST', '/api/create_private_chat', { id_org: currentOrgId, user1_id: currentUserId, user1_name: currentUserName, user2_id: target.id_user, user2_name: target.username }, function(err, res) { if (!err && res && res.room_id) { loadRooms(); selectRoomById(res.room_id); } }); } }); };
-document.getElementById('btn-create-group').onclick = function() { openTextModal("Название кабинета", function(name) { ajax('POST', '/api/create_group', { id_org: currentOrgId, name: name, created_by: currentUserId, creator_name: currentUserName, is_admin: (currentUserRole === 'admin') }, function(err, res) { if (!err && res && res.room_id) { loadRooms(); selectRoomById(res.room_id); } }); }); };
-document.getElementById('btn-secret').onclick = function() { if (!isSecretMode) { openSecretModal(function(key) { userSecretKey = key; isSecretMode = true; document.getElementById('btn-secret').className = 'btn-secret active'; showToast("Шифрование включено"); }); } else { isSecretMode = false; userSecretKey = ""; document.getElementById('btn-secret').className = 'btn-secret'; showToast("Шифрование выключено"); } };
-function triggerDeleteRoom() { if (!currentRoomId || !confirm("Удалить кабинет?")) return; ajax('POST', '/api/delete_room', { room_id: currentRoomId, admin_id: currentUserId }, function(err, res) { if (!err && res && res.success) { if (messagesContainer) messagesContainer.innerHTML = ""; document.getElementById('current-chat-title').textContent = "Выберите чат"; document.getElementById('chat-management-actions').style.display = 'none'; currentRoomId = null; loadRooms(); } }); }
-function triggerArchive() { if (!currentRoomId || !confirm("Выгрузить историю?")) return; ajax('POST', '/api/archive_room', { room_id: currentRoomId, admin_id: currentUserId }, function(err, res) { if (!err && res && res.archive_data) { var jsonStr = JSON.stringify(res.archive_data, null, 2); var blob = new Blob([jsonStr], {type: "application/json"}); if (window.navigator && window.navigator.msSaveOrOpenBlob) { window.navigator.msSaveOrOpenBlob(blob, "archive_room_" + currentRoomId + ".json"); } else { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "archive_room_" + currentRoomId + ".json"; document.body.appendChild(a); a.click(); setTimeout(function() { if (a.parentNode) a.parentNode.removeChild(a); }, 100); } loadRoomHistory(currentRoomId); showToast("История выгружена"); } }); }
-if (inputMsg) { inputMsg.onkeydown = function(e) { var ev = e || window.event; if (ev && ev.keyCode === 13 && !ev.shiftKey) { ev.preventDefault(); ev.returnValue = false; sendMessage(); return false; } }; }
-ajax('GET', '/api/admin/settings', null, function(err, settings) { if (!err && settings && settings.theme_primary_color && settings.theme_primary_color.value) { var header = document.querySelector('.header'); if (header) header.style.backgroundColor = settings.theme_primary_color.value; var sendBtn = document.getElementById('btn-send'); if (sendBtn) sendBtn.style.backgroundColor = settings.theme_primary_color.value; } });
-window.onload = function() { var hash = window.location.hash; if (hash && hash.length > 1) { var parts = decodeURIComponent(hash.substring(1)).split("---"); if (parts.length >= 3) applyAuth(parts[0], parts[1], parts[2], parts[3] || 'user'); } };
+function selectRoom(roomId) {
+    log('Выбрана комната ' + roomId);
+    alert('Выбрана комната ' + roomId);
+}
 </script>
 </body>
 </html>
