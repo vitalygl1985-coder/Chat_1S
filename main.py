@@ -215,34 +215,51 @@ async def upload_file(file: UploadFile = File(...)):
 # ИСПРАВЛЕНО: правильный Content-Disposition для IE/1С
 @app.get("/download/{file_uuid}")
 async def download_file(file_uuid: str):
-    # Ищем файл в папке
-    for filename in os.listdir(UPLOAD_DIR):
-        if filename.startswith(file_uuid):
-            file_path = os.path.join(UPLOAD_DIR, filename)
+    # Проверяем физическое существование файла на диске Railway
+    file_found = False
+    target_filename = ""
+    
+    if os.path.exists(UPLOAD_DIR):
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.startswith(file_uuid):
+                target_filename = filename
+                file_found = True
+                break
+                
+    if file_found:
+        file_path = os.path.join(UPLOAD_DIR, target_filename)
+        
+        # Получаем оригинальное имя
+        mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+        original_name = None
+        if os.path.exists(mapping_file):
+            with open(mapping_file, "r", encoding="utf-8") as f:
+                file_map = json.load(f)
+                original_name = file_map.get(file_uuid)
+        
+        if not original_name:
+            original_name = target_filename
             
-            # Получаем оригинальное имя из маппинга
-            mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
-            original_name = None
-            if os.path.exists(mapping_file):
-                with open(mapping_file, "r", encoding="utf-8") as f:
-                    file_map = json.load(f)
-                    original_name = file_map.get(file_uuid)
-            
-            if not original_name:
-                original_name = filename.split("_", 1)[-1] if "_" in filename else filename
-            
-            # Кодируем имя файла для IE
-            encoded_name = urllib.parse.quote(original_name)
-            
-            # Возвращаем с правильными заголовками для принудительного скачивания
-            return FileResponse(
-                file_path,
-                media_type='application/octet-stream',
-                headers={
-                    'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\'{encoded_name}'
-                }
-            )
-    raise HTTPException(status_code=404, detail="Файл не найден")
+        encoded_name = urllib.parse.quote(original_name)
+        
+        return FileResponse(
+            file_path,
+            media_type='application/force-download',
+            headers={
+                'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\' {encoded_name}'
+            }
+        )
+    
+    # ИСПРАВЛЕНО: Если файл не найден, вместо жесткого 404 возвращаем JS, который тихо закроет всплывающее окно
+    html_content = """
+    <html>
+    <script>
+        alert("Упс! Данный файл не найден на сервере или был удален в архив.");
+        window.close();
+    </script>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
 
 @app.get("/api/admin/settings")
 async def get_admin_settings():

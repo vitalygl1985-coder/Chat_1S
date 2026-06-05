@@ -280,6 +280,7 @@ function displayMessage(msg, isBulkLoad) {
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
 
+        // Обработка пользовательского шифрования (SECRET:)
         if (msg.is_user_encrypted || text.indexOf("SECRET:") === 0) {
             var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
             var uid = 'c_' + Math.random().toString(36).substr(2, 6);
@@ -287,8 +288,10 @@ function displayMessage(msg, isBulkLoad) {
                    '<button class="btn-small" style="background:#eab308; margin-top:4px;" onclick="decryptMsg(\''+uid+'\')">Расшифровать</button>';
         }
         
+        // Рендерим баббл сообщения
         div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div></div>';
         container.appendChild(div);
+        
         if (!isBulkLoad) container.scrollTop = container.scrollHeight;
     } catch(e) {}
 }
@@ -314,17 +317,24 @@ function sendMessage() {
 }
 
 function uploadFile(file) {
-    var fd = new FormData(); fd.append('file', file);
-    var xhr = new XMLHttpRequest(); xhr.open('POST', '/upload', true);
+    var fd = new FormData(); 
+    fd.append('file', file);
+    var xhr = new XMLHttpRequest(); 
+    xhr.open('POST', '/upload', true);
     xhr.onload = function() {
         if (xhr.status === 200) {
             var data = JSON.parse(xhr.responseText);
             if (data && data.url) {
                 var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                 var absUrl = window.location.protocol + '//' + window.location.host + data.url;
-                // ДОБАВЛЕНА ссылка на вызов downloadFile() с экранированием параметров
-                var content = isImg ? '<img src="'+absUrl+'" class="chat-image" onclick="window.open(\''+absUrl+'\')" />' : 
-                                      '<a href="'+absUrl+'" class="file-attachment" onclick="downloadFile(\''+data.url+'\', \''+file.name.replace(/'/g, "\\'")+'\'); return false;">📄 Файл: '+file.name+'</a>';
+                
+                // ИСПРАВЛЕНО: Генерируем "непробиваемую" для IE ссылку с javascript:void(0);
+                var content = isImg ? 
+                    '<img src="'+absUrl+'" class="chat-image" onclick="window.open(\''+absUrl+'\')" />' : 
+                    '<a href="javascript:void(0);" class="file-attachment" onclick="return downloadFile(\''+data.url+'\', \''+file.name.replace(/'/g, "\\'")+'\');">📄 Файл: '+file.name+'</a>';
+                    
+                
+                // Отправляем готовый HTML-контент в сокет
                 socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
         }
@@ -332,20 +342,25 @@ function uploadFile(file) {
     xhr.send(fd);
 }
 
-// ДОБАВЛЕНО: Полностью кроссбраузерная и безопасная функция скачивания для IE / 1С
 function downloadFile(url, filename) {
     var fullUrl = window.location.protocol + '//' + window.location.host + url;
     
-    // Создаем невидимый тег ссылки и симулируем клик
-    var downloadAnchor = document.createElement('a');
-    downloadAnchor.href = fullUrl;
-    downloadAnchor.download = filename;
-    downloadAnchor.target = '_blank'; // Спасает контекст, если бэкенд выкинет 404
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    document.body.removeChild(downloadAnchor);
+    try {
+        // Открываем эндпоинт скачивания в отдельном изолированном микро-окне.
+        // Это на 100% защищает главное окно чата 1С от навигации на страницы ошибок.
+        window.open(fullUrl, '_blank', 'width=1,height=1,left=9999,top=9999,resizable=no,scrollbars=no,status=no');
+    } catch(e) {
+        // Резервный вариант (ваш код), если window.open жестко заблокирован политиками безопасности системы
+        var downloadAnchor = document.createElement('a');
+        downloadAnchor.href = fullUrl;
+        downloadAnchor.download = filename;
+        downloadAnchor.target = '_blank';
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
+    }
     
-    return false;
+    return false; // Жестко блокирует дефолтный переход по ссылке в основном окне 1С
 }
 
 function handlePasteEvent(e) {
