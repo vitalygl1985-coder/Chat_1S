@@ -1,51 +1,83 @@
-/* Красивые бабблы сообщений */
-.message {
-    display: flex;
-    margin-bottom: 12px;
-    animation: fadeIn 0.2s ease;
-}
+/* Базовые настройки и макет, адаптированные для встроенного браузера 1С */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", Arial, sans-serif; }
+body { height: 100vh; display: flex; flex-direction: column; background-color: #f3f4f6; overflow: hidden; }
+
+/* Шапка чата */
+.header { background-color: #2563eb; color: white; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.header h1 { font-size: 15px; font-weight: 600; }
+.header-controls { display: flex; align-items: center; gap: 15px; }
+.user-info { font-size: 13px; font-weight: bold; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; }
+
+/* Основной контейнер */
+.main-container { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 45px); }
+
+/* Боковая панель (Список кабинетов) */
+.sidebar { width: 240px; background-color: #ffffff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+.sidebar-section { padding: 12px; flex: 1; overflow-y: auto; }
+.sidebar-section h3 { font-size: 12px; text-transform: uppercase; color: #6b7280; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.room-item { padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; font-size: 13px; color: #374151; transition: background 0.2s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-item:hover { background-color: #f3f4f6; }
+.room-item.active { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
+
+/* Основное окно чата */
+.chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
+.chat-header { padding: 14px 16px; background-color: #ffffff; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+#current-chat-title { font-size: 14px; font-weight: bold; color: #111827; }
+.chat-actions { display: flex; gap: 6px; }
+
+/* Контейнер сообщений */
+.messages-container { flex: 1; padding: 16px; overflow-y: auto; background-color: #f3f4f6; }
+
+/* КРАСИВЫЕ БАББЛЫ СООБЩЕНИЙ (Как в Telegram/WhatsApp) */
+.message { display: flex; margin-bottom: 10px; animation: fadeIn 0.15s ease; }
 .message.my { justify-content: flex-end; }
-.message-content {
-    max-width: 70%;
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: #ffffff;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-.message.my .message-content {
-    background: #d9fdd3; /* Светло-зеленый как в WhatsApp */
-}
+.message-content { max-width: 65%; padding: 8px 12px; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.08); position: relative; }
+.message.my .message-content { background: #d9fdd3; border-top-right-radius: 2px; }
+.message:not(.my) .message-content { border-top-left-radius: 2px; }
+.msg-author { display: block; font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 3px; }
+.message.my .msg-author { color: #1e88e5; text-align: right; }
+.msg-text { font-size: 13px; color: #111827; line-height: 1.4; word-wrap: break-word; }
 
-/* Статусы пользователей "В сети" */
-.user-row { display: flex; align-items: center; padding: 8px; position: relative; }
-.avatar { width: 36px; height: 36px; border-radius: 50%; background: #ccc; position: relative; }
-.status-online {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 10px;
-    height: 10px;
-    background-color: #22c55e; /* Зеленый круг */
-    border: 2px solid white;
-    border-radius: 50%;
-}
+/* Скриншоты и вложения */
+.chat-image { max-width: 100%; max-height: 220px; border-radius: 6px; cursor: pointer; margin-top: 5px; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.file-attachment { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #2563eb; font-size: 12px; font-weight: bold; margin-top: 5px; border: 1px solid rgba(0,0,0,0.08); }
+.file-attachment:hover { background: rgba(0,0,0,0.08); }
 
-/* Инлайновые скриншоты и файлы */
-.chat-image {
-    max-width: 250px;
-    border-radius: 8px;
-    cursor: pointer;
-    margin-top: 5px;
-    transition: transform 0.2s;
-}
-.chat-image:hover { transform: scale(1.02); }
-.file-attachment {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(0,0,0,0.05);
-    padding: 8px;
-    border-radius: 6px;
-    text-decoration: none;
-    color: #2563eb;
-}
+/* Панель ввода */
+.input-panel { padding: 12px; background-color: #ffffff; border-top: 1px solid #e5e7eb; }
+.secret-row { display: flex; margin-bottom: 8px; }
+.controls-row { display: flex; align-items: center; gap: 8px; }
+.input-msg-div { flex: 1; min-height: 36px; max-height: 100px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; outline: none; background: #f9fafb; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+.input-msg-div:focus { border-color: #2563eb; background: #ffffff; }
+
+/* Правая панель (Сотрудники и Статусы "В сети") */
+.participants-panel { width: 220px; background-color: #ffffff; border-left: 1px solid #e5e7eb; padding: 12px; display: flex; flex-direction: column; }
+.participants-panel h3 { font-size: 12px; text-transform: uppercase; color: #6b7280; margin: 15px 0 8px 0; }
+.participants-panel h3:first-child { margin-top: 0; }
+#participants-list, #users-list-right { flex: 1; overflow-y: auto; font-size: 13px; }
+
+/* Строки пользователей и Аватарки со статусом */
+.user-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 6px; position: relative; margin-bottom: 2px; }
+.avatar-container { position: relative; width: 28px; height: 28px; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; }
+.status-online { position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; background-color: #22c55e; border: 1.5px solid white; border-radius: 50%; display: none; }
+.user-row.online .status-online { display: block; }
+.user-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #374151; }
+
+/* Кнопки и интерактивные элементы */
+button, .btn-small { padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; background-color: #2563eb; }
+button:hover, .btn-small:hover { opacity: 0.9; }
+.btn-send { padding: 8px 16px; font-size: 13px; background-color: #2563eb; border-radius: 8px; }
+.btn-file { padding: 8px 12px; font-size: 15px; background-color: #f3f4f6; color: #4b5563; border-radius: 8px; border: 1px solid #d1d5db; }
+.btn-secret { background-color: #ef4444; padding: 3px 8px; border-radius: 4px; font-size: 11px; }
+.btn-secret.active { background-color: #22c55e; }
+.btn-danger-xs { background-color: #ef4444; font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-left: auto; }
+
+/* Модальные окна */
+.modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal-body { background:white; padding:16px; border-radius:12px; width:280px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.modal-body h4 { font-size:13px; margin-bottom:10px; color:#111827; }
+.modal-body select, .modal-body input { width:100%; padding:6px; margin-bottom:12px; border:1px solid #d1d5db; border-radius:6px; font-size:12px; }
+.modal-buttons { display:flex; justify-content:flex-end; gap:6px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
