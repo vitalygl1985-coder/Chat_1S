@@ -130,6 +130,10 @@ function selectRoomById(roomId) {
     socket.emit('get_room_history', { room_id: roomId });
     socket.emit('get_room_participants', { room_id: roomId });
     socket.emit('get_rooms_again');
+
+    // ДОБАВЛЕНО: Сигнализируем в 1С о смене комнаты
+    // Браузер поймет это не как переход на сайт, а как внутреннюю команду
+    window.location.href = "v8:room_changed---" + roomId;
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
