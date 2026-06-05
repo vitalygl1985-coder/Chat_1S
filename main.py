@@ -722,13 +722,20 @@ async def onec_upload_base64(data: Base64ImageRequest):
 
 @sio.event
 async def connect(sid, environ, auth=None):
+    # ЗАМЕНИТЕ НА ЭТОТ ВАРИАНТ:
     query_params = environ.get('QUERY_STRING', '')
-    params = dict(x.split('=') for x in query_params.split('&') if '=' in x)
-    
-    id_user = urllib.parse.unquote(params.get('id_user', ''))
-    id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
-    username = urllib.parse.unquote(params.get('username', ''))
-    user_role = urllib.parse.unquote(params.get('role', 'user'))
+    params = {}
+    if query_params:
+        for pair in query_params.split('&'):
+            if '=' in pair:
+                k, v = pair.split('=', 1)
+                # Декодируем каждый параметр от %D0%91 и знаков плюс/пробелов
+                params[k] = urllib.parse.unquote(v.replace('+', ' '))
+
+    id_user = params.get('id_user', '')
+    id_org = clean_uuid(params.get('id_org', ''))
+    username = params.get('username', '')
+    user_role = params.get('role', 'user')
 
     if not id_user:
         return False 
