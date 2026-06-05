@@ -96,7 +96,7 @@
 </div>
 
 <div class="modal-overlay" id="base64-image-modal">
-    <div class="modal-body" style="width: 380px;">
+    <div class="modal-body" style="width: 390px;">
         <h4>📋 Вставка скриншота (Base64)</h4>
         <p style="font-size: 11px; color:#6b7280; margin-bottom: 6px;">Вставьте base64-код скриншота в поле ниже:</p>
         <textarea id="modal-base64-field" rows="8" style="width:100%; font-family:monospace; font-size:11px; border:1px solid #d1d5db; padding:6px; border-radius:6px;" placeholder="Вставьте код (начинается на iVBORw0KGgo...)"></textarea>
@@ -340,7 +340,6 @@ function downloadFile(url, filename) {
     return false;
 }
 
-// Отправка скриншота base64 на выделенный REST-эндпоинт
 function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket || !rawInputString) return;
     
@@ -408,30 +407,29 @@ document.getElementById('btn-file').onclick = function() { document.getElementBy
 document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); };
 if (inputMsg) { inputMsg.onkeydown = function(e) { if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { e.preventDefault(); sendMessage(); } }; }
 
-function getQueryParam(paramName) {
-    var searchString = window.location.search.substring(1);
-    var params = searchString.split("&");
-    for (var i = 0; i < params.length; i++) {
-        var pair = params[i].split("=");
-        if (pair[0] == paramName) { return decodeURIComponent(pair[1].replace(/\+/g, " ")); }
-    }
-    return null;
-}
-
-function parseUrlAndAuthorize() {
+// ИСПРАВЛЕНО: Чтение хэша с авто-перезагрузкой при смене сессии 1С
+function parseHashAndAuthorize() {
     try {
-        var id_user  = getQueryParam('id_user');
-        var id_org   = getQueryParam('id_org');
-        var username = getQueryParam('username');
-        var role     = getQueryParam('role') || 'user';
-        
-        if (id_user && id_org && username) {
-            apply1CAuth(id_user, id_org, username, role);
+        var hash = window.location.hash;
+        if (hash && hash.length > 1) {
+            var cleanHash = decodeURIComponent(hash.substring(1));
+            var p = cleanHash.split("---");
+            if (p && p.length >= 3) {
+                
+                // Если форма 1С передала другого пользователя — жестко чистим память IE
+                if (currentUserId && currentUserId !== p[0]) {
+                    window.location.reload(true);
+                    return;
+                }
+                
+                apply1CAuth(p[0], p[1], p[2], p[3] || 'user');
+            }
         }
     } catch(e) {}
 }
 
-window.onload = parseUrlAndAuthorize;
+window.onload = parseHashAndAuthorize;
+window.onhashchange = parseHashAndAuthorize; // Перехватывает изменение соли времени
 </script>
 </body>
 </html>
