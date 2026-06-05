@@ -220,8 +220,6 @@ async def auth_user(data: AuthRequest):
         cur.close()
         conn.close()
 
-# ========== API КОМНАТ ==========
-
 @app.get("/api/rooms")
 async def get_rooms(id_org: str, id_user: str):
     conn = get_db_connection()
@@ -229,22 +227,28 @@ async def get_rooms(id_org: str, id_user: str):
     try:
         validated_org = clean_uuid(id_org)
         cur.execute("""
-            SELECT DISTINCT r.id_room, r.name, r.type, r.created_by
+            SELECT DISTINCT 
+                r.id_room, 
+                r.name, 
+                r.type, 
+                r.created_by,
+                CASE WHEN r.type = 'admin_group' THEN 0 ELSE 1 END as sort_order
             FROM rooms r
             INNER JOIN room_participants rp ON r.id_room = rp.id_room
             WHERE r.id_org = %s::uuid AND rp.id_user = %s
-            ORDER BY 
-                CASE WHEN r.type = 'admin_group' THEN 0 ELSE 1 END,
-                r.name ASC
+            ORDER BY sort_order, r.name ASC
         """, (validated_org, id_user))
         rooms = cur.fetchall()
+        # Убираем вспомогательное поле из ответа, если не нужно
+        for room in rooms:
+            del room['sort_order']
         return {"rooms": rooms}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         cur.close()
         conn.close()
-
+        
 @app.get("/api/users")
 async def get_users(id_org: str):
     conn = get_db_connection()
