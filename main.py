@@ -11,8 +11,11 @@ from typing import Optional
 import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
+from fastapi.staticfiles import StaticFiles
+ 
 app = FastAPI()
+
+app.mount("/style.css", StaticFiles(file_shape="style.css", html=True), name="style")
 
 app.add_middleware(
     CORSMiddleware,
