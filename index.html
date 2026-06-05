@@ -822,9 +822,13 @@ ajax('GET', '/api/admin/settings', null, function(err, settings) {
 // Автовход из хэша
 window.onload = function() {
     var hash = window.location.hash;
+    console.log("hash:", hash);
     if (hash && hash.length > 1) {
         var parts = decodeURIComponent(hash.substring(1)).split("---");
-        if (parts.length >= 3) applyAuth(parts[0], parts[1], parts[2], parts[3] || 'user');
+        console.log("parts:", parts);
+        if (parts.length >= 3) {
+            applyAuth(parts[0], parts[1], parts[2], parts[3] || 'user');
+        }
     }
 };
 window.authorizeFrom1C = function(id_user, id_org, username, role) {
