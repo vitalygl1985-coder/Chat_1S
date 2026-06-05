@@ -15,7 +15,9 @@ from fastapi.staticfiles import StaticFiles
  
 app = FastAPI()
 
-app.mount("/style.css", StaticFiles(file_shape="style.css", html=True), name="style")
+@app.get("/style.css")
+async def get_style():
+    return FileResponse("style.css", media_type="text/css")
 
 app.add_middleware(
     CORSMiddleware,
