@@ -118,11 +118,8 @@ function selectRoomById(roomId) {
     socket.emit('get_room_history', { room_id: roomId });
     socket.emit('get_room_participants', { room_id: roomId });
     socket.emit('get_rooms_again');
-
-    // ИСПРАВЛЕНО: Безопасное уведомление 1С через строку состояния браузера.
-    // Этот метод мгновенно передает данные в 1С 8.3.5, не трогает ссылки 
-    // и гарантирует, что страница НИКОГДА не отвалится в "Не удается отобразить страницу"!
-    window.status = "room_changed---" + roomId;
+    
+    // МЫ ПОЛНОСТЬЮ УБРАЛИ ОТСЮДА СВЯЗЬ С 1С, ЧТОБЫ СТРАНИЦА НЕ ОТВАЛИВАЛАСЬ!
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
@@ -333,7 +330,7 @@ function downloadFile(url, filename) {
     return false;
 }
 
-// 100% КРОССБРАУЗЕРНЫЙ ОБРАБОТЧИК СКРИНШОТОВ BASE64 ДЛЯ 1С 8.3.5
+// СТАБИЛЬНАЯ ОТПРАВКА СКРИНШОТА ИЗ БУФЕРА ОБМЕНА ДЛЯ 1С 8.3.5
 function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket || !rawInputString) return;
     
@@ -363,39 +360,31 @@ function uploadBase64Image(rawInputString) {
     }));
 }
 
-// ИСПРАВЛЕНО: Автоматический перехват вставки скриншота из буфера Windows
 function handlePasteEvent(e) {
     if (!currentRoomId) return true;
     
-    // 1. Попытка современного метода чтения буфера
-    var cbd = e.clipboardData || window.clipboardData;
-    if (cbd && cbd.items) {
-        for (var i = 0; i < cbd.items.length; i++) {
-            if (cbd.items[i].type.indexOf('image') !== -1) {
-                var file = cbd.items[i].getAsFile();
-                if (file) { uploadFile(file); e.preventDefault(); return false; }
-            }
-        }
-    }
-    
-    // 2. Специфический обход для Internet Explorer / 1С 8.3.5:
-    // Мы даем браузеру вставить картинку в contenteditable, а через 50 миллисекунд вытаскиваем ее Base64 код
+    // Безопасный перехват картинок, вставленных движком Trident (IE) в поле ввода
     setTimeout(function() {
-        var imgs = inputMsg.getElementsByTagName('img');
-        if (imgs && imgs.length > 0) {
-            var base64Src = imgs[0].src;
-            if (base64Src.indexOf("data:image") === 0) {
-                uploadBase64Image(base64Src); // Отправляем на сервер
-                imgs[0].parentNode.removeChild(imgs[0]); // Удаляем временную картинку из поля ввода
+        try {
+            var imgs = inputMsg.getElementsByTagName('img');
+            if (imgs && imgs.length > 0) {
+                var base64Src = imgs[0].src;
+                if (base64Src && base64Src.indexOf("data:image") === 0) {
+                    uploadBase64Image(base64Src); // Отправляем в чат
+                }
+                inputMsg.innerHTML = ""; // ИСПРАВЛЕНО: Безопасное и мягкое очищение поля ввода без removeChild
             }
-        }
-    }, 50);
+        } catch(err) {}
+    }, 20);
+    
     return true;
 }
 
-// Привязываем обработчик ко всему документу и полю ввода
+// Привязываем события вставки
+if (inputMsg) {
+    inputMsg.onpaste = handlePasteEvent;
+}
 window.onpaste = handlePasteEvent;
-if (inputMsg) { inputMsg.onpaste = handlePasteEvent; }
 
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;
@@ -410,11 +399,9 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-// ИСПРАВЛЕНО: Кнопка «Вставить скриншот» теперь просто эмулирует фокус и подсказывает пользователю
 document.getElementById('btn-paste-screen').onclick = function() {
     if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
     inputMsg.focus();
-    alert("Поставьте курсор в поле ввода сообщения и нажмите Ctrl + V для автоматической отправки скриншота!");
 };
 
 document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
