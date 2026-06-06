@@ -118,9 +118,15 @@ function selectRoomById(roomId) {
     socket.emit('get_room_history', { room_id: roomId });
     socket.emit('get_room_participants', { room_id: roomId });
     socket.emit('get_rooms_again');
-    
-    // Передаем ИД в 1С при клике на комнату
-    window.location.href = "v8:room_changed---" + roomId;
+
+    // ИСПРАВЛЕНО: Безопасная передача данных в 1С 8.3.5 без изменения URL страницы
+    try {
+        if (window.external && window.external.SelectRoom) {
+            window.external.SelectRoom(roomId);
+        }
+    } catch(e) {
+        console.log("Обычный браузер, игнорируем вызов 1С");
+    }
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
