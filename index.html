@@ -402,33 +402,12 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-document.getElementById('btn-paste-screen').onclick = async function() {
-    if (!currentRoomId) { alert("Выберите кабинет!"); return; }
-    try {
-        // Захватываем поток экрана/окна
-        var stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        var video = document.createElement('video');
-        video.srcObject = stream;
-        video.play();
-        
-        video.onloadedmetadata = function() {
-            setTimeout(function() {
-                var canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                var ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                var base64 = canvas.toDataURL('image/png');
-                uploadBase64Image(base64); // Отправляем скриншот!
-                
-                // Закрываем камеру/поток
-                stream.getTracks().forEach(track => track.stop());
-            }, 500); // Даем полсекунды на стабилизацию кадра
-        };
-    } catch(err) {
-        alert("Запуск захвата экрана отменен или не поддерживается.");
+document.getElementById('btn-paste-screen').onclick = function() {
+    if (!currentRoomId) { 
+        alert("Выберите кабинет перед отправкой скриншота!"); 
+        return; 
     }
+    inputMsg.focus();
 };
 document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
 document.getElementById('btn-create-group').onclick = function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); };
