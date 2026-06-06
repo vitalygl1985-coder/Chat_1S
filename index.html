@@ -209,29 +209,33 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         var downloadBox = document.createElement('div');
         downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
         downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>' +
-                                '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>';
+                                '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>' +
+                                '<input type="hidden" id="hidden-archive-link" value="" />'; // Невидимый буфер обмена для 1С
         
         container.innerHTML = "";
         container.appendChild(downloadBox);
         
         document.getElementById('btn-save-1c-archive').onclick = function(e) {
-            // Жестко блокируем любую попытку браузера перезагрузить или сменить страницу
             if (e && e.preventDefault) e.preventDefault();
             if (window.event) window.event.returnValue = false;
             
-            // ИСПРАВЛЕНО: Передаем данные через эмуляцию клика по невидимому элементу.
-            // Это гарантирует, что 1С поймает событие ПриНажатии, но сам браузер никуда не перейдет!
-            var hiddenLink = document.createElement('a');
-            hiddenLink.href = "v8:save_archive---" + data.url;
-            hiddenLink.style.display = "none";
-            document.body.appendChild(hiddenLink);
-            hiddenLink.click();
-            document.body.removeChild(hiddenLink);
+            // Записываем относительный путь к файлу в скрытый инпут
+            var bufferInput = document.getElementById('hidden-archive-link');
+            if (bufferInput) {
+                bufferInput.value = data.url;
+            }
+            
+            // Визуально меняем состояние кнопки
+            var btn = document.getElementById('btn-save-1c-archive');
+            if (btn) {
+                btn.innerText = "ПЕРЕДАЧА В 1С...";
+                btn.style.background = "#9ca3af";
+                btn.disabled = true;
+            }
             
             return false;
         };
     });
-}
 
 function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
