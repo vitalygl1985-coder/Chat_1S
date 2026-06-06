@@ -260,6 +260,9 @@ function displayMessage(msg, isBulkLoad) {
         var isMyMessage = (msg.id_user_from == currentUserId);
         var div = document.createElement('div');
         div.className = 'message' + (isMyMessage ? ' my' : '');
+        // ДОБАВЛЯЕМ АТРИБУТЫ ДЛЯ КОНТЕКСТНОГО МЕНЮ:
+        div.setAttribute('data-msg-id', msg.id_message || msg.id); 
+        div.setAttribute('data-author-id', msg.id_user_from);
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
 
@@ -399,11 +402,34 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-document.getElementById('btn-paste-screen').onclick = function() {
-    if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
-    inputMsg.focus();
+document.getElementById('btn-paste-screen').onclick = async function() {
+    if (!currentRoomId) { alert("Выберите кабинет!"); return; }
+    try {
+        // Захватываем поток экрана/окна
+        var stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        var video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+        
+        video.onloadedmetadata = function() {
+            setTimeout(function() {
+                var canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                var base64 = canvas.toDataURL('image/png');
+                uploadBase64Image(base64); // Отправляем скриншот!
+                
+                // Закрываем камеру/поток
+                stream.getTracks().forEach(track => track.stop());
+            }, 500); // Даем полсекунды на стабилизацию кадра
+        };
+    } catch(err) {
+        alert("Запуск захвата экрана отменен или не поддерживается.");
+    }
 };
-
 document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
 document.getElementById('btn-create-group').onclick = function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); };
 document.getElementById('btn-secret').onclick = function() {
@@ -434,6 +460,73 @@ function parseHashAndAuthorize() {
 
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
+
+// ДОБАВИТЬ В КОД index.html (внутри тега <script>)
+
+function triggerDeleteRoom() {
+    if (!currentRoomId) return;
+    if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
+        // Сервер проверит роль (admin) или создателя (created_by) перед удалением в БД
+        socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUserId });
+    }
+}
+
+function triggerArchive() {
+    if (!currentRoomId) return;
+    if (confirm("Перенести всю переписку кабинета в архивный файл и очистить текущий чат?")) {
+        socket.emit('archive_room_messages', { room_id: currentRoomId, user_id: currentUserId });
+    }
+}
+
+var selectedMessageIdForCtx = null;
+
+// Перехватываем клик правой кнопкой мыши по контейнеру сообщений
+document.getElementById('messages-container').oncontextmenu = function(e) {
+    e = e || window.event;
+    var target = e.target || e.srcElement;
+    
+    // Ищем родительский элемент сообщения, у которого должен быть ID или атрибут данных
+    var msgDiv = target.closest('.message');
+    if (!msgDiv) return true; // Если кликнули не по сообщению, показываем стандартное меню IE
+    
+    // ВАЖНО: При генерации сообщений в функции displayMessage(msg) 
+    // мы должны привязывать ID сообщения, например: div.setAttribute('data-msg-id', msg.id_message);
+    selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
+    var authorId = msgDiv.getAttribute('data-author-id');
+    
+    // Разрешаем удалять только свои сообщения или если пользователь - админ
+    if (currentUserRole === 'admin' || authorId === currentUserId) {
+        e.preventDefault(); // Блокируем стандартное меню IE
+        
+        var menu = document.getElementById('custom-context-menu');
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.style.display = 'block';
+        return false;
+    }
+};
+
+// Закрываем меню при клике в любом другом месте
+document.onclick = function() {
+    document.getElementById('custom-context-menu').style.display = 'none';
+};
+
+// Обработчик нажатия на кнопку "Удалить" в меню
+document.getElementById('ctx-delete-msg').onclick = function() {
+    if (selectedMessageIdForCtx) {
+        if (confirm("Удалить это сообщение для всех участников?")) {
+            socket.emit('delete_message_request', { 
+                message_id: selectedMessageIdForCtx, 
+                room_id: currentRoomId,
+                user_id: currentUserId 
+            });
+        }
+    }
+};
+
 </script>
+<div id="custom-context-menu" class="context-menu" style="display:none; position:fixed; z-index:10000; background:#ffffff; border:1px solid #d1d5db; border-radius:6px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); padding:4px 0; width:150px;">
+    <div id="ctx-delete-msg" style="padding:6px 12px; font-size:12px; color:#ef4444; cursor:pointer;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">❌ Удалить сообщение</div>
+</div>
 </body>
 </html>
