@@ -198,20 +198,23 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
+    // ИСПРАВЛЕНО: Передаем только UUID готового файла архива в 1С, чтобы избежать падения на длинных строках
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
-        try {
-            var fullUrl = window.location.protocol + '//' + window.location.host + data.url;
-            var container = document.getElementById('messages-container');
-            var downloadBox = document.createElement('div');
-            downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
-            
-            downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки готов!</b>' +
-                                    '<a href="' + fullUrl + '" target="_blank" style="background:#eab308; color:#fff; padding:6px 12px; border-radius:4px; text-decoration:none; font-weight:bold; display:inline-block;">📥 СКАЧАТЬ АРХИВНЫЙ ФАЙЛ</a>';
-            
-            container.innerHTML = "";
-            container.appendChild(downloadBox);
-        } catch(e) {}
+        
+        var container = document.getElementById('messages-container');
+        var downloadBox = document.createElement('div');
+        downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
+        downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>' +
+                                '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>';
+        
+        container.innerHTML = "";
+        container.appendChild(downloadBox);
+        
+        document.getElementById('btn-save-1c-archive').onclick = function() {
+            // Передаем в 1С только относительный путь к файлу
+            window.location.href = "v8:save_archive---" + data.url;
+        };
     });
 }
 
@@ -222,8 +225,6 @@ function renderRoomsList(rooms) {
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         
-        // ИСПРАВЛЕНО: Если это приватный чат, и имя совпадает с именем текущего пользователя (он один там остался),
-        // то мы его вообще СБРАСЫВАЕМ и не рисуем в списке комнат!
         if (room.type === 'private' && room.name.trim() === document.getElementById('user-info').innerText.replace(' 👑', '').trim()) {
             continue;
         }
@@ -476,20 +477,20 @@ function triggerArchive() {
     }
 }
 
-// ИСПРАВЛЕНО: Полное устранение ES6-синтаксиса (убраны => функции и жесткие замыкания)
-document.getElementById('messages-container').oncontextmenu = function(e) {
+// ИСПРАВЛЕНО: Радикальный перехват и блокировка нативного меню ПКМ для 1С (Trident)
+document.oncontextmenu = function(e) {
     e = e || window.event;
     var target = e.target || e.srcElement;
     
     var msgDiv = target;
-    while (msgDiv && msgDiv !== this) {
+    while (msgDiv && msgDiv !== document.body) {
         if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
             break;
         }
         msgDiv = msgDiv.parentNode;
     }
     
-    if (!msgDiv || msgDiv === this) return true; 
+    if (!msgDiv || msgDiv === document.body) return true; 
     
     selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
     var authorId = msgDiv.getAttribute('data-author-id');
@@ -499,8 +500,10 @@ document.getElementById('messages-container').oncontextmenu = function(e) {
         var cleanCurrent = String(currentUserId).toUpperCase();
         
         if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
+            // ФИКС: Жестко глушим стандартное меню IE на всех стадиях события
             if (e.preventDefault) e.preventDefault();
-            e.returnValue = false;
+            e.returnValue = false; 
+            e.cancelBubble = true;
             
             var menu = document.getElementById('custom-context-menu');
             menu.style.left = e.clientX + 'px';
@@ -580,7 +583,6 @@ function parseHashAndAuthorize() {
 
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
-
 </script>
 </body>
 </html>
