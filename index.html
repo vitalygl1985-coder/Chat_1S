@@ -200,28 +200,24 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     });
 
     // ИСПРАВЛЕНО: Безопасное скачивание архива в 1С 8.3.5 без использования блокируемого Blob
+    // ИСПРАВЛЕНО: Безопасный вывод ссылки на скачивание архива с сервера Railway
     socket.on('download_archive_file', function(data) {
-        if (!data || !data.messages) return;
+        if (!data || !data.url) return;
         try {
-            var jsonString = JSON.stringify(data.messages, null, 4);
-            
-            // Вместо скрытой эмуляции клика, создаем НАСТОЯЩУЮ кнопку-ссылку прямо в чате
-            // Пользователь кликает по ней, и IE без ругани на безопасность сохраняет файл
+            var fullUrl = window.location.protocol + '//' + window.location.host + data.url;
             var container = document.getElementById('messages-container');
             var downloadBox = document.createElement('div');
             downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
             
-            var encodedTxt = encodeURIComponent(jsonString);
             downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки готов!</b>' +
-                                    '<a href="data:application/json;charset=utf-8,' + encodedTxt + '" download="archive_room_' + currentRoomId + '.json" style="background:#eab308; color:#fff; padding:6px 12px; border-radius:4px; text-decoration:none; font-weight:bold; display:inline-block;">📥 СКАЧАТЬ АРХИВНЫЙ ФАЙЛ</a>';
+                                    '<a href="' + fullUrl + '" target="_blank" style="background:#eab308; color:#fff; padding:6px 12px; border-radius:4px; text-decoration:none; font-weight:bold; display:inline-block;">📥 СКАЧАТЬ АРХИВНЫЙ ФАЙЛ</a>';
             
             container.innerHTML = "";
             container.appendChild(downloadBox);
         } catch(e) {
-            alert("Ошибка подготовки архива: " + e.message);
+            alert("Ошибка вывода архива: " + e.message);
         }
     });
-}
 
 // ИСПРАВЛЕНО: Приватный чат с 1 участником больше ВООБЩЕ не выводится в список комнат!
 function renderRoomsList(rooms) {
@@ -489,14 +485,14 @@ function triggerArchive() {
     }
 }
 
-// ИСПРАВЛЕНО: Кроссбраузерный ПКМ-клиент для 1С 8.3.5 (IE11) без вылетов
+// ИСПРАВЛЕНО: Бронебойный перехват ПКМ (поддержка IE11 и Chrome) со свободным сравнением типов данных
 document.getElementById('messages-container').oncontextmenu = function(e) {
     e = e || window.event;
     var target = e.target || e.srcElement;
     
     var msgDiv = target;
     while (msgDiv && msgDiv !== this) {
-        if (msgDiv.className && msgDiv.className.indexOf('message') !== -1) {
+        if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
             break;
         }
         msgDiv = msgDiv.parentNode;
@@ -507,14 +503,21 @@ document.getElementById('messages-container').oncontextmenu = function(e) {
     selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
     var authorId = msgDiv.getAttribute('data-author-id');
     
-    if (selectedMessageIdForCtx && (currentUserRole === 'admin' || authorId === currentUserId)) {
-        if (e.preventDefault) e.preventDefault();
+    if (selectedMessageIdForCtx) {
+        // Очищаем строки от пробелов и приводим к нижнему регистру для GUID, сравниваем через ==
+        var cleanAuthor = String(authorId).trim().toLowerCase();
+        var cleanCurrent = String(currentUserId).trim().toLowerCase();
         
-        var menu = document.getElementById('custom-context-menu');
-        menu.style.left = e.clientX + 'px';
-        menu.style.top = e.clientY + 'px';
-        menu.style.display = 'block';
-        return false;
+        if (currentUserRole === 'admin' || cleanAuthor == cleanCurrent) {
+            if (e.preventDefault) e.preventDefault();
+            e.returnValue = false; // Фикс отмены стандартного меню для старого IE
+            
+            var menu = document.getElementById('custom-context-menu');
+            menu.style.left = e.clientX + 'px';
+            menu.style.top = e.clientY + 'px';
+            menu.style.display = 'block';
+            return false;
+        }
     }
     return true;
 };

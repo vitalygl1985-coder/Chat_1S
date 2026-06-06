@@ -985,6 +985,7 @@ async def archive_room_messages(sid, data):
             await sio.emit('system_alert', {"message": "Архивировать эту группу может только её создатель!"}, to=sid)
             return
 
+        # Извлекаем сообщения
         cur.execute("""
             SELECT m.id_user_from, COALESCE(u.username, m.id_user_from) as username, m.encrypted_text, m.created_at 
             FROM messages m
@@ -996,9 +997,32 @@ async def archive_room_messages(sid, data):
             if m['created_at']:
                 m['created_at'] = m['created_at'].isoformat()
 
+        # Очищаем переписку в БД
         cur.execute("DELETE FROM messages WHERE id_room = %s", (room_id,))
         conn.commit()
-        await sio.emit('download_archive_file', {"messages": messages}, to=sid)
+
+        # ФИКС ДЛЯ 1С: Сохраняем архив в файл прямо в uploads на сервере
+        archive_uuid = str(uuid.uuid4())
+        archive_filename = f"archive_{room_id}_{archive_uuid}.json"
+        file_path = os.path.join(UPLOAD_DIR, archive_filename)
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(messages, f, ensure_ascii=False, indent=4)
+
+        # Записываем оригинальное имя файла для скачивания
+        mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+        file_map = {}
+        if os.path.exists(mapping_file):
+            with open(mapping_file, "r", encoding="utf-8") as f:
+                file_map = json.load(f)
+        file_map[archive_uuid] = f"archive_room_{room_id}.json"
+        with open(mapping_file, "w", encoding="utf-8") as f:
+            json.dump(file_map, f)
+
+        # Возвращаем готовую HTTP-ссылку
+        download_url = f"/download/{archive_uuid}"
+        await sio.emit('download_archive_file', {"url": download_url}, to=sid)
+
     except Exception as e:
         print(f"Ошибка архивации: {e}")
     finally:
