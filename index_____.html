@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body oncontextmenu="if (window.event) { window.event.returnValue = false; } return false;">
 
 <div class="header">
     <h1>Корпоративный чат 1С</h1>
@@ -30,8 +30,8 @@
         <div class="chat-header">
             <span id="current-chat-title">Выберите кабинет или сотрудника</span>
             <div class="chat-actions" id="chat-management-actions" style="display: none;">
-                <button onclick="triggerArchive()" class="btn-small" style="background:#eab308;">📦 В архив</button>
-                <button onclick="triggerDeleteRoom()" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
+                <button onclick="triggerArchive(); return false;" class="btn-small" style="background:#eab308;">📦 В архив</button>
+                <button onclick="triggerDeleteRoom(); return false;" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
             </div>
         </div>
 
@@ -179,9 +179,9 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     
     socket.on('system_alert', function(data) { alert(data.message); });
     
-    socket.on('refresh_rooms_trigger', function() { 
+    socket.on('refresh_rooms_trigger', function(data) { 
         socket.emit('get_rooms_again'); 
-        if (currentRoomId) {
+        if (data && data.deleted_room_id && currentRoomId == data.deleted_room_id) {
             currentRoomId = null;
             document.getElementById('current-chat-title').innerText = "Выберите кабинет или сотрудника";
             document.getElementById('chat-management-actions').style.display = "none";
@@ -198,20 +198,35 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
+    // ИСПРАВЛЕНО: Безопасное сохранение пути в атрибут без деструктивного parentWindow и v8-ссылок
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
         try {
-            var fullUrl = window.location.protocol + '//' + window.location.host + data.url;
             var container = document.getElementById('messages-container');
-            var downloadBox = document.createElement('div');
-            downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
+            if (!container) return;
             
-            downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки готов!</b>' +
-                                    '<a href="' + fullUrl + '" target="_blank" style="background:#eab308; color:#fff; padding:6px 12px; border-radius:4px; text-decoration:none; font-weight:bold; display:inline-block;">📥 СКАЧАТЬ АРХИВНЫЙ ФАЙЛ</a>';
+            container.innerHTML = '<div style="background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;">' +
+                                    '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>' +
+                                    '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>' +
+                                  '</div>';
             
-            container.innerHTML = "";
-            container.appendChild(downloadBox);
-        } catch(e) {}
+            var btn = document.getElementById('btn-save-1c-archive');
+            if (btn) {
+                // Прячем путь скачивания в стандартный data-атрибут тега кнопки
+                btn.setAttribute('data-url', data.url);
+                
+                btn.onclick = function(e) {
+                    if (e && e.preventDefault) e.preventDefault();
+                    if (window.event) window.event.returnValue = false;
+                    
+                    // Меняем текст. Этот флаг 1С считает по таймеру и выполнит выгрузку
+                    this.innerText = "ПЕРЕДАЧА В 1С...";
+                    this.style.background = "#9ca3af";
+                    
+                    return false;
+                };
+            }
+        } catch(err) {}
     });
 }
 
@@ -219,14 +234,20 @@ function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
     if (!container) return;
     container.innerHTML = "";
+    
+    var myCleanId = currentUserId ? String(currentUserId).trim().toUpperCase() : "";
+
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         
-        // ИСПРАВЛЕНО: Если это приватный чат, и имя совпадает с именем текущего пользователя (он один там остался),
-        // то мы его вообще СБРАСЫВАЕМ и не рисуем в списке комнат!
-        if (room.type === 'private' && room.name.trim() === document.getElementById('user-info').innerText.replace(' 👑', '').trim()) {
-            continue;
-        }
+        try {
+            if (room.type === 'private' && room.created_by && myCleanId) {
+                var creatorCleanId = String(room.created_by).trim().toUpperCase();
+                if (creatorCleanId === myCleanId && room.name && room.name.indexOf("⇄") === -1) {
+                    continue; 
+                }
+            }
+        } catch(e) {}
         
         var div = document.createElement('div');
         div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
@@ -240,7 +261,10 @@ function renderRoomsList(rooms) {
             document.getElementById('btn-add-participant').style.display = room.type === 'private' ? 'none' : 'inline-block';
         }
         
-        (function(r) { div.onclick = function() { selectRoomById(r.id_room); }; })(room);
+        (function(r) { 
+            div.onclick = function() { selectRoomById(r.id_room); }; 
+        })(room);
+        
         container.appendChild(div);
     }
 }
@@ -380,7 +404,7 @@ function uploadFile(file) {
             if (data && data.url) {
                 var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                 var absUrl = window.location.protocol + '//' + window.location.host + data.url;
-                var content = isImg ? '<img src="' + absUrl + '" class="chat-image" onclick="window.open(\'' + absUrl + '\')" />' : 
+                var content = isImg ? '<img src="' + absUrl + '" class="chat-image" onclick="window.open(\'' + absUrl + '"\)" />' : 
                                       '<a href="javascript:void(0);" class="file-attachment" onclick="return downloadFile(\'' + data.url + '\', \'' + file.name.replace(/'/g, "\\'") + '\');">📄 Файл: ' + file.name + '</a>';
                 socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
@@ -476,37 +500,89 @@ function triggerArchive() {
     }
 }
 
-// ИСПРАВЛЕНО: Полное устранение ES6-синтаксиса (убраны => функции и жесткие замыкания)
-document.getElementById('messages-container').oncontextmenu = function(e) {
+document.oncontextmenu = function(e) {
     e = e || window.event;
-    var target = e.target || e.srcElement;
     
+    // 1. СРАЗУ глушим стандартное меню 1С для всей страницы
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+    e.cancelBubble = true;
+    if (e.stopPropagation) e.stopPropagation();
+    
+    var target = e.target || e.srcElement;
     var msgDiv = target;
-    while (msgDiv && msgDiv !== this) {
+    
+    // Ищем контейнер сообщения вверх по дереву DOM
+    while (msgDiv && msgDiv !== document.body) {
         if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
             break;
         }
         msgDiv = msgDiv.parentNode;
     }
     
-    if (!msgDiv || msgDiv === this) return true; 
+    // 2. Если кликнули мимо сообщения — просто ничего не делаем (меню 1С не откроется)
+    if (!msgDiv || msgDiv === document.body) return false; 
     
     selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
     var authorId = msgDiv.getAttribute('data-author-id');
     
     if (selectedMessageIdForCtx) {
-        var cleanAuthor = String(authorId).toUpperCase();
-        var cleanCurrent = String(currentUserId).toUpperCase();
+        var cleanAuthor = String(authorId).toUpperCase().trim();
+        var cleanCurrent = String(currentUserId).toUpperCase().trim();
         
+        // 3. Если это админ или автор сообщения — показываем наше меню
         if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
-            if (e.preventDefault) e.preventDefault();
-            e.returnValue = false;
-            
             var menu = document.getElementById('custom-context-menu');
-            menu.style.left = e.clientX + 'px';
-            menu.style.top = e.clientY + 'px';
-            menu.style.display = 'block';
-            return false;
+            if (menu) {
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+                menu.style.display = 'block';
+            }
+        }
+    }
+    
+    return false;
+};
+
+// Перехватываем правый клик на этапе мыши, до вызова меню платформы
+document.onmousedown = function(e) {
+    e = e || window.event;
+    if (!e) return true;
+    
+    // 2 — это код правой кнопки мыши в старых стандартах IE
+    if (e.button === 2 || e.which === 3) {
+        var target = e.target || e.srcElement;
+        
+        var msgDiv = target;
+        while (msgDiv && msgDiv !== document.body) {
+            if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
+                break;
+            }
+            msgDiv = msgDiv.parentNode;
+        }
+        
+        if (!msgDiv || msgDiv === document.body) return true; 
+        
+        selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
+        var authorId = msgDiv.getAttribute('data-author-id');
+        
+        if (selectedMessageIdForCtx) {
+            var cleanAuthor = String(authorId).toUpperCase().trim();
+            var cleanCurrent = String(currentUserId).toUpperCase().trim();
+            
+            if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
+                if (e.stopPropagation) e.stopPropagation();
+                if (e.preventDefault) e.preventDefault();
+                e.cancelBubble = true;
+                e.returnValue = false;
+                
+                var menu = document.getElementById('custom-context-menu');
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+                menu.style.display = 'block';
+                
+                return false;
+            }
         }
     }
     return true;
@@ -572,7 +648,11 @@ function parseHashAndAuthorize() {
                     window.location.reload(true);
                     return;
                 }
-                apply1CAuth(p[0], p[1], p[2], p[3] || 'user');
+                var roleParam = p[3] || 'user';
+                if (roleParam !== 'user' && roleParam !== 'admin') {
+                    roleParam = 'user';
+                }
+                apply1CAuth(p[0], p[1], p[2], roleParam);
             }
         }
     } catch(e) {}
@@ -580,7 +660,6 @@ function parseHashAndAuthorize() {
 
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
-
 </script>
 </body>
 </html>

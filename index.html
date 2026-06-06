@@ -660,6 +660,17 @@ function parseHashAndAuthorize() {
 
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
+
+// Функция для экстренного и чистого закрытия чата из 1С
+window.destroyChatBeforeClose = function() {
+    try {
+        if (socket) {
+            socket.disconnect(); // Насильно отключаем сокеты
+        }
+    } catch(e) {}
+    return true;
+};
+
 </script>
 </body>
 </html>
