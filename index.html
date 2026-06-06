@@ -238,11 +238,23 @@ function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
     if (!container) return;
     container.innerHTML = "";
+    
+    // Получаем чистое имя текущего пользователя для безопасной проверки
+    var currentInfoEl = document.getElementById('user-info');
+    var currentName = currentInfoEl ? currentInfoEl.innerText.replace(' 👑', '').trim().toUpperCase() : "";
+
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         
-        if (room.type === 'private' && room.name.trim() === document.getElementById('user-info').innerText.replace(' 👑', '').trim()) {
-            continue;
+        try {
+            // Безопасный пропуск: если это приватный чат и его имя СТРОГО совпадает с именем текущего пользователя
+            if (room.type === 'private' && room.name && currentName) {
+                if (room.name.trim().toUpperCase() === currentName) {
+                    continue; 
+                }
+            }
+        } catch(e) {
+            // Если в старом IE произошел сбой кодировки строк, просто пропускаем фильтр, но НЕ ЛОМАЕМ чат
         }
         
         var div = document.createElement('div');
@@ -257,7 +269,10 @@ function renderRoomsList(rooms) {
             document.getElementById('btn-add-participant').style.display = room.type === 'private' ? 'none' : 'inline-block';
         }
         
-        (function(r) { div.onclick = function() { selectRoomById(r.id_room); }; })(room);
+        (function(r) { 
+            div.onclick = function() { selectRoomById(r.id_room); }; 
+        })(room);
+        
         container.appendChild(div);
     }
 }
