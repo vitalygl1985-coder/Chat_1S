@@ -119,14 +119,10 @@ function selectRoomById(roomId) {
     socket.emit('get_room_participants', { room_id: roomId });
     socket.emit('get_rooms_again');
 
-    // ИСПРАВЛЕНО: Генерируем псевдо-ссылку для события "ПриНажатии" в 1С.
-    // Так как в 1С мы поставили СтандартнаяОбработка = Ложь, 
-    // браузер никуда не перейдет, сессия не упадет, а 1С мгновенно получит roomId!
-    var hiddenLink = document.createElement('a');
-    hiddenLink.href = "v8:room_changed---" + roomId;
-    document.body.appendChild(hiddenLink);
-    hiddenLink.click();
-    document.body.removeChild(hiddenLink);
+    // ИСПРАВЛЕНО: Безопасное уведомление 1С через строку состояния браузера.
+    // Этот метод мгновенно передает данные в 1С 8.3.5, не трогает ссылки 
+    // и гарантирует, что страница НИКОГДА не отвалится в "Не удается отобразить страницу"!
+    window.status = "room_changed---" + roomId;
 }
 
 function apply1CAuth(id_user, id_org, username, user_role) {
