@@ -215,9 +215,19 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         container.appendChild(downloadBox);
         
         document.getElementById('btn-save-1c-archive').onclick = function(e) {
+            // Жестко блокируем любую попытку браузера перезагрузить или сменить страницу
             if (e && e.preventDefault) e.preventDefault();
-            // Передаем ссылку в 1С и жестко гасим стандартный переход браузера
-            window.location.href = "v8:save_archive---" + data.url;
+            if (window.event) window.event.returnValue = false;
+            
+            // ИСПРАВЛЕНО: Передаем данные через эмуляцию клика по невидимому элементу.
+            // Это гарантирует, что 1С поймает событие ПриНажатии, но сам браузер никуда не перейдет!
+            var hiddenLink = document.createElement('a');
+            hiddenLink.href = "v8:save_archive---" + data.url;
+            hiddenLink.style.display = "none";
+            document.body.appendChild(hiddenLink);
+            hiddenLink.click();
+            document.body.removeChild(hiddenLink);
+            
             return false;
         };
     });
