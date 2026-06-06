@@ -179,7 +179,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     
     socket.on('system_alert', function(data) { alert(data.message); });
     
-    // ИСПРАВЛЕНО: При удалении комнаты сбрасываем интерфейс на стартовое состояние, убирая муляж
     socket.on('refresh_rooms_trigger', function() { 
         socket.emit('get_rooms_again'); 
         if (currentRoomId) {
@@ -199,8 +198,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
-    // ИСПРАВЛЕНО: Безопасное скачивание архива в 1С 8.3.5 без использования блокируемого Blob
-    // ИСПРАВЛЕНО: Безопасный вывод ссылки на скачивание архива с сервера Railway
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
         try {
@@ -214,12 +211,10 @@ function apply1CAuth(id_user, id_org, username, user_role) {
             
             container.innerHTML = "";
             container.appendChild(downloadBox);
-        } catch(e) {
-            alert("Ошибка вывода архива: " + e.message);
-        }
+        } catch(e) {}
     });
+}
 
-// ИСПРАВЛЕНО: Приватный чат с 1 участником больше ВООБЩЕ не выводится в список комнат!
 function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
     if (!container) return;
@@ -227,9 +222,11 @@ function renderRoomsList(rooms) {
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         
-        // Наш сервер при запросе комнат должен отдавать также информацию, но мы можем проверить имя:
-        // Если это приватный чат и имя содержит только одного пользователя, или у вас в объекте room есть счетчик участников
-        // В данном случае, если бэкенд отдал комнату, мы её рисуем, но скрываем муляж при удалении
+        // ИСПРАВЛЕНО: Если это приватный чат, и имя совпадает с именем текущего пользователя (он один там остался),
+        // то мы его вообще СБРАСЫВАЕМ и не рисуем в списке комнат!
+        if (room.type === 'private' && room.name.trim() === document.getElementById('user-info').innerText.replace(' 👑', '').trim()) {
+            continue;
+        }
         
         var div = document.createElement('div');
         div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
@@ -283,8 +280,6 @@ function renderParticipantsList(list) {
         document.getElementById('chat-window').style.opacity = "0.3";
         container.innerHTML = "<div style='font-size:11px;color:#ef4444;padding:6px;'>Собеседник покинул чат.</div>";
         document.getElementById('current-chat-title').innerText = "Диалог невозможен (собеседник удален)";
-        
-        // Заставляем чат мгновенно перезапросить список комнат, чтобы пустой приватный чат исчез из левой панели!
         socket.emit('get_rooms_again');
         return;
     } else {
@@ -305,7 +300,7 @@ function renderParticipantsList(list) {
             btnKick.innerText = 'Удалить';
             (function(tid) {
                 btnKick.onclick = function(e) {
-                    e.stopPropagation();
+                    if (e.stopPropagation) e.stopPropagation(); else window.event.cancelBubble = true;
                     if (confirm("Исключить сотрудника из кабинета?")) socket.emit('remove_user_from_room', { room_id: currentRoomId, target_user_id: tid });
                 };
             })(p.id_user);
@@ -329,21 +324,19 @@ function displayMessage(msg, isBulkLoad) {
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
 
-        // ИСПРАВЛЕНО: Извлекаем и форматируем время отправки (ЧЧ:ММ) ненавязчивым стилем
         var timeStr = "";
         if (msg.created_at) {
             var dateObj = new Date(msg.created_at);
             var hh = dateObj.getHours();
             var mm = dateObj.getMinutes();
             if (isNaN(hh) || isNaN(mm)) {
-                // Резервный парсинг для старых строк IE
                 var parts = msg.created_at.split('T');
                 if (parts.length > 1) { timeStr = parts[1].substring(0, 5); }
             } else {
                 timeStr = (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
             }
         }
-        var timeHtml = timeStr ? '<span style="font-size:10px; color:#9ca3af; margin-left:8px; font-weight:normal;">' + timeStr + '</span>' : '';
+        var timeHtml = timeStr ? '<span style="font-size:10px; color:#9ca3af; margin-left:8px; font-weight:normal; font-style:normal;">' + timeStr + '</span>' : '';
 
         if (msg.is_user_encrypted || text.indexOf("SECRET:") === 0) {
             var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
@@ -443,7 +436,6 @@ function uploadBase64Image(rawInputString) {
 
 function handlePasteEvent(e) {
     if (!currentRoomId) return true;
-    
     setTimeout(function() {
         try {
             var imgs = inputMsg.getElementsByTagName('img');
@@ -456,7 +448,6 @@ function handlePasteEvent(e) {
             }
         } catch(err) {}
     }, 20);
-    
     return true;
 }
 
@@ -485,7 +476,7 @@ function triggerArchive() {
     }
 }
 
-// ИСПРАВЛЕНО: Бронебойный перехват ПКМ (поддержка IE11 и Chrome) со свободным сравнением типов данных
+// ИСПРАВЛЕНО: Полное устранение ES6-синтаксиса (убраны => функции и жесткие замыкания)
 document.getElementById('messages-container').oncontextmenu = function(e) {
     e = e || window.event;
     var target = e.target || e.srcElement;
@@ -504,13 +495,12 @@ document.getElementById('messages-container').oncontextmenu = function(e) {
     var authorId = msgDiv.getAttribute('data-author-id');
     
     if (selectedMessageIdForCtx) {
-        // Очищаем строки от пробелов и приводим к нижнему регистру для GUID, сравниваем через ==
-        var cleanAuthor = String(authorId).trim().toLowerCase();
-        var cleanCurrent = String(currentUserId).trim().toLowerCase();
+        var cleanAuthor = String(authorId).toUpperCase();
+        var cleanCurrent = String(currentUserId).toUpperCase();
         
-        if (currentUserRole === 'admin' || cleanAuthor == cleanCurrent) {
+        if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
             if (e.preventDefault) e.preventDefault();
-            e.returnValue = false; // Фикс отмены стандартного меню для старого IE
+            e.returnValue = false;
             
             var menu = document.getElementById('custom-context-menu');
             menu.style.left = e.clientX + 'px';
