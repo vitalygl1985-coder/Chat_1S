@@ -203,45 +203,29 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     });
 
     // ИСПРАВЛЕНО: 100% совместимая передача в 1С через DOM-буфер без ошибок сценария
+    // ИСПРАВЛЕНО: Безопасная передача через внутреннюю переменную window без создания ссылок и кликов
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
         try {
             var container = document.getElementById('messages-container');
             if (!container) return;
             
-            // 1. Создаем контейнер плашки
             var downloadBox = document.createElement('div');
             downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
-            
-            // 2. Создаем кнопку сохранения
-            var btnSave = document.createElement('button');
-            btnSave.id = "btn-save-1c-archive";
-            btnSave.style.cssText = "background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;";
-            btnSave.innerText = "📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ";
-            
-            // 3. Создаем скрытое поле буфера (строго без ES6 конкатенации)
-            var bufferInput = document.createElement('input');
-            bufferInput.type = "hidden";
-            bufferInput.id = "hidden-archive-link";
-            bufferInput.value = data.url;
-            
-            // 4. Собираем элементы вместе
-            downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>';
-            downloadBox.appendChild(btnSave);
-            downloadBox.appendChild(bufferInput);
+            downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>' +
+                                    '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>';
             
             container.innerHTML = "";
             container.appendChild(downloadBox);
             
-            // 5. Обработчик клика в старом стандарте ES5
-            btnSave.onclick = function(e) {
-                if (e && e.preventDefault) {
-                    e.preventDefault();
-                } else if (window.event) {
-                    window.event.returnValue = false;
-                }
+            // Записываем URL архива напрямую в глобальное свойство окна браузера
+            window.lastArchiveUrl = data.url;
+            
+            document.getElementById('btn-save-1c-archive').onclick = function(e) {
+                if (e && e.preventDefault) e.preventDefault();
+                if (window.event) window.event.returnValue = false;
                 
-                // Перекрашиваем кнопку через безопасные свойства стилей
+                // Сигнализируем нажатие изменением текста кнопки (это считает 1С)
                 this.innerText = "ПЕРЕДАЧА В 1С...";
                 this.style.background = "#9ca3af";
                 
