@@ -257,6 +257,42 @@ async def download_file(file_uuid: str):
     """
     return HTMLResponse(content=html_content, status_code=200)
 
+@app.get("/download-archive/{file_uuid}")
+async def download_archive_endpoint(file_uuid: str):
+    mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+    if not os.path.exists(mapping_file):
+        raise HTTPException(status_code=404, detail="Файл карты маппинга не найден")
+        
+    with open(mapping_file, "r", encoding="utf-8") as f:
+        file_map = json.load(f)
+        
+    if file_uuid not in file_map:
+        raise HTTPException(status_code=404, detail="Архив не зарегистрирован в системе")
+        
+    # Ищем физический файл на диске Railway, содержащий UUID в имени
+    target_filename = ""
+    if os.path.exists(UPLOAD_DIR):
+        for filename in os.listdir(UPLOAD_DIR):
+            if file_uuid in filename and filename.endswith(".json"):
+                target_filename = filename
+                break
+                
+    if not target_filename:
+        raise HTTPException(status_code=404, detail="Файл архива отсутствует на диске")
+        
+    file_path = os.path.join(UPLOAD_DIR, target_filename)
+    original_name = file_map[file_uuid]
+    encoded_name = urllib.parse.quote(original_name)
+    
+    # Отдаем файл в WinHttp без дополнительных заголовков браузерной авторизации
+    return FileResponse(
+        path=file_path, 
+        media_type="application/json",
+        headers={
+            'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\'{encoded_name}'
+        }
+    )
+
 @app.get("/api/admin/settings")
 async def get_admin_settings():
     conn = get_db_connection()
@@ -1028,42 +1064,6 @@ async def archive_room_messages(sid, data):
     finally:
         cur.close()
         conn.close()
-
-@app.get("/download-archive/{file_uuid}")
-async def download_archive_endpoint(file_uuid: str):
-    mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
-    if not os.path.exists(mapping_file):
-        raise HTTPException(status_code=404, detail="Файл карты маппинга не найден")
-        
-    with open(mapping_file, "r", encoding="utf-8") as f:
-        file_map = json.load(f)
-        
-    if file_uuid not in file_map:
-        raise HTTPException(status_code=404, detail="Архив не зарегистрирован в системе")
-        
-    # Ищем физический файл на диске Railway, содержащий UUID в имени
-    target_filename = ""
-    if os.path.exists(UPLOAD_DIR):
-        for filename in os.listdir(UPLOAD_DIR):
-            if file_uuid in filename and filename.endswith(".json"):
-                target_filename = filename
-                break
-                
-    if not target_filename:
-        raise HTTPException(status_code=404, detail="Файл архива отсутствует на диске")
-        
-    file_path = os.path.join(UPLOAD_DIR, target_filename)
-    original_name = file_map[file_uuid]
-    encoded_name = urllib.parse.quote(original_name)
-    
-    # Отдаем файл в WinHttp без дополнительных заголовков браузерной авторизации
-    return FileResponse(
-        path=file_path, 
-        media_type="application/json",
-        headers={
-            'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\'{encoded_name}'
-        }
-    )
 
 @sio.event
 async def delete_message_request(sid, data):
