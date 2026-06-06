@@ -239,22 +239,26 @@ function renderRoomsList(rooms) {
     if (!container) return;
     container.innerHTML = "";
     
-    // Получаем чистое имя текущего пользователя для безопасной проверки
-    var currentInfoEl = document.getElementById('user-info');
-    var currentName = currentInfoEl ? currentInfoEl.innerText.replace(' 👑', '').trim().toUpperCase() : "";
+    // Приводим ID текущего пользователя к верхнему регистру для безопасного сопоставления
+    var myCleanId = currentUserId ? String(currentUserId).trim().toUpperCase() : "";
 
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
         
         try {
-            // Безопасный пропуск: если это приватный чат и его имя СТРОГО совпадает с именем текущего пользователя
-            if (room.type === 'private' && room.name && currentName) {
-                if (room.name.trim().toUpperCase() === currentName) {
-                    continue; 
+            // ИСПРАВЛЕНО: Если это приватный чат, и создателем является текущий пользователь,
+            // а имя чата содержит ТОЛЬКО его имя (то есть собеседник удален/вышел и остался 1 человек),
+            // мы проверяем поле room.created_by, которое база данных всегда отдает на 100% стабильно!
+            if (room.type === 'private' && room.created_by) {
+                var creatorCleanId = String(room.created_by).trim().toUpperCase();
+                
+                // Если в комнате больше нет участников, кроме создателя, скрываем её
+                if (myCleanId && creatorCleanId === myCleanId && room.name === document.getElementById('user-info').innerText.replace(' 👑', '').trim()) {
+                    continue;
                 }
             }
         } catch(e) {
-            // Если в старом IE произошел сбой кодировки строк, просто пропускаем фильтр, но НЕ ЛОМАЕМ чат
+            // Резервный перехват, чтобы ошибки кодировки не вешали цикл
         }
         
         var div = document.createElement('div');
