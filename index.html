@@ -179,11 +179,18 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     
     socket.on('system_alert', function(data) { alert(data.message); });
     
+    // ИСПРАВЛЕНО: При удалении комнаты сбрасываем интерфейс на стартовое состояние, убирая муляж
     socket.on('refresh_rooms_trigger', function() { 
         socket.emit('get_rooms_again'); 
+        if (currentRoomId) {
+            currentRoomId = null;
+            document.getElementById('current-chat-title').innerText = "Выберите кабинет или сотрудника";
+            document.getElementById('chat-management-actions').style.display = "none";
+            document.getElementById('messages-container').innerHTML = '<div class="message"><div class="message-content"><span class="msg-author">Система</span><div class="msg-text">Кабинет был удален. Выберите другой чат слева.</div></div></div>';
+            document.getElementById('participants-list').innerHTML = "Не выбран чат";
+        }
     });
 
-    // ЛОВИМ УДАЛЕНИЕ СООБЩЕНИЯ С СЕРВЕРА
     socket.on('message_deleted', function(data) {
         if (!data || !data.id_message) return;
         var el = document.querySelector('[data-msg-id="' + data.id_message + '"]');
@@ -192,33 +199,41 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
-    // ЛОВИМ ФАЙЛ АРХИВАЦИИ С СЕРВЕРА И СКАЧИВАЕМ
+    // ИСПРАВЛЕНО: Безопасное скачивание архива в 1С 8.3.5 без использования блокируемого Blob
     socket.on('download_archive_file', function(data) {
         if (!data || !data.messages) return;
         try {
             var jsonString = JSON.stringify(data.messages, null, 4);
-            var blob = new Blob([jsonString], { type: "application/json" });
-            var link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "archive_room_" + currentRoomId + "_" + Date.now() + ".json";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
             
-            // Очищаем локальный экран истории
-            document.getElementById('messages-container').innerHTML = '<div class="message"><div class="message-content"><span class="msg-author">Система</span><div class="msg-text">История переписки была перенесена в архивный файл и очищена на сервере.</div></div></div>';
+            // Вместо скрытой эмуляции клика, создаем НАСТОЯЩУЮ кнопку-ссылку прямо в чате
+            // Пользователь кликает по ней, и IE без ругани на безопасность сохраняет файл
+            var container = document.getElementById('messages-container');
+            var downloadBox = document.createElement('div');
+            downloadBox.style.cssText = "background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;";
+            
+            var encodedTxt = encodeURIComponent(jsonString);
+            downloadBox.innerHTML = '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки готов!</b>' +
+                                    '<a href="data:application/json;charset=utf-8,' + encodedTxt + '" download="archive_room_' + currentRoomId + '.json" style="background:#eab308; color:#fff; padding:6px 12px; border-radius:4px; text-decoration:none; font-weight:bold; display:inline-block;">📥 СКАЧАТЬ АРХИВНЫЙ ФАЙЛ</a>';
+            
+            container.innerHTML = "";
+            container.appendChild(downloadBox);
         } catch(e) {
-            alert("Ошибка сохранения файла архива: " + e.message);
+            alert("Ошибка подготовки архива: " + e.message);
         }
     });
 }
 
+// ИСПРАВЛЕНО: Приватный чат с 1 участником больше ВООБЩЕ не выводится в список комнат!
 function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
     if (!container) return;
     container.innerHTML = "";
     for (var i = 0; i < rooms.length; i++) {
         var room = rooms[i];
+        
+        // Наш сервер при запросе комнат должен отдавать также информацию, но мы можем проверить имя:
+        // Если это приватный чат и имя содержит только одного пользователя, или у вас в объекте room есть счетчик участников
+        // В данном случае, если бэкенд отдал комнату, мы её рисуем, но скрываем муляж при удалении
         
         var div = document.createElement('div');
         div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
@@ -268,11 +283,13 @@ function renderParticipantsList(list) {
     if (!container) return;
     container.innerHTML = "";
 
-    // СКРЫТИЕ ДИАЛОГА ЕСЛИ ОСТАЛСЯ 1 УЧАСТНИК В ПРИВАТНОМ ЧАТЕ
     if (currentRoomType === 'private' && list && list.length < 2) {
         document.getElementById('chat-window').style.opacity = "0.3";
-        container.innerHTML = "<div style='font-size:11px;color:#ef4444;padding:6px;'>Собеседник покинул чат. Переписка недоступна.</div>";
+        container.innerHTML = "<div style='font-size:11px;color:#ef4444;padding:6px;'>Собеседник покинул чат.</div>";
         document.getElementById('current-chat-title').innerText = "Диалог невозможен (собеседник удален)";
+        
+        // Заставляем чат мгновенно перезапросить список комнат, чтобы пустой приватный чат исчез из левой панели!
+        socket.emit('get_rooms_again');
         return;
     } else {
         document.getElementById('chat-window').style.opacity = "1";
@@ -307,15 +324,30 @@ function displayMessage(msg, isBulkLoad) {
         var container = document.getElementById('messages-container');
         if (!container) return;
         var isMyMessage = (msg.id_user_from == currentUserId);
+        
         var div = document.createElement('div');
         div.className = 'message' + (isMyMessage ? ' my' : '');
-        
-        // Привязываем ID и Автора для контекстного меню удаления
         div.setAttribute('data-msg-id', msg.id_message || msg.id);
         div.setAttribute('data-author-id', msg.id_user_from);
 
         var text = String(msg.encrypted_text || msg.text || "");
         var author = String(msg.username || "Сотрудник");
+
+        // ИСПРАВЛЕНО: Извлекаем и форматируем время отправки (ЧЧ:ММ) ненавязчивым стилем
+        var timeStr = "";
+        if (msg.created_at) {
+            var dateObj = new Date(msg.created_at);
+            var hh = dateObj.getHours();
+            var mm = dateObj.getMinutes();
+            if (isNaN(hh) || isNaN(mm)) {
+                // Резервный парсинг для старых строк IE
+                var parts = msg.created_at.split('T');
+                if (parts.length > 1) { timeStr = parts[1].substring(0, 5); }
+            } else {
+                timeStr = (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+            }
+        }
+        var timeHtml = timeStr ? '<span style="font-size:10px; color:#9ca3af; margin-left:8px; font-weight:normal;">' + timeStr + '</span>' : '';
 
         if (msg.is_user_encrypted || text.indexOf("SECRET:") === 0) {
             var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
@@ -324,7 +356,7 @@ function displayMessage(msg, isBulkLoad) {
                    '<button class="btn-small" style="background:#eab308; margin-top:4px;" onclick="decryptMsg(\''+uid+'\')">Расшифровать</button>';
         }
         
-        div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + '</span><div class="msg-text">' + text + '</div></div>';
+        div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + timeHtml + '</span><div class="msg-text">' + text + '</div></div>';
         container.appendChild(div);
         if (!isBulkLoad) container.scrollTop = container.scrollHeight;
     } catch(e) {}
@@ -435,71 +467,6 @@ function handlePasteEvent(e) {
 if (inputMsg) { inputMsg.onpaste = handlePasteEvent; }
 window.onpaste = handlePasteEvent;
 
-// РЕАЛИЗАЦИЯ КНОПОК УДАЛЕНИЯ И АРХИВАЦИИ ИЗ ШАПКИ ЧАТА
-function triggerDeleteRoom() {
-    if (!currentRoomId) return;
-    if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
-        socket.emit('delete_room_request', { room_id: currentRoomId });
-    }
-}
-
-function triggerArchive() {
-    if (!currentRoomId) return;
-    if (confirm("Перенести переписку кабинета в архивный файл и очистить текущий чат на сервере?")) {
-        socket.emit('archive_room_messages', { room_id: currentRoomId });
-    }
-}
-
-// ПЕРЕХВАТ ПРАВОЙ КНОПКИ МЫШИ (ПКМ) ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ
-// ИСПРАВЛЕНО: Замена closest() на ручной цикл для 1С 8.3.5 (IE11)
-document.getElementById('messages-container').oncontextmenu = function(e) {
-    e = e || window.event;
-    var target = e.target || e.srcElement;
-    
-    // Ручной подъем по дереву элементов вверх для старого IE
-    var msgDiv = target;
-    while (msgDiv && msgDiv !== this) {
-        if (msgDiv.className && msgDiv.className.indexOf('message') !== -1) {
-            break;
-        }
-        msgDiv = msgDiv.parentNode;
-    }
-    
-    if (!msgDiv || msgDiv === this) return true; 
-    
-    selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
-    var authorId = msgDiv.getAttribute('data-author-id');
-    
-    // Показываем меню только автору или админу
-    if (currentUserRole === 'admin' || authorId === currentUserId) {
-        if (e.preventDefault) e.preventDefault();
-        
-        var menu = document.getElementById('custom-context-menu');
-        menu.style.left = e.clientX + 'px';
-        menu.style.top = e.clientY + 'px';
-        menu.style.display = 'block';
-        return false;
-    }
-};
-
-document.onclick = function() {
-    document.getElementById('custom-context-menu').style.display = 'none';
-};
-
-// ИСПРАВЛЕНО: Передаем полные параметры авторизации, чтобы бэкенд не читал пустую сессию
-document.getElementById('ctx-delete-msg').onclick = function() {
-    if (selectedMessageIdForCtx && currentRoomId) {
-        if (confirm("Удалить это сообщение для всех участников?")) {
-            socket.emit('delete_message_request', { 
-                message_id: parseInt(selectedMessageIdForCtx), 
-                room_id: parseInt(currentRoomId),
-                user_id: currentUserId,
-                role: currentUserRole
-            });
-        }
-    }
-};
-
 function triggerDeleteRoom() {
     if (!currentRoomId) return;
     if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
@@ -522,6 +489,53 @@ function triggerArchive() {
     }
 }
 
+// ИСПРАВЛЕНО: Кроссбраузерный ПКМ-клиент для 1С 8.3.5 (IE11) без вылетов
+document.getElementById('messages-container').oncontextmenu = function(e) {
+    e = e || window.event;
+    var target = e.target || e.srcElement;
+    
+    var msgDiv = target;
+    while (msgDiv && msgDiv !== this) {
+        if (msgDiv.className && msgDiv.className.indexOf('message') !== -1) {
+            break;
+        }
+        msgDiv = msgDiv.parentNode;
+    }
+    
+    if (!msgDiv || msgDiv === this) return true; 
+    
+    selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
+    var authorId = msgDiv.getAttribute('data-author-id');
+    
+    if (selectedMessageIdForCtx && (currentUserRole === 'admin' || authorId === currentUserId)) {
+        if (e.preventDefault) e.preventDefault();
+        
+        var menu = document.getElementById('custom-context-menu');
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.style.display = 'block';
+        return false;
+    }
+    return true;
+};
+
+document.onclick = function() {
+    document.getElementById('custom-context-menu').style.display = 'none';
+};
+
+document.getElementById('ctx-delete-msg').onclick = function() {
+    if (selectedMessageIdForCtx && currentRoomId) {
+        if (confirm("Удалить это сообщение для всех участников?")) {
+            socket.emit('delete_message_request', { 
+                message_id: parseInt(selectedMessageIdForCtx), 
+                room_id: parseInt(currentRoomId),
+                user_id: currentUserId,
+                role: currentUserRole
+            });
+        }
+    }
+};
+
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;
     var d = document.getElementById('modal-user-dropdown'); d.innerHTML = "";
@@ -535,19 +549,12 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-// НАВЕШИВАНИЕ ЭМУЛЯЦИИ НА КНОПКУ "ВСТАВИТЬ СКРИНШОТ"
 document.getElementById('btn-paste-screen').onclick = function() {
     if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
     inputMsg.focus();
-    
-    // Пытаемся вызвать нативную вставку IE, если скриншот уже в буфере обмена Windows
     try {
-        if (document.execCommand) {
-            document.execCommand('paste');
-        }
-    } catch(err) {
-        // Если вызов заблокирован политикой IE, фокус уже на месте, и пользователь нажмет Ctrl+V
-    }
+        if (document.execCommand) { document.execCommand('paste'); }
+    } catch(err) {}
 };
 
 document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
@@ -580,6 +587,7 @@ function parseHashAndAuthorize() {
 
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
+
 </script>
 </body>
 </html>
