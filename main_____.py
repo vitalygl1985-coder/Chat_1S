@@ -152,6 +152,10 @@ def get_session_by_token(token: str):
         conn.close()
 
 # ─── Pydantic-модели ──────────────────────────────────────────────────────────
+class Base64ImageRequest(BaseModel):
+    room_id: int
+    base64_data: str
+    filename: str
 
 class AdminAuthRequest(BaseModel):
     id_user: str
@@ -677,7 +681,41 @@ async def onec_new_messages(
     finally:
         cur.close()
         conn.close()
+import base64
 
+@app.post("/api/1c/upload-base64")
+async def onec_upload_base64(data: Base64ImageRequest):
+    try:
+        # Очищаем строку от возможных префиксов данных (data:image/png;base64,)
+        clean_base64 = data.base64_data
+        if "," in clean_base64:
+            clean_base64 = clean_base64.split(",")[1]
+            
+        # Декодируем base64 в бинарные байты силами Python
+        image_bytes = base64.b64decode(clean_base64)
+        
+        unique_id = str(uuid.uuid4())
+        saved_filename = f"{unique_id}.png"
+        file_path = os.path.join(UPLOAD_DIR, saved_filename)
+        
+        # Сохраняем файл на сервере Railway
+        with open(file_path, "wb") as f:
+            f.write(image_bytes)
+            
+        # Записываем оригинальное имя в маппинг
+        mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+        file_map = {}
+        if os.path.exists(mapping_file):
+            with open(mapping_file, "r", encoding="utf-8") as f:
+                file_map = json.load(f)
+        file_map[unique_id] = data.filename
+        with open(mapping_file, "w", encoding="utf-8") as f:
+            json.dump(file_map, f)
+            
+        absolute_url = f"/download/{unique_id}"
+        return {"success": True, "url": absolute_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера при сохранении скриншота: {str(e)}")
 # ─── конец REST API для 1С ───────────────────────────────────────────────────
 
 # --- SOCKET.IO EVENTS ---
@@ -705,7 +743,7 @@ async def connect(sid, environ, auth=None):
             username = EXCLUDED.username, 
             role = EXCLUDED.role, 
             id_org = EXCLUDED.id_org
-        """, (id_user, id_org, username, user_role))
+        """, (id_user, validated_org if 'validated_org' in locals() else id_org, username, user_role))
         
         cur.execute("""
             SELECT id_room FROM rooms 
