@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body oncontextmenu="if (window.event) { window.event.returnValue = false; } return false;">
 
 <div class="header">
     <h1>Корпоративный чат 1С</h1>
@@ -30,8 +30,8 @@
         <div class="chat-header">
             <span id="current-chat-title">Выберите кабинет или сотрудника</span>
             <div class="chat-actions" id="chat-management-actions" style="display: none;">
-                <button onclick="triggerArchive()" class="btn-small" style="background:#eab308;">📦 В архив</button>
-                <button onclick="triggerDeleteRoom()" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
+                <button onclick="triggerArchive(); return false;" class="btn-small" style="background:#eab308;">📦 В архив</button>
+                <button onclick="triggerDeleteRoom(); return false;" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
             </div>
         </div>
 
@@ -179,9 +179,13 @@ function apply1CAuth(id_user, id_org, username, user_role) {
     
     socket.on('system_alert', function(data) { alert(data.message); });
     
-    socket.on('refresh_rooms_trigger', function() { 
+    // ИСПРАВЛЕНО: Фокус больше не слетает при добавлении участников или создании смежных комнат!
+    socket.on('refresh_rooms_trigger', function(data) { 
         socket.emit('get_rooms_again'); 
-        if (currentRoomId) {
+        
+        // Сбрасываем интерфейс только если сервер явно прислал ID удаленной комнаты, 
+        // и этот ID совпадает с нашей текущей активной комнатой
+        if (data && data.deleted_room_id && currentRoomId == data.deleted_room_id) {
             currentRoomId = null;
             document.getElementById('current-chat-title').innerText = "Выберите кабинет или сотрудника";
             document.getElementById('chat-management-actions').style.display = "none";
@@ -198,7 +202,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
-    // ИСПРАВЛЕНО: Передаем только UUID готового файла архива в 1С, чтобы избежать падения на длинных строках
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
         
@@ -211,9 +214,11 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         container.innerHTML = "";
         container.appendChild(downloadBox);
         
-        document.getElementById('btn-save-1c-archive').onclick = function() {
-            // Передаем в 1С только относительный путь к файлу
+        document.getElementById('btn-save-1c-archive').onclick = function(e) {
+            if (e && e.preventDefault) e.preventDefault();
+            // Передаем ссылку в 1С и жестко гасим стандартный переход браузера
             window.location.href = "v8:save_archive---" + data.url;
+            return false;
         };
     });
 }
@@ -477,20 +482,20 @@ function triggerArchive() {
     }
 }
 
-// ИСПРАВЛЕНО: Радикальный перехват и блокировка нативного меню ПКМ для 1С (Trident)
-document.oncontextmenu = function(e) {
+// ИСПРАВЛЕНО: Полная и точечная прорисовка кастомного меню удалений сообщений
+document.getElementById('messages-container').oncontextmenu = function(e) {
     e = e || window.event;
     var target = e.target || e.srcElement;
     
     var msgDiv = target;
-    while (msgDiv && msgDiv !== document.body) {
+    while (msgDiv && msgDiv !== this) {
         if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
             break;
         }
         msgDiv = msgDiv.parentNode;
     }
     
-    if (!msgDiv || msgDiv === document.body) return true; 
+    if (!msgDiv || msgDiv === this) return true; 
     
     selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
     var authorId = msgDiv.getAttribute('data-author-id');
@@ -500,7 +505,6 @@ document.oncontextmenu = function(e) {
         var cleanCurrent = String(currentUserId).toUpperCase();
         
         if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
-            // ФИКС: Жестко глушим стандартное меню IE на всех стадиях события
             if (e.preventDefault) e.preventDefault();
             e.returnValue = false; 
             e.cancelBubble = true;

@@ -1080,7 +1080,7 @@ async def create_group_chat(sid, data):
         conn.commit()
         
         await sio.emit('private_chat_created', {'id_room': new_room['id_room']}, to=sid)
-        await sio.emit('refresh_rooms_trigger')
+        await sio.emit('refresh_rooms_trigger', {"deleted_room_id": int(room_id)})
     except Exception as e:
         conn.rollback()
     finally:
