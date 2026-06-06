@@ -536,6 +536,50 @@ document.oncontextmenu = function(e) {
     return true;
 };
 
+// Перехватываем правый клик на этапе мыши, до вызова меню платформы
+document.onmousedown = function(e) {
+    e = e || window.event;
+    if (!e) return true;
+    
+    // 2 — это код правой кнопки мыши в старых стандартах IE
+    if (e.button === 2 || e.which === 3) {
+        var target = e.target || e.srcElement;
+        
+        var msgDiv = target;
+        while (msgDiv && msgDiv !== document.body) {
+            if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
+                break;
+            }
+            msgDiv = msgDiv.parentNode;
+        }
+        
+        if (!msgDiv || msgDiv === document.body) return true; 
+        
+        selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
+        var authorId = msgDiv.getAttribute('data-author-id');
+        
+        if (selectedMessageIdForCtx) {
+            var cleanAuthor = String(authorId).toUpperCase().trim();
+            var cleanCurrent = String(currentUserId).toUpperCase().trim();
+            
+            if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
+                if (e.stopPropagation) e.stopPropagation();
+                if (e.preventDefault) e.preventDefault();
+                e.cancelBubble = true;
+                e.returnValue = false;
+                
+                var menu = document.getElementById('custom-context-menu');
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+                menu.style.display = 'block';
+                
+                return false;
+            }
+        }
+    }
+    return true;
+};
+
 document.onclick = function() {
     document.getElementById('custom-context-menu').style.display = 'none';
 };
