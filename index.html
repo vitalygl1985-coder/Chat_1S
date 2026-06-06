@@ -502,9 +502,17 @@ function triggerArchive() {
 
 document.oncontextmenu = function(e) {
     e = e || window.event;
-    var target = e.target || e.srcElement;
     
+    // 1. СРАЗУ глушим стандартное меню 1С для всей страницы
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+    e.cancelBubble = true;
+    if (e.stopPropagation) e.stopPropagation();
+    
+    var target = e.target || e.srcElement;
     var msgDiv = target;
+    
+    // Ищем контейнер сообщения вверх по дереву DOM
     while (msgDiv && msgDiv !== document.body) {
         if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
             break;
@@ -512,7 +520,8 @@ document.oncontextmenu = function(e) {
         msgDiv = msgDiv.parentNode;
     }
     
-    if (!msgDiv || msgDiv === document.body) return true; 
+    // 2. Если кликнули мимо сообщения — просто ничего не делаем (меню 1С не откроется)
+    if (!msgDiv || msgDiv === document.body) return false; 
     
     selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
     var authorId = msgDiv.getAttribute('data-author-id');
@@ -521,19 +530,18 @@ document.oncontextmenu = function(e) {
         var cleanAuthor = String(authorId).toUpperCase().trim();
         var cleanCurrent = String(currentUserId).toUpperCase().trim();
         
+        // 3. Если это админ или автор сообщения — показываем наше меню
         if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
-            if (e.preventDefault) e.preventDefault();
-            e.returnValue = false;
-            e.cancelBubble = true;
-            
             var menu = document.getElementById('custom-context-menu');
-            menu.style.left = e.clientX + 'px';
-            menu.style.top = e.clientY + 'px';
-            menu.style.display = 'block';
-            return false;
+            if (menu) {
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+                menu.style.display = 'block';
+            }
         }
     }
-    return true;
+    
+    return false;
 };
 
 // Перехватываем правый клик на этапе мыши, до вызова меню платформы
