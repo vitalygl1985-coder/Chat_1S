@@ -95,18 +95,6 @@
     </div>
 </div>
 
-<div class="modal-overlay" id="base64-image-modal">
-    <div class="modal-body" style="width: 390px;">
-        <h4>📋 Вставка скриншота (Base64)</h4>
-        <p style="font-size: 11px; color:#6b7280; margin-bottom: 6px;">Вставьте base64-код скриншота в поле ниже:</p>
-        <textarea id="modal-base64-field" rows="8" style="width:100%; font-family:monospace; font-size:11px; border:1px solid #d1d5db; padding:6px; border-radius:6px;" placeholder="Вставьте код (начинается на iVBORw0KGgo...)"></textarea>
-        <div class="modal-buttons" style="margin-top: 10px;">
-            <button onclick="closeBase64Modal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="base64-modal-submit-btn" class="btn-small">Отправить</button>
-        </div>
-    </div>
-</div>
-
 <script>
 window.onerror = function() { return true; };
 
@@ -130,9 +118,8 @@ function selectRoomById(roomId) {
     socket.emit('get_room_history', { room_id: roomId });
     socket.emit('get_room_participants', { room_id: roomId });
     socket.emit('get_rooms_again');
-
-    // ДОБАВЛЕНО: Сигнализируем в 1С о смене комнаты
-    // Браузер поймет это не как переход на сайт, а как внутреннюю команду
+    
+    // Передаем ИД в 1С при клике на комнату
     window.location.href = "v8:room_changed---" + roomId;
 }
 
@@ -344,6 +331,7 @@ function downloadFile(url, filename) {
     return false;
 }
 
+// 100% КРОССБРАУЗЕРНЫЙ ОБРАБОТЧИК СКРИНШОТОВ BASE64 ДЛЯ 1С 8.3.5
 function uploadBase64Image(rawInputString) {
     if (!currentRoomId || !socket || !rawInputString) return;
     
@@ -363,10 +351,7 @@ function uploadBase64Image(rawInputString) {
                 var absoluteUrl = window.location.protocol + '//' + window.location.host + response.url;
                 var content = '<img src="' + absoluteUrl + '" class="chat-image" onclick="window.open(\'' + absoluteUrl + '\')" />';
                 socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
-                closeBase64Modal();
             }
-        } else {
-            alert("Ошибка сохранения скриншота на сервере: " + xhr.status);
         }
     };
     xhr.send(JSON.stringify({
@@ -375,6 +360,40 @@ function uploadBase64Image(rawInputString) {
         filename: "screenshot_" + Date.now() + ".png"
     }));
 }
+
+// ИСПРАВЛЕНО: Автоматический перехват вставки скриншота из буфера Windows
+function handlePasteEvent(e) {
+    if (!currentRoomId) return true;
+    
+    // 1. Попытка современного метода чтения буфера
+    var cbd = e.clipboardData || window.clipboardData;
+    if (cbd && cbd.items) {
+        for (var i = 0; i < cbd.items.length; i++) {
+            if (cbd.items[i].type.indexOf('image') !== -1) {
+                var file = cbd.items[i].getAsFile();
+                if (file) { uploadFile(file); e.preventDefault(); return false; }
+            }
+        }
+    }
+    
+    // 2. Специфический обход для Internet Explorer / 1С 8.3.5:
+    // Мы даем браузеру вставить картинку в contenteditable, а через 50 миллисекунд вытаскиваем ее Base64 код
+    setTimeout(function() {
+        var imgs = inputMsg.getElementsByTagName('img');
+        if (imgs && imgs.length > 0) {
+            var base64Src = imgs[0].src;
+            if (base64Src.indexOf("data:image") === 0) {
+                uploadBase64Image(base64Src); // Отправляем на сервер
+                imgs[0].parentNode.removeChild(imgs[0]); // Удаляем временную картинку из поля ввода
+            }
+        }
+    }, 50);
+    return true;
+}
+
+// Привязываем обработчик ко всему документу и полю ввода
+window.onpaste = handlePasteEvent;
+if (inputMsg) { inputMsg.onpaste = handlePasteEvent; }
 
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;
@@ -389,15 +408,11 @@ function closeSecretModal() { document.getElementById('secret-input-modal').styl
 function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
+// ИСПРАВЛЕНО: Кнопка «Вставить скриншот» теперь просто эмулирует фокус и подсказывает пользователю
 document.getElementById('btn-paste-screen').onclick = function() {
     if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
-    document.getElementById('modal-base64-field').value = "";
-    document.getElementById('base64-image-modal').style.display = 'flex';
-};
-function closeBase64Modal() { document.getElementById('base64-image-modal').style.display = 'none'; }
-document.getElementById('base64-modal-submit-btn').onclick = function() {
-    var code = document.getElementById('modal-base64-field').value;
-    uploadBase64Image(code);
+    inputMsg.focus();
+    alert("Поставьте курсор в поле ввода сообщения и нажмите Ctrl + V для автоматической отправки скриншота!");
 };
 
 document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
@@ -411,7 +426,6 @@ document.getElementById('btn-file').onclick = function() { document.getElementBy
 document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); };
 if (inputMsg) { inputMsg.onkeydown = function(e) { if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { e.preventDefault(); sendMessage(); } }; }
 
-// ИСПРАВЛЕНО: Чтение хэша с авто-перезагрузкой при смене сессии 1С
 function parseHashAndAuthorize() {
     try {
         var hash = window.location.hash;
@@ -419,13 +433,10 @@ function parseHashAndAuthorize() {
             var cleanHash = decodeURIComponent(hash.substring(1));
             var p = cleanHash.split("---");
             if (p && p.length >= 3) {
-                
-                // Если форма 1С передала другого пользователя — жестко чистим память IE
                 if (currentUserId && currentUserId !== p[0]) {
                     window.location.reload(true);
                     return;
                 }
-                
                 apply1CAuth(p[0], p[1], p[2], p[3] || 'user');
             }
         }
@@ -433,7 +444,7 @@ function parseHashAndAuthorize() {
 }
 
 window.onload = parseHashAndAuthorize;
-window.onhashchange = parseHashAndAuthorize; // Перехватывает изменение соли времени
+window.onhashchange = parseHashAndAuthorize;
 </script>
 </body>
 </html>
