@@ -451,16 +451,26 @@ function triggerArchive() {
 }
 
 // ПЕРЕХВАТ ПРАВОЙ КНОПКИ МЫШИ (ПКМ) ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ
+// ИСПРАВЛЕНО: Замена closest() на ручной цикл для 1С 8.3.5 (IE11)
 document.getElementById('messages-container').oncontextmenu = function(e) {
     e = e || window.event;
     var target = e.target || e.srcElement;
     
-    var msgDiv = target.closest('.message');
-    if (!msgDiv) return true; 
+    // Ручной подъем по дереву элементов вверх для старого IE
+    var msgDiv = target;
+    while (msgDiv && msgDiv !== this) {
+        if (msgDiv.className && msgDiv.className.indexOf('message') !== -1) {
+            break;
+        }
+        msgDiv = msgDiv.parentNode;
+    }
+    
+    if (!msgDiv || msgDiv === this) return true; 
     
     selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
     var authorId = msgDiv.getAttribute('data-author-id');
     
+    // Показываем меню только автору или админу
     if (currentUserRole === 'admin' || authorId === currentUserId) {
         if (e.preventDefault) e.preventDefault();
         
@@ -476,16 +486,41 @@ document.onclick = function() {
     document.getElementById('custom-context-menu').style.display = 'none';
 };
 
+// ИСПРАВЛЕНО: Передаем полные параметры авторизации, чтобы бэкенд не читал пустую сессию
 document.getElementById('ctx-delete-msg').onclick = function() {
     if (selectedMessageIdForCtx && currentRoomId) {
         if (confirm("Удалить это сообщение для всех участников?")) {
             socket.emit('delete_message_request', { 
                 message_id: parseInt(selectedMessageIdForCtx), 
-                room_id: parseInt(currentRoomId) 
+                room_id: parseInt(currentRoomId),
+                user_id: currentUserId,
+                role: currentUserRole
             });
         }
     }
 };
+
+function triggerDeleteRoom() {
+    if (!currentRoomId) return;
+    if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
+        socket.emit('delete_room_request', { 
+            room_id: parseInt(currentRoomId),
+            user_id: currentUserId,
+            role: currentUserRole
+        });
+    }
+}
+
+function triggerArchive() {
+    if (!currentRoomId) return;
+    if (confirm("Перенести переписку кабинета в архивный файл и очистить текущий чат на сервере?")) {
+        socket.emit('archive_room_messages', { 
+            room_id: parseInt(currentRoomId),
+            user_id: currentUserId,
+            role: currentUserRole
+        });
+    }
+}
 
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;

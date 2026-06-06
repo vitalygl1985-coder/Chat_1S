@@ -12,7 +12,8 @@ import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi.staticfiles import StaticFiles
- 
+import base64
+
 app = FastAPI()
 
 @app.get("/style.css")
@@ -94,7 +95,6 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        # Создаем общий кабинет, если его нет
         cur.execute("SELECT 1 FROM rooms WHERE type='admin_group' AND UPPER(name) LIKE 'ОБЩ%' LIMIT 1")
         if not cur.fetchone():
             cur.execute("""
@@ -111,7 +111,6 @@ def init_db():
 
 init_db()
 
-# ─── REST-сессии для 1С ───────────────────────────────────────────────────────
 def init_sessions_table():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -137,7 +136,6 @@ def init_sessions_table():
 init_sessions_table()
 
 def get_session_by_token(token: str):
-    """Проверяет токен и возвращает данные пользователя или None."""
     if not token:
         return None
     conn = get_db_connection()
@@ -151,7 +149,6 @@ def get_session_by_token(token: str):
         cur.close()
         conn.close()
 
-# ─── Pydantic-модели ──────────────────────────────────────────────────────────
 class Base64ImageRequest(BaseModel):
     room_id: int
     base64_data: str
@@ -202,7 +199,6 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
         
-        # Сохраняем соответствие UUID -> оригинальное имя
         mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
         file_map = {}
         if os.path.exists(mapping_file):
@@ -216,10 +212,8 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ИСПРАВЛЕНО: правильный Content-Disposition для IE/1С
 @app.get("/download/{file_uuid}")
 async def download_file(file_uuid: str):
-    # Проверяем физическое существование файла на диске Railway
     file_found = False
     target_filename = ""
     
@@ -233,7 +227,6 @@ async def download_file(file_uuid: str):
     if file_found:
         file_path = os.path.join(UPLOAD_DIR, target_filename)
         
-        # Получаем оригинальное имя
         mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
         original_name = None
         if os.path.exists(mapping_file):
@@ -254,7 +247,6 @@ async def download_file(file_uuid: str):
             }
         )
     
-    # ИСПРАВЛЕНО: Если файл не найден, вместо жесткого 404 возвращаем JS, который тихо закроет всплывающее окно
     html_content = """
     <html>
     <script>
@@ -376,10 +368,7 @@ async def admin_execute_sql(data: ExecuteSqlRequest):
         cur.close()
         conn.close()
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# REST API для 1С (без Socket.IO, работает в любом браузере/HTTPЗапрос)
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# ─── REST API для 1С ──────────────────────────────────────────────────────────
 class OneCAuthRequest(BaseModel):
     id_user: str
     id_org: str
@@ -393,15 +382,10 @@ class OneCMessageRequest(BaseModel):
 
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
-    """
-    Авторизация из 1С. Принимает данные пользователя, регистрирует/обновляет
-    запись в users и возвращает токен сессии.
-    """
     validated_org = clean_uuid(data.id_org)
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Upsert пользователя (то же что делает Socket.IO connect)
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
@@ -411,7 +395,6 @@ async def onec_auth(data: OneCAuthRequest):
                 id_org   = EXCLUDED.id_org
         """, (data.id_user, validated_org, data.username, data.role))
 
-        # Добавляем в ОБЩИЙ КАБИНЕТ если он есть
         cur.execute("""
             SELECT id_room FROM rooms
             WHERE id_org = %s::uuid AND UPPER(name) LIKE 'ОБЩ%%' AND type = 'admin_group'
@@ -424,9 +407,7 @@ async def onec_auth(data: OneCAuthRequest):
                 (room_general[0], data.id_user)
             )
 
-        # Создаём токен
         token = str(uuid.uuid4()).replace("-", "")
-        # Удаляем старый токен этого пользователя (один пользователь — один токен)
         cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (data.id_user,))
         cur.execute("""
             INSERT INTO api_sessions (token, id_user, id_org, username, role)
@@ -442,10 +423,8 @@ async def onec_auth(data: OneCAuthRequest):
         cur.close()
         conn.close()
 
-
 @app.get("/api/1c/rooms")
 async def onec_get_rooms(x_token: Optional[str] = Header(None)):
-    """Список комнат текущего пользователя."""
     session = get_session_by_token(x_token)
     if not session:
         raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
@@ -467,18 +446,8 @@ async def onec_get_rooms(x_token: Optional[str] = Header(None)):
         cur.close()
         conn.close()
 
-
 @app.get("/api/1c/messages")
-async def onec_get_messages(
-    room_id: int,
-    since_id: int = 0,
-    x_token: Optional[str] = Header(None)
-):
-    """
-    История сообщений комнаты.
-    since_id — ID последнего известного сообщения; если передан,
-    возвращаются только новые (для polling из фонового задания 1С).
-    """
+async def onec_get_messages(room_id: int, since_id: int = 0, x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
     if not session:
         raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
@@ -486,7 +455,6 @@ async def onec_get_messages(
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Проверяем, что пользователь — участник комнаты
         cur.execute("""
             SELECT 1 FROM room_participants
             WHERE id_room = %s AND id_user = %s
@@ -530,13 +498,8 @@ async def onec_get_messages(
         cur.close()
         conn.close()
 
-
 @app.post("/api/1c/messages")
-async def onec_send_message(
-    data: OneCMessageRequest,
-    x_token: Optional[str] = Header(None)
-):
-    """Отправка сообщения из 1С."""
+async def onec_send_message(data: OneCMessageRequest, x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
     if not session:
         raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
@@ -544,7 +507,6 @@ async def onec_send_message(
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Проверяем участие
         cur.execute("""
             SELECT 1 FROM room_participants
             WHERE id_room = %s AND id_user = %s
@@ -560,7 +522,6 @@ async def onec_send_message(
         new_msg = cur.fetchone()
         conn.commit()
 
-        # Уведомляем подключённых через Socket.IO участников (если есть онлайн)
         try:
             await sio.emit('new_message', {
                 "id_message": new_msg['id_message'],
@@ -572,7 +533,7 @@ async def onec_send_message(
                 "created_at": new_msg['created_at'].isoformat() if new_msg['created_at'] else None
             }, room=f"room_{data.room_id}")
         except Exception:
-            pass  # Socket.IO не обязателен
+            pass
 
         return {"success": True, "id_message": new_msg['id_message']}
     except HTTPException:
@@ -584,10 +545,8 @@ async def onec_send_message(
         cur.close()
         conn.close()
 
-
 @app.get("/api/1c/users")
 async def onec_get_users(x_token: Optional[str] = Header(None)):
-    """Список сотрудников организации."""
     session = get_session_by_token(x_token)
     if not session:
         raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
@@ -608,13 +567,8 @@ async def onec_get_users(x_token: Optional[str] = Header(None)):
         cur.close()
         conn.close()
 
-
 @app.get("/api/1c/participants")
-async def onec_get_participants(
-    room_id: int,
-    x_token: Optional[str] = Header(None)
-):
-    """Участники комнаты."""
+async def onec_get_participants(room_id: int, x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
     if not session:
         raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
@@ -635,17 +589,8 @@ async def onec_get_participants(
         cur.close()
         conn.close()
 
-
 @app.get("/api/1c/new_messages")
-async def onec_new_messages(
-    since_id: int = 0,
-    x_token: Optional[str] = Header(None)
-):
-    """
-    Все новые сообщения по всем комнатам пользователя после since_id.
-    Используется фоновым заданием 1С для уведомлений.
-    Возвращает: список сообщений + max_id для следующего запроса.
-    """
+async def onec_new_messages(since_id: int = 0, x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
     if not session:
         raise HTTPException(status_code=401, detail="Неверный или отсутствующий токен")
@@ -681,28 +626,23 @@ async def onec_new_messages(
     finally:
         cur.close()
         conn.close()
-import base64
 
 @app.post("/api/1c/upload-base64")
 async def onec_upload_base64(data: Base64ImageRequest):
     try:
-        # Очищаем строку от возможных префиксов данных (data:image/png;base64,)
         clean_base64 = data.base64_data
         if "," in clean_base64:
             clean_base64 = clean_base64.split(",")[1]
             
-        # Декодируем base64 в бинарные байты силами Python
         image_bytes = base64.b64decode(clean_base64)
         
         unique_id = str(uuid.uuid4())
         saved_filename = f"{unique_id}.png"
         file_path = os.path.join(UPLOAD_DIR, saved_filename)
         
-        # Сохраняем файл на сервере Railway
         with open(file_path, "wb") as f:
             f.write(image_bytes)
             
-        # Записываем оригинальное имя в маппинг
         mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
         file_map = {}
         if os.path.exists(mapping_file):
@@ -716,7 +656,6 @@ async def onec_upload_base64(data: Base64ImageRequest):
         return {"success": True, "url": absolute_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка сервера при сохранении скриншота: {str(e)}")
-# ─── конец REST API для 1С ───────────────────────────────────────────────────
 
 # --- SOCKET.IO EVENTS ---
 
@@ -743,7 +682,7 @@ async def connect(sid, environ, auth=None):
             username = EXCLUDED.username, 
             role = EXCLUDED.role, 
             id_org = EXCLUDED.id_org
-        """, (id_user, validated_org if 'validated_org' in locals() else id_org, username, user_role))
+        """, (id_user, id_org, username, user_role))
         
         cur.execute("""
             SELECT id_room FROM rooms 
@@ -988,12 +927,17 @@ async def remove_user_from_room(sid, data):
         cur.close()
         conn.close()
 
+# ИСПРАВЛЕНО: событие синхронизировано под фронтенд-вызов delete_room_request
+# ЗАМЕНИТЕ ЭТИ ТРИ СОБЫТИЯ В НАСТОЯЩЕМ main.py:
+
 @sio.event
-async def delete_room(sid, data):
+async def delete_room_request(sid, data):
     room_id = data.get('room_id')
+    user_id = data.get('user_id')
+    user_role = data.get('role', 'user')
     if not room_id:
         return
-    session = await sio.get_session(sid)
+        
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1001,10 +945,12 @@ async def delete_room(sid, data):
         room = cur.fetchone()
         if not room:
             return
-        if room['type'] == 'admin_group' and session['role'] != 'admin':
-            await sio.emit('system_alert', {"message": "Удалять официальные каналы структуры может только администратор!"}, to=sid)
+            
+        # Защита: удаляет только админ или создатель
+        if room['type'] == 'admin_group' and user_role != 'admin':
+            await sio.emit('system_alert', {"message": "Удалять официальные каналы может только администратор!"}, to=sid)
             return
-        if room['type'] == 'group' and room['created_by'] != session['id_user'] and session['role'] != 'admin':
+        if room['type'] == 'group' and room['created_by'] != user_id and user_role != 'admin':
             await sio.emit('system_alert', {"message": "Удалить эту комнату может только её создатель!"}, to=sid)
             return
 
@@ -1012,26 +958,31 @@ async def delete_room(sid, data):
         conn.commit()
         await sio.emit('refresh_rooms_trigger')
     except Exception as e:
-        print(f"Ошибка удаления: {e}")
+        print(f"Ошибка удаления комнаты: {e}")
     finally:
         cur.close()
         conn.close()
 
 @sio.event
-async def archive_room_history(sid, data):
+async def archive_room_messages(sid, data):
     room_id = data.get('room_id')
+    user_id = data.get('user_id')
+    user_role = data.get('role', 'user')
     if not room_id:
         return
-    session = await sio.get_session(sid)
+        
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT type FROM rooms WHERE id_room = %s", (room_id,))
+        cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
         room = cur.fetchone()
         if not room:
             return
-        if room['type'] == 'admin_group' and session['role'] != 'admin':
+        if room['type'] == 'admin_group' and user_role != 'admin':
             await sio.emit('system_alert', {"message": "Архивировать этот закрытый канал может только администратор!"}, to=sid)
+            return
+        if room['type'] == 'group' and room['created_by'] != user_id and user_role != 'admin':
+            await sio.emit('system_alert', {"message": "Архивировать эту группу может только её создатель!"}, to=sid)
             return
 
         cur.execute("""
@@ -1050,6 +1001,34 @@ async def archive_room_history(sid, data):
         await sio.emit('download_archive_file', {"messages": messages}, to=sid)
     except Exception as e:
         print(f"Ошибка архивации: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+@sio.event
+async def delete_message_request(sid, data):
+    message_id = data.get('message_id')
+    room_id = data.get('room_id')
+    user_id = data.get('user_id')
+    user_role = data.get('role', 'user')
+    if not message_id or not room_id:
+        return
+        
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT id_user_from FROM messages WHERE id_message = %s", (message_id,))
+        msg = cur.fetchone()
+        if not msg:
+            return
+            
+        # Проверяем права: либо ты автор, либо ты админ чата
+        if user_role == 'admin' or str(msg['id_user_from']) == str(user_id):
+            cur.execute("DELETE FROM messages WHERE id_message = %s", (message_id,))
+            conn.commit()
+            await sio.emit('message_deleted', {"id_message": message_id}, room=f"room_{room_id}")
+    except Exception as e:
+        print(f"Ошибка удаления сообщения: {e}")
     finally:
         cur.close()
         conn.close()
