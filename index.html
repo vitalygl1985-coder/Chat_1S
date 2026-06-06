@@ -198,26 +198,28 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
-    // ИСПРАВЛЕНО: Безопасное сохранение пути в невидимый HTML-атрибут, который 1С прочитает без ошибок!
+    // ИСПРАВЛЕНО: Безопасное сохранение пути в атрибут без деструктивного parentWindow и v8-ссылок
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
         try {
             var container = document.getElementById('messages-container');
             if (!container) return;
             
-            // Формируем разметку. В саму кнопку мы намертво вшиваем data-url атрибут!
             container.innerHTML = '<div style="background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;">' +
                                     '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>' +
-                                    '<button id="btn-save-1c-archive" data-url="' + data.url + '" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>' +
+                                    '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>' +
                                   '</div>';
             
             var btn = document.getElementById('btn-save-1c-archive');
             if (btn) {
+                // Прячем путь скачивания в стандартный data-атрибут тега кнопки
+                btn.setAttribute('data-url', data.url);
+                
                 btn.onclick = function(e) {
                     if (e && e.preventDefault) e.preventDefault();
                     if (window.event) window.event.returnValue = false;
                     
-                    // Меняем текст кнопки. По этому флагу 1С поймет, что пора забирать архив
+                    // Меняем текст. Этот флаг 1С считает по таймеру и выполнит выгрузку
                     this.innerText = "ПЕРЕДАЧА В 1С...";
                     this.style.background = "#9ca3af";
                     
@@ -226,8 +228,8 @@ function apply1CAuth(id_user, id_org, username, user_role) {
             }
         } catch(err) {}
     });
+}
 
-// ИСПРАВЛЕНО: Полная изоляция от DOM-структур. Не вызывает ошибок сценария при асинхронном рендере
 function renderRoomsList(rooms) {
     var container = document.getElementById('rooms-list');
     if (!container) return;
@@ -239,7 +241,6 @@ function renderRoomsList(rooms) {
         var room = rooms[i];
         
         try {
-            // Безопасный пропуск пустых приватных чатов
             if (room.type === 'private' && room.created_by && myCleanId) {
                 var creatorCleanId = String(room.created_by).trim().toUpperCase();
                 if (creatorCleanId === myCleanId && room.name && room.name.indexOf("⇄") === -1) {
@@ -403,7 +404,7 @@ function uploadFile(file) {
             if (data && data.url) {
                 var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
                 var absUrl = window.location.protocol + '//' + window.location.host + data.url;
-                var content = isImg ? '<img src="' + absUrl + '" class="chat-image" onclick="window.open(\'' + absUrl + '\')" />' : 
+                var content = isImg ? '<img src="' + absUrl + '" class="chat-image" onclick="window.open(\'' + absUrl + '"\)" />' : 
                                       '<a href="javascript:void(0);" class="file-attachment" onclick="return downloadFile(\'' + data.url + '\', \'' + file.name.replace(/'/g, "\\'") + '\');">📄 Файл: ' + file.name + '</a>';
                 socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
             }
@@ -499,7 +500,6 @@ function triggerArchive() {
     }
 }
 
-// ИСПРАВЛЕНО: Радикальный кроссбраузерный ПКМ для IE/Chrome со свободным сравнением типов данных
 document.oncontextmenu = function(e) {
     e = e || window.event;
     var target = e.target || e.srcElement;
@@ -585,7 +585,6 @@ document.getElementById('btn-file').onclick = function() { document.getElementBy
 document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); };
 if (inputMsg) { inputMsg.onkeydown = function(e) { if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { e.preventDefault(); sendMessage(); } }; }
 
-// ИСПРАВЛЕНО: Безопасный разбор строки СолиКэша для Тонкого клиента 1С
 function parseHashAndAuthorize() {
     try {
         var hash = window.location.hash;
