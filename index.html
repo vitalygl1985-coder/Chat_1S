@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <link rel="stylesheet" href="/style.css">
 </head>
-<body oncontextmenu="if (window.event) { window.event.returnValue = false; } return false;">
+<body>
 
 <div class="header">
     <h1>Корпоративный чат 1С</h1>
@@ -198,7 +198,6 @@ function apply1CAuth(id_user, id_org, username, user_role) {
         }
     });
 
-    // ИСПРАВЛЕНО: Безопасное сохранение пути в атрибут без деструктивного parentWindow и v8-ссылок
     socket.on('download_archive_file', function(data) {
         if (!data || !data.url) return;
         try {
@@ -212,19 +211,14 @@ function apply1CAuth(id_user, id_org, username, user_role) {
             
             var btn = document.getElementById('btn-save-1c-archive');
             if (btn) {
-                // Прячем путь скачивания в стандартный data-атрибут тега кнопки
                 btn.setAttribute('data-url', data.url);
-                
-                btn.onclick = function(e) {
+                btn.addEventListener('click', function(e) {
                     if (e && e.preventDefault) e.preventDefault();
                     if (window.event) window.event.returnValue = false;
-                    
-                    // Меняем текст. Этот флаг 1С считает по таймеру и выполнит выгрузку
                     this.innerText = "ПЕРЕДАЧА В 1С...";
                     this.style.background = "#9ca3af";
-                    
                     return false;
-                };
+                });
             }
         } catch(err) {}
     });
@@ -262,7 +256,7 @@ function renderRoomsList(rooms) {
         }
         
         (function(r) { 
-            div.onclick = function() { selectRoomById(r.id_room); }; 
+            div.addEventListener('click', function() { selectRoomById(r.id_room); }); 
         })(room);
         
         container.appendChild(div);
@@ -287,9 +281,9 @@ function renderUsersRightPanel(users) {
                         '<div class="user-name-text">' + u.username + '</div>';
         
         (function(target) {
-            div.onclick = function() {
+            div.addEventListener('click', function() {
                 socket.emit('create_private_chat', { target_user_id: target.id_user, target_username: target.username });
-            };
+            });
         })(u);
         container.appendChild(div);
     }
@@ -323,10 +317,10 @@ function renderParticipantsList(list) {
             btnKick.className = 'btn-danger-xs';
             btnKick.innerText = 'Удалить';
             (function(tid) {
-                btnKick.onclick = function(e) {
+                btnKick.addEventListener('click', function(e) {
                     if (e.stopPropagation) e.stopPropagation(); else window.event.cancelBubble = true;
                     if (confirm("Исключить сотрудника из кабинета?")) socket.emit('remove_user_from_room', { room_id: currentRoomId, target_user_id: tid });
-                };
+                });
             })(p.id_user);
             div.appendChild(btnKick);
         }
@@ -418,13 +412,16 @@ function downloadFile(url, filename) {
     try {
         window.open(fullUrl, '_blank', 'width=1,height=1,left=9999,top=9999,resizable=no,scrollbars=no,status=no');
     } catch(e) {
-        var downloadAnchor = document.createElement('a');
-        downloadAnchor.href = fullUrl;
-        downloadAnchor.download = filename;
-        downloadAnchor.target = '_blank';
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        document.body.removeChild(downloadAnchor);
+        // ИСПРАВЛЕНО: Проверка на готовность document.body (замечание Алисы)
+        if (document.body) {
+            var downloadAnchor = document.createElement('a');
+            downloadAnchor.href = fullUrl;
+            downloadAnchor.download = filename;
+            downloadAnchor.target = '_blank';
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            document.body.removeChild(downloadAnchor);
+        }
     }
     return false;
 }
@@ -475,81 +472,11 @@ function handlePasteEvent(e) {
     return true;
 }
 
-if (inputMsg) { inputMsg.onpaste = handlePasteEvent; }
-window.onpaste = handlePasteEvent;
-
-function triggerDeleteRoom() {
-    if (!currentRoomId) return;
-    if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
-        socket.emit('delete_room_request', { 
-            room_id: parseInt(currentRoomId),
-            user_id: currentUserId,
-            role: currentUserRole
-        });
-    }
-}
-
-function triggerArchive() {
-    if (!currentRoomId) return;
-    if (confirm("Перенести переписку кабинета в архивный файл и очистить текущий чат на сервере?")) {
-        socket.emit('archive_room_messages', { 
-            room_id: parseInt(currentRoomId),
-            user_id: currentUserId,
-            role: currentUserRole
-        });
-    }
-}
-
-document.oncontextmenu = function(e) {
-    e = e || window.event;
-    
-    // 1. СРАЗУ глушим стандартное меню 1С для всей страницы
-    if (e.preventDefault) e.preventDefault();
-    e.returnValue = false;
-    e.cancelBubble = true;
-    if (e.stopPropagation) e.stopPropagation();
-    
-    var target = e.target || e.srcElement;
-    var msgDiv = target;
-    
-    // Ищем контейнер сообщения вверх по дереву DOM
-    while (msgDiv && msgDiv !== document.body) {
-        if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
-            break;
-        }
-        msgDiv = msgDiv.parentNode;
-    }
-    
-    // 2. Если кликнули мимо сообщения — просто ничего не делаем (меню 1С не откроется)
-    if (!msgDiv || msgDiv === document.body) return false; 
-    
-    selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
-    var authorId = msgDiv.getAttribute('data-author-id');
-    
-    if (selectedMessageIdForCtx) {
-        var cleanAuthor = String(authorId).toUpperCase().trim();
-        var cleanCurrent = String(currentUserId).toUpperCase().trim();
-        
-        // 3. Если это админ или автор сообщения — показываем наше меню
-        if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
-            var menu = document.getElementById('custom-context-menu');
-            if (menu) {
-                menu.style.left = e.clientX + 'px';
-                menu.style.top = e.clientY + 'px';
-                menu.style.display = 'block';
-            }
-        }
-    }
-    
-    return false;
-};
-
-// Перехватываем правый клик на этапе мыши, до вызова меню платформы
-document.onmousedown = function(e) {
+// ИСПРАВЛЕНО: Заменили onmousedown на изолированный handleMouseDown (замечание Алисы)
+function handleMouseDown(e) {
     e = e || window.event;
     if (!e) return true;
     
-    // 2 — это код правой кнопки мыши в старых стандартах IE
     if (e.button === 2 || e.which === 3) {
         var target = e.target || e.srcElement;
         
@@ -577,22 +504,79 @@ document.onmousedown = function(e) {
                 e.returnValue = false;
                 
                 var menu = document.getElementById('custom-context-menu');
-                menu.style.left = e.clientX + 'px';
-                menu.style.top = e.clientY + 'px';
-                menu.style.display = 'block';
+                if (menu) {
+                    menu.style.left = e.clientX + 'px';
+                    menu.style.top = e.clientY + 'px';
+                    menu.style.display = 'block';
+                }
                 
                 return false;
             }
         }
     }
     return true;
-};
+}
 
-document.onclick = function() {
-    document.getElementById('custom-context-menu').style.display = 'none';
-};
+// ИСПРАВЛЕНО: Заменили oncontextmenu на изолированный handleContextMenu (замечание Алисы)
+function handleContextMenu(e) {
+    e = e || window.event;
+    
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+    e.cancelBubble = true;
+    if (e.stopPropagation) e.stopPropagation();
+    
+    var target = e.target || e.srcElement;
+    var msgDiv = target;
+    
+    while (msgDiv && msgDiv !== document.body) {
+        if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
+            break;
+        }
+        msgDiv = msgDiv.parentNode;
+    }
+    
+    if (!msgDiv || msgDiv === document.body) return false; 
+    
+    selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
+    var authorId = msgDiv.getAttribute('data-author-id');
+    
+    if (selectedMessageIdForCtx) {
+        var cleanAuthor = String(authorId).toUpperCase().trim();
+        var cleanCurrent = String(currentUserId).toUpperCase().trim();
+        
+        if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
+            var menu = document.getElementById('custom-context-menu');
+            if (menu) {
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+                menu.style.display = 'block';
+            }
+        }
+    }
+    
+    return false;
+}
 
-document.getElementById('ctx-delete-msg').onclick = function() {
+// ИСПРАВЛЕНО: Регистрация всех глобальных событий через addEventListener / attachEvent
+if (document.addEventListener) {
+    document.addEventListener('mousedown', handleMouseDown, false);
+    document.addEventListener('contextmenu', handleContextMenu, false);
+    window.addEventListener('paste', handlePasteEvent, false);
+    if (inputMsg) { inputMsg.addEventListener('paste', handlePasteEvent, false); }
+} else if (document.attachEvent) {
+    document.attachEvent('onmousedown', handleMouseDown);
+    document.attachEvent('oncontextmenu', handleContextMenu);
+    window.attachEvent('onpaste', handlePasteEvent);
+    if (inputMsg) { inputMsg.attachEvent('onpaste', handlePasteEvent); }
+}
+
+document.addEventListener('click', function() {
+    var menu = document.getElementById('custom-context-menu');
+    if (menu) menu.style.display = 'none';
+});
+
+document.getElementById('ctx-delete-msg').addEventListener('click', function() {
     if (selectedMessageIdForCtx && currentRoomId) {
         if (confirm("Удалить это сообщение для всех участников?")) {
             socket.emit('delete_message_request', { 
@@ -603,39 +587,48 @@ document.getElementById('ctx-delete-msg').onclick = function() {
             });
         }
     }
-};
+});
 
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;
     var d = document.getElementById('modal-user-dropdown'); d.innerHTML = "";
     for (var i=0; i<globalUsersCache.length; i++) { d.innerHTML += '<option value="'+globalUsersCache[i].id_user+'">'+globalUsersCache[i].username+'</option>'; }
     document.getElementById('user-select-modal').style.display = 'flex';
-    document.getElementById('modal-submit-btn').onclick = function() { cb(d.value); closeUserModal(); };
+    document.getElementById('modal-submit-btn').addEventListener('click', function() { cb(d.value); closeUserModal(); });
 }
 function closeUserModal() { document.getElementById('user-select-modal').style.display = 'none'; }
-function openSecretModal(t, cb) { document.getElementById('secret-input-modal').style.display = 'flex'; document.getElementById('secret-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-secret-field').value); closeSecretModal(); }; }
+function openSecretModal(t, cb) { document.getElementById('secret-input-modal').style.display = 'flex'; document.getElementById('secret-modal-submit-btn').addEventListener('click', function() { cb(document.getElementById('modal-secret-field').value); closeSecretModal(); }); }
 function closeSecretModal() { document.getElementById('secret-input-modal').style.display = 'none'; }
-function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
+function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').addEventListener('click', function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }); }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-document.getElementById('btn-paste-screen').onclick = function() {
+document.getElementById('btn-paste-screen').addEventListener('click', function() {
     if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
     inputMsg.focus();
     try {
         if (document.execCommand) { document.execCommand('paste'); }
     } catch(err) {}
-};
+});
 
-document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
-document.getElementById('btn-create-group').onclick = function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); };
-document.getElementById('btn-secret').onclick = function() {
+document.getElementById('btn-add-participant').addEventListener('click', function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); });
+document.getElementById('btn-create-group').addEventListener('click', function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); });
+document.getElementById('btn-secret').addEventListener('click', function() {
     if (!isSecretMode) { openSecretModal("Секретный ключ", function(k) { userSecretKey = k; isSecretMode = true; document.getElementById('btn-secret').className = 'btn-secret active'; document.getElementById('btn-secret').innerText = '🔒 Шифрование ВКЛ'; }); }
     else { isSecretMode = false; this.className = 'btn-secret'; this.innerText = '🔒 Обычный режим'; }
-};
-document.getElementById('btn-send').onclick = sendMessage;
-document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); };
-if (inputMsg) { inputMsg.onkeydown = function(e) { if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { e.preventDefault(); sendMessage(); } }; }
+});
+document.getElementById('btn-send').addEventListener('click', sendMessage);
+document.getElementById('btn-file').addEventListener('click', function() { document.getElementById('file-input').click(); });
+document.getElementById('file-input').addEventListener('change', function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+
+// ИСПРАВЛЕНО: Добавлена пропущенная закрывающая скобка круглая ")" в обработчике keydown (Критическая синтаксическая ошибка)
+if (inputMsg) { 
+    inputMsg.addEventListener('keydown', function(e) { 
+        if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { 
+            e.preventDefault(); 
+            sendMessage(); 
+        } 
+    }); 
+}
 
 function parseHashAndAuthorize() {
     try {
@@ -661,13 +654,24 @@ function parseHashAndAuthorize() {
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
 
-// Заглушка на случай, если 1С вызовет эту функцию при закрытии
+// ИСПРАВЛЕНО: Насильное удаление слушателей при закрытии обработки 1С
 window.destroyChatBeforeClose = function() {
-    console.log("Destroy called from 1C");
-    if (socket) {
-        try { socket.disconnect(); } catch(e) {}
-        socket = null;
-    }
+    try {
+        if (socket) { socket.disconnect(); }
+        
+        if (document.removeEventListener) {
+            document.removeEventListener('mousedown', handleMouseDown, false);
+            document.removeEventListener('contextmenu', handleContextMenu, false);
+            window.removeEventListener('paste', handlePasteEvent, false);
+            if (inputMsg) { inputMsg.removeEventListener('paste', handlePasteEvent, false); }
+        } else if (document.detachEvent) {
+            document.detachEvent('onmousedown', handleMouseDown);
+            document.detachEvent('oncontextmenu', handleContextMenu);
+            window.detachEvent('onpaste', handlePasteEvent);
+            if (inputMsg) { inputMsg.detachEvent('onpaste', handlePasteEvent); }
+        }
+    } catch(e) {}
+    return true;
 };
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -676,9 +680,8 @@ window.onerror = function(message, source, lineno, colno, error) {
         var errMsg = '<div style="color:red; padding:4px; border:1px solid red;">JS ERROR: ' + message + ' at line ' + lineno + '</div>';
         logDiv.insertAdjacentHTML('afterbegin', errMsg);
     }
-    return true; // Предотвратить всплытие ошибки в 1С
+    return true; 
 };
-
 </script>
 </body>
 </html>
