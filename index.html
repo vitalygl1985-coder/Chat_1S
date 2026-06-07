@@ -19,24 +19,39 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body, html { height: 100vh; max-height: 100vh; background: var(--bg-main); color: var(--text-main); overflow: hidden; }
+        body, html { height: 100vh; max-height: 100vh; background: var(--bg-main); color: var(--text-main); overflow: hidden; display: flex; flex-direction: column; }
 
         .app-container {
             display: grid;
             grid-template-columns: 260px 1fr 280px;
-            height: 100vh;
-            max-height: 100vh;
+            flex: 1;
+            max-height: calc(100vh - 25px);
             background: var(--bg-panel);
             overflow: hidden;
         }
+
+        /* ТРЕБОВАНИЕ: Нижний слой ссылок из админки чата и 1С */
+        .system-footer-links {
+            height: 25px;
+            background: #e5e7eb;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            font-size: 11px;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .system-footer-links a { color: var(--primary-color); text-decoration: none; }
+        .system-footer-links a:hover { text-decoration: underline; }
 
         .panel {
             display: flex;
             flex-direction: column;
             background: var(--bg-panel);
             border-right: 1px solid var(--border-color);
-            height: 100vh;
-            max-height: 100vh;
+            height: 100%;
             overflow: hidden;
         }
         .panel-header {
@@ -91,7 +106,12 @@
             background: var(--bg-panel);
             flex-shrink: 0;
         }
+        
+        /* ТРЕБОВАНИЕ: Информационная плашка пользователя вверху чата */
+        .chat-title-area { display: flex; flex-direction: column; }
         .chat-title { font-weight: 600; font-size: 15px; }
+        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; }
+        
         .chat-actions { display: flex; gap: 6px; }
         
         .btn {
@@ -111,11 +131,9 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* ДОРАБОТАНО: Адаптивные стили для вставки инлайн-изображений по ТЗ */
-        .msg-text img { max-width: 100%; max-height: 300px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
+        .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
-        /* СТИЛИ ДЛЯ ЛАЙКОВ / ПРОЧИТАНО */
         .msg-read-panel {
             display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; border-top: 1px dashed #e5e7eb; padding-top: 4px;
         }
@@ -144,7 +162,6 @@
         .toolbar-item:hover { background: var(--bg-main); }
         .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
         
-        /* ГИБКАЯ ПАНЕЛЬ ЭМОДЗИ */
         .emoji-picker-popover {
             position: absolute; bottom: 35px; left: 120px; background: white; border: 1px solid var(--border-color);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; padding: 8px; display: none;
@@ -155,7 +172,7 @@
 
         .controls-row { display: flex; gap: 8px; align-items: center; }
         .input-msg-div {
-            flex: 1; height: 36px; max-height: 70px; overflow-y: auto;
+            flex: 1; min-height: 36px; max-height: 80px; overflow-y: auto;
             border: 1px solid var(--border-color); border-radius: 6px;
             padding: 8px; outline: none; background: #fff; font-size: 13px;
         }
@@ -185,7 +202,6 @@
         .view-pane { display: none; }
         .view-pane.active { display: block; }
 
-        /* МОДАЛЬНЫЕ ОКНА */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000;
@@ -202,41 +218,34 @@
             border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 4px;
         }
         .modal-user-item:hover { background: var(--bg-main); }
-
-        .screenshot-modal-window {
-            width: 85vw; height: 85vh; max-width: 1000px; background: white; border-radius: 12px;
-            display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden;
-        }
-        .editor-container {
-            flex: 1; display: flex; background: #333; overflow: hidden; justify-content: center; align-items: center; position: relative;
-        }
-        .canvas-wrapper {
-            position: relative; max-width: 100%; max-height: 100%; overflow: auto; padding: 10px;
-        }
-        canvas { background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: block; cursor: crosshair; }
-        .editor-toolbar {
-            padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb;
-            display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
-        }
-        .editor-tool-btn {
-            padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px;
-            cursor: pointer; font-size: 12px; font-weight: 500;
-        }
-        .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
+        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
+        .btn-decrypt-inline { background: #f59e0b; padding: 2px 8px; border-radius: 4px; border: none; color: white; font-size: 11px; cursor: pointer; font-weight: bold; margin-left: 5px; }
         
-        .btn-decrypt-inline {
-            background: #f59e0b; padding: 2px 8px; border-radius: 4px; border: none; color: white;
-            font-size: 11px; cursor: pointer; font-weight: bold; margin-left: 5px;
-        }
-        .btn-decrypt-inline:hover { background: #d97706; }
-
-        .unread-badge {
-            background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px;
-            font-size: 10px; font-weight: bold; margin-left: auto; box-shadow: 0 1px 3px rgba(37,99,235,0.4);
-        }
+        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
+
+<div class="modal-overlay" id="create-room-modal">
+    <div class="modal-window" style="width: 420px;">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">🛠️ Создание нового кабинета</span>
+            <span id="btn-close-room-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px; border-bottom: 1px solid var(--border-color);">
+            <label style="font-size:12px; font-weight:600; color:var(--text-main)">Название кабинета:</label>
+            <input type="text" class="search-box" id="new-room-name" placeholder="Введите имя комнаты...">
+        </div>
+        <div style="padding: 10px 15px 5px 15px; font-size:11px; font-weight:bold; color:var(--text-muted); text-transform:uppercase;">
+            Выберите участников (минимум 1):
+        </div>
+        <div class="modal-body" id="create-room-users-container" style="max-height: 250px;"></div>
+        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
+            <button class="btn" id="btn-cancel-room-creation" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-primary" id="btn-confirm-room-creation">Создать комнату</button>
+        </div>
+    </div>
+</div>
 
 <div class="modal-overlay" id="add-user-modal">
     <div class="modal-window">
@@ -251,48 +260,12 @@
     </div>
 </div>
 
-<div class="modal-overlay" id="screenshot-modal">
-    <div class="screenshot-modal-window">
-        <div class="modal-header">
-            <span style="font-weight: 600; font-size: 14px;">🎨 Графический редактор скриншотов</span>
-            <span id="btn-close-screenshot-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
-        </div>
-        <div class="editor-toolbar">
-            <button class="editor-tool-btn active" id="tool-draw">✏️ Кисть</button>
-            <button class="editor-tool-btn" id="tool-text">🔤 Текст (Клик на холст)</button>
-            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
-                <span>Цвет:</span>
-                <input type="color" id="editor-color" value="#ef4444" style="width:24px; height:24px; border:none; cursor:pointer;">
-            </div>
-            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
-                <span>Размер:</span>
-                <select id="editor-size" style="padding:2px; font-size:12px;">
-                    <option value="3">3 px</option>
-                    <option value="5" selected>5 px</option>
-                    <option value="10">10 px</option>
-                    <option value="15">15 px</option>
-                </select>
-            </div>
-            <button class="editor-tool-btn" id="btn-editor-clear" style="margin-left:auto; background:#fca5a5; color:#7f1d1d;">🗑️ Очистить правки</button>
-        </div>
-        <div class="editor-container">
-            <div class="canvas-wrapper">
-                <canvas id="editor-canvas"></canvas>
-            </div>
-        </div>
-        <div class="modal-header" style="border-top: 1px solid var(--border-color); border-bottom:none; justify-content:flex-end; gap:10px;">
-            <button class="btn" id="btn-cancel-screenshot" style="background:#9ca3af;">Отмена</button>
-            <button class="btn btn-success" id="btn-submit-screenshot" style="padding:7px 20px;">💾 Отправить в чат</button>
-        </div>
-    </div>
-</div>
-
 <div class="app-container">
     <div class="panel left-panel">
         <div class="panel-header">
             <h3 style="font-size: 14px;">Кабинеты</h3>
             <input type="text" class="search-box" id="search-rooms" placeholder="Поиск кабинета...">
-            <button class="btn btn-primary" id="btn-create-group" style="width:100%;">+ Создать Кабинет</button>
+            <button class="btn btn-primary" id="btn-open-create-modal">+ Создать Кабинет</button>
         </div>
         <div class="panel-scroll-area" id="rooms-list-container">
             <div id="active-rooms-list"></div>
@@ -308,7 +281,10 @@
 
     <div class="panel chat-panel">
         <div class="chat-header">
-            <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
+            <div class="chat-title-area">
+                <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
+                <div class="chat-user-identity" id="header-user-identity">Загрузка сессии...</div>
+            </div>
             <div class="chat-actions" id="chat-management-controls" style="display: none;">
                 <button class="btn btn-warn" id="btn-archive-room">📦 В архив</button>
                 <button class="btn btn-danger" id="btn-delete-room">❌ Удалить чат</button>
@@ -325,7 +301,6 @@
                     <option value="Segoe UI">Стандартный</option>
                     <option value="Courier New">Широкий (Код)</option>
                     <option value="Georgia">Строгий</option>
-                    <option value="Impact">Жирный акцент</option>
                 </select>
                 <select id="font-size-select">
                     <option value="13px">13px</option>
@@ -334,23 +309,19 @@
                 </select>
                 <div class="toolbar-item" id="style-bold" style="font-weight:bold;">B</div>
                 <div class="toolbar-item" id="style-italic" style="font-style:italic;">I</div>
-                
                 <div class="toolbar-item" id="btn-emoji-trigger" title="Эмодзи">😀</div>
                 <div class="emoji-picker-popover" id="emoji-popover"></div>
 
-                <input type="color" id="text-color-picker" title="Цвет текста" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
-                <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
+                <input type="color" id="text-color-picker" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
+                <input type="color" id="text-bg-picker" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
-                <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
+                <div class="toolbar-item" id="btn-secret-toggle" style="font-size: 12px;">🔓 Открыто</div>
             </div>
 
             <div class="controls-row">
                 <input type="file" id="global-file-input" style="display:none">
                 <button class="btn btn-primary" id="btn-attach-file" style="background:#6b7280; padding: 10px 14px;" title="Отправить файл">📎</button>
-                <!-- ИСПРАВЛЕНО: Кнопка скриншота снова открывает графический редактор по ТЗ -->
-                <button class="btn btn-primary" id="btn-screenshot-editor" style="background:#4b5563; padding: 10px 15px;" title="Редактор скриншотов">📋 Скриншот</button>
-                <!-- ТРЕБОВАНИЕ: Добавлена текстовая подсказка Ctrl+V в плейсхолдер -->
-                <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Напишите сообщение... (Ctrl+V - что бы вставить скрин в чат)"></div>
+                <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора"></div>
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
@@ -374,6 +345,11 @@
     </div>
 </div>
 
+<div class="system-footer-links">
+    <div id="footer-admin-block"><a href="/admin-panel" target="_blank">⚙️ Панель администратора чата</a></div>
+    <div id="footer-onec-block"><a href="https://onec.company.local/trade" target="_blank">🌐 Запуск веб-клиента 1С:Предприятие</a></div>
+</div>
+
 <script>
     window.onerror = function() { return true; };
 
@@ -383,57 +359,23 @@
     let sessionToken = null;
     let globalUsersCache = []; 
     let roomParticipantsCache = []; 
-    let isMentionMenuOpen = false;
-    let isSecretMode = false;
-    let userSecretKey = "";
-    
-    let unreadCounts = {}; 
     let latestRoomsListCache = [];
-    
     let onlineUsersCache = {}; 
     let messageReadsMap = {}; 
+    let isSecretMode = false;
+    let userSecretKey = "";
 
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
 
-    let currentEditorTool = 'draw'; 
-    let isDrawing = false;
-    let lastX = 0; let lastY = 0;
-    let baseImageObj = null; 
-
     const inputMsg = document.getElementById('input-msg');
     const messagesStream = document.getElementById('messages-stream');
-    const screenshotModal = document.getElementById('screenshot-modal');
-    const canvas = document.getElementById('editor-canvas');
-    const ctx = canvas.getContext('2d');
+    const createRoomModal = document.getElementById('create-room-modal');
 
-    const popularEmojis = ['😀', '😂', '👍', '🔥', '🎉', '💩', '🚀', '❤️', '👀', '💼', '✅', '❌'];
-
-    function playNotificationSound() {
-        try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return;
-            const audioCtx = new AudioContext();
-            let osc1 = audioCtx.createOscillator();
-            let gain1 = audioCtx.createGain();
-            osc1.type = 'sine'; osc1.frequency.setValueAtTime(659.25, audioCtx.currentTime);
-            gain1.gain.setValueAtTime(0.08, audioCtx.currentTime);
-            gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-            osc1.connect(gain1); gain1.connect(audioCtx.destination);
-            osc1.start(); osc1.stop(audioCtx.currentTime + 0.15);
-            setTimeout(() => {
-                let osc2 = audioCtx.createOscillator(); let gain2 = audioCtx.createGain();
-                osc2.type = 'sine'; osc2.frequency.setValueAtTime(880.00, audioCtx.currentTime);
-                gain2.gain.setValueAtTime(0.08, audioCtx.currentTime);
-                gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-                osc2.connect(gain2); gain2.connect(audioCtx.destination);
-                osc2.start(); osc2.stop(audioCtx.currentTime + 0.25);
-            }, 80);
-        } catch(e) {}
-    }
+    const popularEmojis = ['😀', '😂', '👍', '🔥', '🎉', '💩', '🚀', '❤️', '👀', '✅', '❌'];
 
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         var content = document.getElementById('inactive-rooms-list');
-        content.toggle('open');
+        content.classList.toggle('open');
         this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
     });
 
@@ -464,11 +406,14 @@
             if (data.success) {
                 sessionToken = data.token;
                 currentUser = data.user;
+                
+                // Отображаем текущего сотрудника в шапке
+                document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
+                
                 buildEmojiPicker();
                 connectSockets();
                 initUIEventListeners();
                 initMentionLogic();
-                initScreenshotEditorLogic();
             } else { alert("Ошибка авторизации: Токен устарел."); }
         } catch (err) { alert("Не удалось связаться с сервером авторизации."); }
     }
@@ -502,21 +447,7 @@
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         
         socket.on('new_message', (msg) => { 
-            if (msg) {
-                if (msg.id_room == currentRoomId) {
-                    displayMessage(msg, false); 
-                } else {
-                    unreadCounts[msg.id_room] = (unreadCounts[msg.id_room] || 0) + 1;
-                    playNotificationSound();
-                    filterAndRenderRooms();
-                }
-                
-                if (msg.text.includes(`data-user-id="${currentUser.id_user}"`) || msg.text.includes(`@${currentUser.username}`)) {
-                    if (Notification.permission === "granted") {
-                        new Notification(`Вас упомянул ${msg.username}`, { body: "Нажмите, чтобы открыть кабинет." });
-                    }
-                }
-            }
+            if (msg && msg.id_room == currentRoomId) displayMessage(msg, false); 
         });
 
         socket.on('user_statuses', (statuses) => {
@@ -545,14 +476,20 @@
             }
         });
 
+        // ИСПРАВЛЕНО: Безопасная очистка текста при удалении сообщения без деформации структуры чата и полей ввода
         socket.on('message_deleted', (data) => {
             const el = document.querySelector(`[data-msg-id="${data.id_message}"] .msg-text`);
-            if (el) el.innerHTML = '<span style="color:#9ca3af; font-style:italic;">Сообщение удалено автором</span>';
+            if (el) {
+                el.innerText = ""; 
+                const span = document.createElement('span');
+                span.style.color = "#9ca3af";
+                span.style.fontStyle = "italic";
+                span.innerText = "Сообщение удалено автором";
+                el.appendChild(span);
+            }
         });
 
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
-        socket.on('system_alert', (data) => { alert(data.message); });
-        socket.on('download_archive_file', (data) => { if (data && data.url) window.open(data.url, '_blank'); });
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
     }
 
@@ -575,26 +512,12 @@
         allRooms.forEach(room => {
             const div = document.createElement('div');
             const isSelected = (room.id_room == currentRoomId);
-            const unread = unreadCounts[room.id_room] || 0;
-
             div.className = `room-item ${isSelected ? 'active' : ''}`;
-            if (unread > 0 && !isSelected) {
-                div.style.borderLeft = "4px solid var(--primary-color)";
-                div.style.background = "#f3f4f6";
-            }
 
             let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
             const labelSpan = document.createElement('span');
             labelSpan.innerText = icon + room.name;
-            if (unread > 0 && !isSelected) labelSpan.style.fontWeight = "bold";
             div.appendChild(labelSpan);
-
-            if (unread > 0 && !isSelected) {
-                const badge = document.createElement('span');
-                badge.className = 'unread-badge';
-                badge.innerText = unread;
-                div.appendChild(badge);
-            }
 
             div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
             
@@ -606,8 +529,6 @@
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId;
-        unreadCounts[roomId] = 0; 
-        
         document.getElementById('current-chat-title').innerText = name || "Кабинет";
         const managementRow = document.getElementById('chat-management-controls');
         managementRow.style.display = (currentUser.role === 'admin' || createdBy == currentUser.id_user) && type !== 'private' ? 'flex' : 'none';
@@ -616,13 +537,6 @@
         socket.emit('join_room_pool', { room_id: roomId });
         socket.emit('get_room_history', { room_id: roomId });
         socket.emit('get_room_participants', { room_id: roomId });
-        
-        document.getElementById('pane-company').classList.remove('active');
-        document.getElementById('pane-participants').classList.add('active');
-        document.getElementById('btn-toggle-right-view').innerText = "👥 Все сотрудники";
-        document.getElementById('btn-toggle-right-view').style.background = "#4b5563";
-
-        filterAndRenderRooms();
     }
 
     function displayMessage(msg, isBulkLoad) {
@@ -680,7 +594,7 @@
                             renderProcessedText(textBlock, decryptedText);
                             decryptBtn.remove();
                         } else { alert("Неверный код шифрования!"); }
-                    } catch(err) { alert("Ошибка расшифровки: Неверный ключ."); }
+                    } catch(err) { alert("Ошибка расшифровки."); }
                 }
             };
             textBlock.appendChild(decryptBtn);
@@ -695,7 +609,7 @@
         if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username });
     };
 
-    // ТРЕБОВАНИЕ: Картинка рендерится inline прямо в чат, а под ней — кнопка скачивания по ТЗ
+    // ТРЕБОВАНИЕ: Объединение скриншота/картинки и кнопки скачивания в один узел сообщения
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
@@ -706,9 +620,7 @@
                 `;
             } else {
                 const parts = contentText.split('|');
-                const fileUrl = parts[0];
-                const fileName = parts[1] || "Скачать файл";
-                targetElement.innerHTML = `📁 <a href="${fileUrl}" target="_blank" style="color:var(--primary-color); font-weight:600;">${fileName}</a>`;
+                targetElement.innerHTML = `📁 <a href="${parts[0]}" target="_blank" style="color:var(--primary-color); font-weight:600;">${parts[1] || "Скачать файл"}</a>`;
             }
         } else {
             targetElement.innerHTML = contentText;
@@ -722,9 +634,29 @@
     function initUIEventListeners() {
         document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
 
-        document.getElementById('btn-create-group').addEventListener('click', () => {
-            let gname = prompt("Введите название нового кабинета:");
-            if (gname && gname.trim() !== "") socket.emit('create_group_chat', { group_name: gname.trim() });
+        // ТРЕБОВАНИЕ: Логика открытия модального диалога расширенного создания комнат
+        document.getElementById('btn-open-create-modal').addEventListener('click', () => {
+            createRoomModal.classList.add('open');
+            renderCreateRoomUsers(globalUsersCache);
+        });
+
+        document.getElementById('btn-close-room-modal').addEventListener('click', () => createRoomModal.classList.remove('open'));
+        document.getElementById('btn-cancel-room-creation').addEventListener('click', () => createRoomModal.classList.remove('open'));
+        
+        // ТРЕБОВАНИЕ: Проверка на имя и выбор хотя бы одного участника перед отправкой на бэк
+        document.getElementById('btn-confirm-room-creation').addEventListener('click', () => {
+            const rName = document.getElementById('new-room-name').value.trim();
+            const checkedBoxes = document.querySelectorAll('.participant-checkbox:checked');
+            
+            if(!rName) { alert("Укажите название создаваемой комнаты!"); return; }
+            if(checkedBoxes.length === 0) { alert("Необходимо выбрать хотя бы одного участника для создания комнаты!"); return; }
+            
+            const participantsArray = [];
+            checkedBoxes.forEach(cb => participantsArray.push(cb.value));
+            
+            socket.emit('create_advanced_room', { name: rName, participants: participantsArray });
+            document.getElementById('new-room-name').value = "";
+            createRoomModal.classList.remove('open');
         });
 
         const modal = document.getElementById('add-user-modal');
@@ -737,9 +669,7 @@
         document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
 
         document.getElementById('search-modal-users').addEventListener('input', function() {
-            const val = this.value.toLowerCase().trim();
-            const filtered = globalUsersCache.filter(u => u.username.toLowerCase().includes(val));
-            renderModalUsers(filtered);
+            renderModalUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim())));
         });
 
         document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
@@ -751,13 +681,24 @@
             } 
         });
 
-        window.addEventListener('paste', (e) => {
+        // ТРЕБОВАНИЕ: Ctrl+V ловит скриншот из буфера и автоматически пушит его в чат без задержек в один клик
+        window.addEventListener('paste', async (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let index in items) {
                 const item = items[index];
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    if (!currentRoomId) { alert("Сначала выберите рабочий чат для вставки скриншота!"); return; }
                     const blob = item.getAsFile();
-                    openEditorWithBlob(blob);
+                    const formData = new FormData();
+                    formData.append('file', blob, `screenshot_${Date.now()}.png`);
+                    
+                    try {
+                        const res = await fetch('/upload', { method: 'POST', body: formData });
+                        const meta = await res.json();
+                        if (meta.url) {
+                            socket.emit('send_message', { room_id: currentRoomId, text: meta.url, is_secret: false, ui_styles: "{}" });
+                        }
+                    } catch(err) { alert("Сбой автоматической отправки скриншота."); }
                 }
             }
         });
@@ -765,41 +706,30 @@
         const fileInput = document.getElementById('global-file-input');
         document.getElementById('btn-attach-file').addEventListener('click', () => fileInput.click());
         
-        // ИСПРАВЛЕНО: Кнопка скриншот снова открывает графический модальный редактор холста по ТЗ
-        document.getElementById('btn-screenshot-editor').addEventListener('click', () => {
-            alert("Скопируйте изображение (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора!");
-        });
-        
         fileInput.addEventListener('change', async function() {
             if (this.files.length === 0) return;
-            if (!currentRoomId) { alert("Сначала выберите рабочий чат!"); return; }
-            
             const formData = new FormData();
             formData.append('file', this.files[0]);
-            
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const meta = await res.json();
                 if (meta.url) {
                     let ext = meta.filename.split('.').pop().toLowerCase();
-                    let payload = meta.url;
-                    if (!['png','jpg','jpeg','gif','webp'].includes(ext)) {
-                        payload = `${meta.url}|${meta.filename}`;
-                    }
+                    let payload = ['png','jpg','jpeg','gif','webp'].includes(ext) ? meta.url : `${meta.url}|${meta.filename}`;
                     socket.emit('send_message', { room_id: currentRoomId, text: payload, is_secret: false, ui_styles: "{}" });
                 }
-            } catch(e) { alert("Ошибка загрузки файла на server."); }
+            } catch(e) {}
             this.value = "";
         });
 
         document.getElementById('btn-secret-toggle').addEventListener('click', function() {
             isSecretMode = !isSecretMode;
             if (isSecretMode) {
-                let key = prompt("Задайте секретный код для зашифрования отправляемого сообщения:");
+                let key = prompt("Задайте секретный код:");
                 if (key && key.trim() !== "") {
                     userSecretKey = key.trim();
                     this.innerHTML = "🔒 Зашифровано"; 
-                    this.style.background = "#fef08a"; this.style.color = "#a16207"; this.style.fontWeight = "bold";
+                    this.style.background = "#fef08a";
                 } else { isSecretMode = false; resetSecretToggleUI(this); }
             } else { resetSecretToggleUI(this); }
         });
@@ -819,105 +749,40 @@
         document.getElementById('text-bg-picker').addEventListener('input', function() { currentTextStyles.background = this.value; inputMsg.style.backgroundColor = this.value; });
 
         document.getElementById('search-contacts').addEventListener('input', function() {
-            const value = this.value.toLowerCase().trim();
-            renderCompanyUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(value)));
+            renderCompanyUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim())));
         });
 
-        document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
+        document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId }); });
         document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
     }
 
-    function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; element.style.color = "var(--text-main)"; element.style.fontWeight = "normal"; userSecretKey = ""; }
-
+    function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; userSecretKey = ""; }
+    
     function sendMessageStream() {
         let text = inputMsg.innerHTML.trim(); if (!text || !currentRoomId) return;
-        
         if (isSecretMode && userSecretKey) {
-            let pureText = inputMsg.innerText.trim();
-            text = CryptoJS.AES.encrypt(pureText, userSecretKey).toString();
+            text = CryptoJS.AES.encrypt(inputMsg.innerText.trim(), userSecretKey).toString();
         }
-        
         socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
         inputMsg.innerHTML = "";
-        
         isSecretMode = false;
         resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
     }
 
-    function initScreenshotEditorLogic() {
-        document.getElementById('btn-close-screenshot-modal').addEventListener('click', () => screenshotModal.classList.remove('open'));
-        document.getElementById('btn-cancel-screenshot').addEventListener('click', () => screenshotModal.classList.remove('open'));
-
-        const toolDraw = document.getElementById('tool-draw');
-        const toolText = document.getElementById('tool-text');
-
-        toolDraw.addEventListener('click', () => { currentEditorTool = 'draw'; toolDraw.classList.add('active'); toolText.classList.remove('active'); });
-        toolText.addEventListener('click', () => { currentEditorTool = 'text'; toolText.classList.add('active'); toolDraw.classList.remove('active'); });
-
-        document.getElementById('btn-editor-clear').addEventListener('click', () => {
-            if(baseImageObj) redrawCanvasBase();
+    // ТРЕБОВАНИЕ: Рендер списка чекбоксов в модальном окне создания комнат
+    function renderCreateRoomUsers(users) {
+        const container = document.getElementById('create-room-users-container');
+        container.innerHTML = "";
+        users.forEach(u => {
+            if (u.id_user === currentUser.id_user) return;
+            const div = document.createElement('div');
+            div.className = 'modal-user-item';
+            div.innerHTML = `
+                <span><b>${u.username}</b> (${u.role})</span>
+                <input type="checkbox" class="participant-checkbox" value="${u.id_user}">
+            `;
+            container.appendChild(div);
         });
-
-        canvas.addEventListener('mousedown', (e) => {
-            if (currentEditorTool === 'draw') {
-                isDrawing = true;
-                [lastX, lastY] = [e.offsetX, e.offsetY];
-            } else if (currentEditorTool === 'text') {
-                let userText = prompt("Введите текст подписи на скриншоте:");
-                if (userText && userText.trim() !== "") {
-                    ctx.font = `bold ${document.getElementById('editor-size').value * 3}px Arial`;
-                    ctx.fillStyle = document.getElementById('editor-color').value;
-                    ctx.fillText(userText.trim(), e.offsetX, e.offsetY);
-                }
-            }
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDrawing || currentEditorTool !== 'draw') return;
-            ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(e.offsetX, e.offsetY);
-            ctx.strokeStyle = document.getElementById('editor-color').value;
-            ctx.lineWidth = document.getElementById('editor-size').value;
-            ctx.lineCap = 'round'; ctx.stroke();
-            [lastX, lastY] = [e.offsetX, e.offsetY];
-        });
-
-        canvas.addEventListener('mouseup', () => isDrawing = false);
-        canvas.addEventListener('mouseout', () => isDrawing = false);
-
-        document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
-            if (!currentRoomId) { alert("Выберите кабинет!"); return; }
-            canvas.toBlob(async (blob) => {
-                const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
-                const formData = new FormData(); formData.append('file', file);
-                
-                try {
-                    const res = await fetch('/upload', { method: 'POST', body: formData });
-                    const meta = await res.json();
-                    if (meta.url) {
-                        socket.emit('send_message', { room_id: currentRoomId, text: meta.url, is_secret: false, ui_styles: "{}" });
-                        screenshotModal.classList.remove('open');
-                    }
-                } catch(err) { alert("Ошибка при передаче скриншота на сервер."); }
-            }, 'image/png');
-        });
-    }
-
-    function openEditorWithBlob(blob) {
-        if(!currentRoomId) { alert("Сначала выберите чат!"); return; }
-        const url = URL.createObjectURL(blob);
-        baseImageObj = new Image();
-        baseImageObj.onload = function() {
-            canvas.width = baseImageObj.width; canvas.height = baseImageObj.height;
-            redrawCanvasBase();
-            screenshotModal.classList.add('open');
-            URL.revokeObjectURL(url);
-        };
-        baseImageObj.src = url;
-    }
-
-    function redrawCanvasBase() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(baseImageObj, 0, 0);
     }
 
     function renderModalUsers(users) {
@@ -925,10 +790,10 @@
         users.forEach(u => {
             if (roomParticipantsCache.some(p => p.id_user === u.id_user)) return;
             const div = document.createElement('div'); div.className = 'modal-user-item';
-            div.innerHTML = `<span><b>${u.username}</b> (${u.role})</span><button class="btn btn-primary" style="padding: 3px 8px; font-size: 11px;">Добавить</button>`;
+            div.innerHTML = `<span><b>${u.username}</b></span><button class="btn btn-primary" style="padding: 3px 8px; font-size: 11px;">Добавить</button>`;
             div.querySelector('button').addEventListener('click', () => {
                 socket.emit('add_user_to_room', { room_id: parseInt(currentRoomId), user_id: u.id_user });
-                modal.classList.remove('open');
+                document.getElementById('add-user-modal').classList.remove('open');
             });
             container.appendChild(div);
         });
@@ -939,17 +804,7 @@
         list.forEach(p => {
             const div = document.createElement('div'); div.className = 'user-row'; div.style.cursor = 'default';
             const isOnline = !!onlineUsersCache[p.id_user];
-            
-            div.innerHTML = `
-                <div class="avatar-container">
-                    <div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div>
-                    <div class="status-badge ${isOnline ? 'online' : 'offline'}"></div>
-                </div>
-                <div class="user-info-meta">
-                    <span style="font-weight:600;">${p.username}</span>
-                    <span class="user-role">${p.role}</span>
-                </div>
-            `;
+            div.innerHTML = `<div class="avatar-container"><div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${p.username}</span><span class="user-role">${p.role}</span></div>`;
             container.appendChild(div);
         });
     }
@@ -958,21 +813,9 @@
         const container = document.getElementById('company-users-list'); container.innerHTML = "";
         users.forEach(u => {
             if (u.id_user === currentUser.id_user) return;
-            
             const div = document.createElement('div'); div.className = "user-row";
             const isOnline = !!onlineUsersCache[u.id_user];
-
-            div.innerHTML = `
-                <div class="avatar-container">
-                    <div class="avatar">${u.username.charAt(0).toUpperCase()}</div>
-                    <div class="status-badge ${isOnline ? 'online' : 'offline'}"></div>
-                </div>
-                <div class="user-info-meta">
-                    <span style="font-weight:600;">${u.username}</span>
-                    <span class="user-role">${u.role ? u.role : 'user'}</span>
-                </div>
-            `;
-            
+            div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role}</span></div>`;
             div.addEventListener('click', () => {
                 socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username });
             });
@@ -983,24 +826,19 @@
     function initMentionLogic() {
         const mentionMenu = document.getElementById('mention-menu');
         inputMsg.addEventListener('input', function(e) {
-            if (roomParticipantsCache.length <= 2) {
-                mentionMenu.style.display = 'none'; isMentionMenuOpen = false; return;
-            }
-
-            const text = inputMsg.innerText; const selection = window.getSelection();
-            if (!selection.rangeCount) return;
-            const caretPos = selection.getRangeAt(0).startOffset; const textBeforeCaret = text.substring(0, caretPos); const lastAtIndex = textBeforeCaret.lastIndexOf('@');
+            if (roomParticipantsCache.length <= 2) { mentionMenu.style.display = 'none'; return; }
+            const text = inputMsg.innerText, selection = window.getSelection(); if (!selection.rangeCount) return;
+            const caretPos = selection.getRangeAt(0).startOffset, textBeforeCaret = text.substring(0, caretPos), lastAtIndex = textBeforeCaret.lastIndexOf('@');
             if (lastAtIndex !== -1 && (lastAtIndex === 0 || textBeforeCaret[lastAtIndex - 1] === ' ')) {
                 const query = textBeforeCaret.substring(lastAtIndex + 1).toLowerCase();
                 const filtered = roomParticipantsCache.filter(p => p.id_user !== currentUser.id_user && p.username.toLowerCase().includes(query));
-                if (filtered.length > 0) { renderMentionMenu(filtered, lastAtIndex, caretPos); }
-                else { mentionMenu.style.display = 'none'; isMentionMenuOpen = false; }
-            } else { mentionMenu.style.display = 'none'; isMentionMenuOpen = false; }
+                if (filtered.length > 0) { renderMentionMenu(filtered, lastAtIndex, caretPos); } else { mentionMenu.style.display = 'none'; }
+            } else { mentionMenu.style.display = 'none'; }
         });
     }
 
     function renderMentionMenu(users, addIndex, caretPos) {
-        const mentionMenu = document.getElementById('mention-menu'); mentionMenu.innerHTML = ""; mentionMenu.style.display = 'block'; isMentionMenuOpen = true;
+        const mentionMenu = document.getElementById('mention-menu'); mentionMenu.innerHTML = ""; mentionMenu.style.display = 'block';
         users.forEach(u => {
             const div = document.createElement('div'); div.className = 'mention-item'; div.innerText = `@${u.username}`;
             div.addEventListener('click', function() { insertMentionIntoInput(u.username, u.id_user, addIndex, caretPos); });
@@ -1009,10 +847,10 @@
     }
 
     function insertMentionIntoInput(username, userId, addIndex, caretPos) {
-        const mentionMenu = document.getElementById('mention-menu'); const text = inputMsg.innerText; const beforeAt = text.substring(0, addIndex); const afterCaret = text.substring(caretPos);
+        const text = inputMsg.innerText, beforeAt = text.substring(0, addIndex), afterCaret = text.substring(caretPos);
         inputMsg.innerHTML = beforeAt + `<span class="mention" data-user-id="${userId}" style="color:var(--primary-color); font-weight:bold; background:#eff6ff; padding:2px 4px; border-radius:4px;">@${username}</span>&nbsp;` + afterCaret;
-        mentionMenu.style.display = 'none'; isMentionMenuOpen = false; inputMsg.focus();
-        const range = document.createRange(); const sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
+        document.getElementById('mention-menu').style.display = 'none'; inputMsg.focus();
+        const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
     if (Notification.permission === "default") Notification.requestPermission();
