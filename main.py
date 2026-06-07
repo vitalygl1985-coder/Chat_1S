@@ -13,6 +13,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi.staticfiles import StaticFiles
 import base64
+import secrets
 
 app = FastAPI()
 
@@ -27,7 +28,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
@@ -36,6 +36,178 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
+
+# ─── ИЗМЕНЕНИЕ СТРУКТУРЫ БД (Добавление поля стилей в сообщения и таблицы билетов) ───
+def patch_db_for_new_features():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Таблица для одноразовых билетов авторизации (время жизни 10 секунд)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS auth_tickets (
+                ticket VARCHAR(64) PRIMARY KEY,
+                id_user VARCHAR(100) NOT NULL,
+                id_org UUID NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                role VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        # Добавляем поле для хранения пользовательских стилей текста, если его нет
+        cur.execute("""
+            ALTER TABLE messages 
+            ADD COLUMN IF NOT EXISTS ui_styles TEXT DEFAULT '{}';
+        """)
+        conn.commit()
+    except Exception as e:
+        print(f"Ошибка патча БД: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+patch_db_for_new_features()
+
+# ─── НОВЫЕ МОДЕЛИ ДАННЫХ PYANTIC ───
+class WebTicketExchangeRequest(BaseModel):
+    ticket: str
+
+class NewMessageWithStylesRequest(BaseModel):
+    room_id: int
+    text: str
+    is_secret: bool = False
+    ui_styles: Optional[str] = "{}" # JSON-строка со шрифтами, цветом и фоном
+
+# ─── ШАГ 1: БЕЗОПАСНАЯ АВТОРpatch ИЗ 1С (ГЕНЕРАЦИЯ ОДНОРАЗОВОГО БИЛЕТА) ───
+@app.post("/api/1c/generate-ticket")
+async def generate_auth_ticket(data: OneCAuthRequest):
+    validated_org = clean_uuid(data.id_org)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Проверяем / обновляем пользователя в базе
+        cur.execute("""
+            INSERT INTO users (id_user, id_org, username, role, is_active)
+            VALUES (%s, %s::uuid, %s, %s, true)
+            ON CONFLICT (id_user) DO UPDATE SET
+                username = EXCLUDED.username,
+                role     = EXCLUDED.role,
+                id_org   = EXCLUDED.id_org
+        """, (data.id_user, validated_org, data.username, data.role))
+        
+        # Создаем криптографически стойкий одноразовый билет (Ticket)
+        one_time_ticket = secrets.token_hex(32)
+        
+        # Очищаем старые билеты этого пользователя и пишем новый
+        cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
+        cur.execute("""
+            INSERT INTO auth_tickets (ticket, id_user, id_org, username, role)
+            VALUES (%s, %s, %s::uuid, %s, %s)
+        """, (one_time_ticket, data.id_user, validated_org, data.username, data.role))
+        
+        conn.commit()
+        # Возвращаем 1С только одноразовый билет! ИД пользователя наружу не идет.
+        return {"success": True, "ticket": one_time_ticket}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+# ─── ШАГ 2: ОБМЕН БИЛЕТА ВЕБ-ПРИЛОЖЕНИЕМ НА ПОЛНОЦЕННУЮ СЕССИЮ ───
+@app.post("/api/web/exchange-ticket")
+async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
+    conn = get_db_connection()
+    # Использование RealDictCursor для удобной работы со структурами
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Проверяем, существует ли такой билет и не истекло ли время (10 секунд)
+        cur.execute("""
+            SELECT * FROM auth_tickets 
+            WHERE ticket = %s AND created_at >= NOW() - INTERVAL '10 seconds'
+        """, (data.ticket,))
+        ticket_data = cur.fetchone()
+        
+        if not ticket_data:
+            raise HTTPException(status_code=403, detail="Билет недействителен или истек срок его действия.")
+            
+        # Билет верный! Немедленно удаляем его, чтобы сделать невозможным повторное использование
+        cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
+        
+        # Генерируем постоянный сессионный токен для веб-клиента
+        session_token = secrets.token_hex(32)
+        
+        # Записываем постоянную сессию
+        cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (ticket_data['id_user'],))
+        cur.execute("""
+            INSERT INTO api_sessions (token, id_user, id_org, username, role)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (session_token, ticket_data['id_user'], ticket_data['id_org'], ticket_data['username'], ticket_data['role']))
+        
+        conn.commit()
+        
+        # Возвращаем веб-приложению зашифрованные данные авторизации
+        return {
+            "success": True,
+            "token": session_token,
+            "user": {
+                "id_user": ticket_data['id_user'],
+                "username": ticket_data['username'],
+                "role": ticket_data['role'],
+                "id_org": str(ticket_data['id_org'])
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+# ─── ШАГ 3: УМНЫЙ ЭНДПОИНТ КОМНАТ С РАЗДЕЛЕНИЕМ НА АКТИВНЫЕ / НЕАКТИВНЫЕ ───
+@app.get("/api/web/rooms")
+async def web_get_rooms(x_token: Optional[str] = Header(None)):
+    session = get_session_by_token(x_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Неверная сессия")
+        
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # SQL-запрос динамически считает количество участников в каждой комнате через подзапрос COUNT
+        query = """
+            SELECT r.id_room, r.name, r.type, r.created_by,
+                   (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+            FROM rooms r
+            INNER JOIN room_participants rp ON r.id_room = rp.id_room
+            WHERE r.id_org = %s::uuid AND rp.id_user = %s
+            ORDER BY r.name ASC
+        """
+        cur.execute(query, (str(session['id_org']), session['id_user']))
+        all_rooms = cur.fetchall()
+        
+        active_rooms = []
+        inactive_rooms = []
+        
+        for room in all_rooms:
+            # Если участников меньше 2 — отправляем в скрытую группу "Неактивные сообщения"
+            if room['participants_count'] < 2:
+                inactive_rooms.append(room)
+            else:
+                active_rooms.append(room)
+                
+        return {
+            "active": active_rooms,
+            "inactive_text_group": inactive_rooms
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
