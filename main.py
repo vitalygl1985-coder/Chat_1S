@@ -11,8 +11,6 @@ from typing import Optional
 import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from fastapi.staticfiles import StaticFiles
-import base64
 import secrets
 
 app = FastAPI()
@@ -32,13 +30,11 @@ app.add_middleware(
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
 UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-# ─── ВСЕ МОДЕЛИ ДАННЫХ PYDANTIC ───
+# ─── PYDANTIC МОДЕЛИ ДАННЫХ ───
 class OneCAuthRequest(BaseModel):
     id_user: str
     id_org: str
@@ -63,44 +59,8 @@ class AdminAuthRequest(BaseModel):
     id_user: str
     id_org: str
 
-class SaveSettingsRequest(BaseModel):
-    theme_primary_color: str
-    link1_name: str
-    link1_url: str
-    link2_name: str
-    link2_url: str
 
-class ExecuteSqlRequest(BaseModel):
-    sql: str
-
-
-# ─── ИСПРАВЛЕНО: ФУНКЦИЯ ВЫНЕСЕНА В ЧИСТОЕ ПРОСТРАНСТВО КОДА ───
-def check_and_create_global_rooms(cur, id_org, user_id, user_role):
-    # 1. Проверяем / Создаем комнату ОБЩИЙ
-    cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", (id_org,))
-    room_general = cur.fetchone()
-    
-    if not room_general:
-        cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', 'system') RETURNING id_room", (id_org,))
-        room_general = cur.fetchone()
-    
-    general_room_id = room_general[0]
-    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
-
-    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем комнату АДМИН
-    if user_role == 'admin':
-        cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", (id_org,))
-        room_admin = cur.fetchone()
-        
-        if not room_admin:
-            cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', 'system') RETURNING id_room", (id_org,))
-            room_admin = cur.fetchone()
-        
-        admin_room_id = room_admin[0]
-        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
-
-
-# ─── ВСЕ ОСТАЛЬНЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ───
+# ─── ОПТИМИЗАЦИЯ И ПОДКЛЮЧЕНИЕ К БД ───
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
     if url and url.startswith("postgres://"):
@@ -113,16 +73,64 @@ def clean_uuid(org_id_str):
     except ValueError:
         return "00000000-0000-0000-0000-000000000001"
 
+
+# ─── ИСПРАВЛЕНО: ЕДИНАЯ ИОЛИРОВАННАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ КОМНАТ ───
+def check_and_create_global_rooms(cur, id_org, user_id, user_role):
+    """
+    Проверяет и создает системные комнаты ОБЩИЙ и АДМИН для организации.
+    Гарантирует автоматическое добавление пользователей в соответствии с их ролями.
+    """
+    # 1. Проверяем / Создаем комнату ОБЩИЙ (тип: admin_group)
+    cur.execute(
+        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
+        (id_org,)
+    )
+    room_general = cur.fetchone()
+    
+    if not room_general:
+        cur.execute(
+            "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', 'system') RETURNING id_room", 
+            (id_org,)
+        )
+        room_general = cur.fetchone()
+    
+    general_room_id = room_general[0]
+    
+    # Добавляем вошедшего пользователя (user или admin) в ОБЩИЙ кабинет
+    cur.execute(
+        "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+        (general_room_id, user_id)
+    )
+
+    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем скрытую комнату АДМИН
+    if user_role == 'admin':
+        cur.execute(
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", 
+            (id_org,)
+        )
+        room_admin = cur.fetchone()
+        
+        if not room_admin:
+            cur.execute(
+                "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', 'system') RETURNING id_room", 
+                (id_org,)
+            )
+            room_admin = cur.fetchone()
+        
+        admin_room_id = room_admin[0]
+        
+        # Привязываем админа к админскому кабинету
+        cur.execute(
+            "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+            (admin_room_id, user_id)
+        )
+
+
+# ─── ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ СТРУКТУРЫ БД ───
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS admin_settings (
-                key VARCHAR(100) PRIMARY KEY,
-                value TEXT NOT NULL
-            );
-        """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id_user VARCHAR(100) PRIMARY KEY,
@@ -131,8 +139,6 @@ def init_db():
                 role VARCHAR(50) DEFAULT 'user',
                 is_active BOOLEAN DEFAULT true
             );
-        """)
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS rooms (
                 id_room SERIAL PRIMARY KEY,
                 id_org UUID NOT NULL,
@@ -141,21 +147,34 @@ def init_db():
                 created_by VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-        """)
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS room_participants (
                 id_room INT REFERENCES rooms(id_room) ON DELETE CASCADE,
                 id_user VARCHAR(100),
                 PRIMARY KEY (id_room, id_user)
             );
-        """)
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 id_message SERIAL PRIMARY KEY,
                 id_room INT REFERENCES rooms(id_room) ON DELETE CASCADE,
                 id_user_from VARCHAR(100),
                 encrypted_text TEXT NOT NULL,
                 is_user_encrypted BOOLEAN DEFAULT false,
+                ui_styles TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS api_sessions (
+                token VARCHAR(64) PRIMARY KEY,
+                id_user VARCHAR(100) NOT NULL,
+                id_org UUID NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                role VARCHAR(50) DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS auth_tickets (
+                ticket VARCHAR(64) PRIMARY KEY,
+                id_user VARCHAR(100) NOT NULL,
+                id_org UUID NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                role VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
@@ -169,139 +188,88 @@ def init_db():
 
 init_db()
 
-def init_sessions_table():
-    conn = get_db_connection(); cur = conn.cursor()
-    try:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS api_sessions (
-                token VARCHAR(64) PRIMARY KEY,
-                id_user VARCHAR(100) NOT NULL,
-                id_org UUID NOT NULL,
-                username VARCHAR(255) NOT NULL,
-                role VARCHAR(50) DEFAULT 'user',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS auth_tickets (
-                ticket VARCHAR(64) PRIMARY KEY,
-                id_user VARCHAR(100) NOT NULL,
-                id_org UUID NOT NULL,
-                username VARCHAR(255) NOT NULL,
-                role VARCHAR(50) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        cur.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS ui_styles TEXT DEFAULT '{}';")
-        conn.commit()
-    except Exception as e: conn.rollback()
-    finally: cur.close(); conn.close()
-
-init_sessions_table()
-
 def get_session_by_token(token: str):
     if not token: return None
-    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM api_sessions WHERE token = %s", (token,))
         return cur.fetchone()
     except Exception: return None
     finally: cur.close(); conn.close()
 
-# ИСПРАВЛЕНО: Глобальная бизнес-логика проверки и автосоздания комнат ОБЩИЙ и АДМИН
-def check_and_create_global_rooms(cur, id_org, user_id, user_role):
-    # 1. Проверяем / Создаем комнату ОБЩИЙ
-    cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", (id_org,))
-    room_general = cur.fetchone()
-    if not room_general:
-        cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', 'system') RETURNING id_room", (id_org,))
-        room_general = cur.fetchone()
-    
-    # Все пользователи (и админы, и обычные) автоматически добавляются в ОБЩИЙ кабинет
-    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_general[0], user_id))
 
-    # 2. Если входит АДМИНИСТРАТОР — проверяем / создаем комнату АДМИН
-    if user_role == 'admin':
-        cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", (id_org,))
-        room_admin = cur.fetchone()
-        if not room_admin:
-            cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', 'system') RETURNING id_room", (id_org,))
-            room_admin = cur.fetchone()
-        
-        # Привязываем админа к админскому кабинету
-        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_admin[0], user_id))
-
-
-# ─── REST API ДЛЯ 1С (ГЕНЕРАЦИЯ ТОКЕНА С АВТОРАСПРЕДЕЛЕНИЕМ РОЛЕЙ) ───
+# ─── REST API: АВТОРИЗАЦИЯ 1С (ГЕНЕРАЦИЯ БЕЗОПАСНОГО ТИКЕТА) ───
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
     validated_org = clean_uuid(data.id_org)
-    conn = get_db_connection(); cur = conn.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
+        # Сохраняем или обновляем пользователя
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (data.id_user, validated_org, data.username, data.role))
 
-     # Вызываем логику автопроверки и генерации комнат ОБЩИЙ/АДМИН
-    # ИСПРАВЛЕНО: Безопасное чтение кортежей из стандартного курсора базы данных
-    def check_and_create_global_rooms(cur, id_org, user_id, user_role):
-    # 1. Проверяем / Создаем комнату ОБЩИЙ
-    cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", (id_org,))
-    room_general = cur.fetchone()
-    
-    if not room_general:
-        cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', 'system') RETURNING id_room", (id_org,))
-        room_general = cur.fetchone()
-    
-    # Читаем ID через индекс [0], так как курсор возвращает кортеж
-    general_room_id = room_general[0]
-    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
+        # Вызываем единственную глобальную функцию проверки/создания комнат
+        check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
 
-    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем комнату АДМИН
-    if user_role == 'admin':
-        cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", (id_org,))
-        room_admin = cur.fetchone()
-        
-        if not room_admin:
-            cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', 'system') RETURNING id_room", (id_org,))
-            room_admin = cur.fetchone()
-        
-        admin_room_id = room_admin[0]
-        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
-
+        # Создаем одноразовый тикет обмена для фронтенда
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
-        cur.execute("INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
-                    (one_time_ticket, data.id_user, validated_org, data.username, data.role))
+        cur.execute(
+            "INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
+            (one_time_ticket, data.id_user, validated_org, data.username, data.role)
+        )
 
         conn.commit()
         return {"success": True, "token": one_time_ticket}
     except Exception as e:
-        conn.rollback(); raise HTTPException(status_code=500, detail=str(e))
-    finally: cur.close(); conn.close()
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 
-# ─── Rest эндпоинты обмена тикетов и комнат ───
+# ─── REST API: ОБМЕН ТИКЕТА НА СЕССИЮ ВЕБА ───
 @app.post("/api/web/exchange-ticket")
 async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
-    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '30 seconds'", (data.ticket,))
         ticket_data = cur.fetchone()
-        if not ticket_data: raise HTTPException(status_code=403, detail="Билет авторизации истек.")
+        if not ticket_data: 
+            raise HTTPException(status_code=403, detail="Билет авторизации истек или не существует.")
             
         cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
         session_token = secrets.token_hex(32)
         
         cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (ticket_data['id_user'],))
-        cur.execute("INSERT INTO api_sessions (token, id_user, id_org, username, role) VALUES (%s, %s, %s, %s, %s)", 
-                    (session_token, ticket_data['id_user'], ticket_data['id_org'], ticket_data['username'], ticket_data['role']))
+        cur.execute(
+            "INSERT INTO api_sessions (token, id_user, id_org, username, role) VALUES (%s, %s, %s, %s, %s)", 
+            (session_token, ticket_data['id_user'], ticket_data['id_org'], ticket_data['username'], ticket_data['role'])
+        )
         conn.commit()
-        return {"success": True, "token": session_token, "user": {"id_user": ticket_data['id_user'], "username": ticket_data['username'], "role": ticket_data['role'], "id_org": str(ticket_data['id_org'])}}
-    except Exception as e: conn.rollback(); raise HTTPException(status_code=500, detail=str(e))
-    finally: cur.close(); conn.close()
+        return {
+            "success": True, 
+            "token": session_token, 
+            "user": {
+                "id_user": ticket_data['id_user'], 
+                "username": ticket_data['username'], 
+                "role": ticket_data['role'], 
+                "id_org": str(ticket_data['id_org'])
+            }
+        }
+    except Exception as e: 
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally: 
+        cur.close(); conn.close()
+
 
 @app.get("/api/web/rooms")
 async def web_get_rooms(x_token: Optional[str] = Header(None)):
@@ -319,12 +287,15 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
         """
         cur.execute(query, (str(session['id_org']), session['id_user']))
         all_rooms = cur.fetchall()
-        return {"active": [r for r in all_rooms if r['participants_count'] >= 2], "inactive_text_group": [r for r in all_rooms if r['participants_count'] < 2]}
+        return {
+            "active": [r for r in all_rooms if r['participants_count'] >= 2], 
+            "inactive_text_group": [r for r in all_rooms if r['participants_count'] < 2]
+        }
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
     finally: cur.close(); conn.close()
 
 
-# ─── ФАЙЛОВЫЙ СЕРВИС И ОПЕРАЦИИ ЧАТА ───
+# ─── ФАЙЛОВЫЙ СЕРВИС ───
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -378,17 +349,26 @@ async def download_archive_endpoint(file_uuid: str):
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
     params = dict(x.split('=') for x in query_params.split('&') if '=' in x)
-    id_user, id_org, username, user_role = urllib.parse.unquote(params.get('id_user', '')), clean_uuid(urllib.parse.unquote(params.get('id_org', ''))), urllib.parse.unquote(params.get('username', '')), urllib.parse.unquote(params.get('role', 'user'))
+    id_user = urllib.parse.unquote(params.get('id_user', ''))
+    id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
+    username = urllib.parse.unquote(params.get('username', ''))
+    user_role = urllib.parse.unquote(params.get('role', 'user'))
+    
     if not id_user: return False
 
     conn = get_db_connection(); cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO users (id_user, id_org, username, role, is_active) VALUES (%s, %s::uuid, %s, %s, true) ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role", (id_user, id_org, username, user_role))
-        # Проверяем сквозное распределение комнат при сокет-коннекте
+        cur.execute(
+            "INSERT INTO users (id_user, id_org, username, role, is_active) VALUES (%s, %s::uuid, %s, %s, true) ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role", 
+            (id_user, id_org, username, user_role)
+        )
         check_and_create_global_rooms(cur, id_org, id_user, user_role)
         conn.commit()
-    except Exception: conn.rollback()
-    finally: cur.close(); conn.close()
+    except Exception: 
+        conn.rollback()
+    finally: 
+        cur.close(); conn.close()
+        
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
 
 @sio.event
@@ -519,13 +499,10 @@ async def delete_room_request(sid, data):
 
 @sio.event
 async def archive_room_messages(sid, data):
-    room_id, user_id, user_role = data.get('room_id'), data.get('user_id'), data.get('role', 'user')
+    room_id = data.get('room_id')
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
-        room = cur.fetchone()
-        if not room: return
         cur.execute("SELECT m.id_user_from, COALESCE(u.username, m.id_user_from) as username, m.encrypted_text, m.ui_styles, m.created_at FROM messages m LEFT JOIN users u ON m.id_user_from = u.id_user WHERE m.id_room = %s ORDER BY m.created_at ASC", (room_id,))
         messages = cur.fetchall()
         for m in messages:
