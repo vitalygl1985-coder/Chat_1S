@@ -3,6 +3,24 @@
 <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta charset="UTF-8">
+    <hta:application 
+        id="chat1cApp"
+        applicationname="1CChat"
+        border="thin"
+        caption="yes"
+        showintaskbar="yes"
+        singleinstance="no"
+        sysmenu="yes"
+        windowstate="normal"
+        navigable="yes"
+    />
+
+    <script>
+    // Автоматический подгон размера независимого окна при старте под комфортные пропорции
+    window.resizeTo(1200, 750);
+    // Центрируем окно на экране пользователя
+    window.moveTo((screen.availWidth - 1200) / 2, (screen.availHeight - 750) / 2);
+    </script>
     <title>1C Chat Client</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
