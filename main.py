@@ -201,13 +201,26 @@ def get_session_by_token(token: str):
 # ─── REST API: АВТОРИЗАЦИЯ 1С (ГЕНЕРАЦИЯ БЕЗОПАСНОГО ТИКЕТА) ───
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
+    import traceback  # Гарантируем наличие модуля для логирования
     validated_org = clean_uuid(data.id_org)
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Логируем входящие данные для контроля
         print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
         print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
+
+        # [ИСПРАВЛЕНО]: Проверяем и динамически создаем организацию, чтобы удовлетворить Foreign Key
+        try:
+            cur.execute(
+                "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
+                (validated_org, f"Организация {validated_org[:8]}")
+            )
+        except psycopg2.Error:
+            # Если таблицы organizations вообще нет или структура иная — пропускаем, 
+            # но если foreign key жестко требует её наличия, этот INSERT спасет транзакцию.
+            conn.rollback()
+            conn = get_db_connection()
+            cur = conn.cursor()
 
         # 1. Сохраняем или обновляем пользователя
         cur.execute("""
@@ -233,11 +246,8 @@ async def onec_auth(data: OneCAuthRequest):
         
     except Exception as e:
         conn.rollback()
-        # КРИТИЧЕСКИ ВАЖНО: Выводим полную ошибку со стеком вызовов прямо в консоль/логи сервера
         print("!!! КРИТИЧЕСКАЯ ОШИБКА В ЭНДПОИНТЕ /api/1c/auth !!!")
         traceback.print_exc() 
-        
-        # Возвращаем детальное описание ошибки клиенту, чтобы сразу увидеть её в ответе 1С
         raise HTTPException(status_code=500, detail=f"Database or internal crash: {str(e)}")
     finally:
         cur.close()
