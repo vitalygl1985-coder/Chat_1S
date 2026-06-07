@@ -101,7 +101,23 @@
 </div>
 
 <script>
+// Жесткое глушение внутренних ошибок IE
 window.onerror = function() { return true; };
+
+// ИСПРАВЛЕНО ДЛЯ ПОВТОРНОГО ОТКРЫТИЯ В 1С: 
+// Тотальная зачистка глобального контекста перед инициализацией новых сокетов
+(function() {
+    try {
+        if (window.socket) { 
+            window.socket.disconnect(); 
+            window.socket = null;
+        }
+        // Насильно сбрасываем старые привязки, если они застряли в кэше Windows
+        document.onmousedown = null;
+        document.oncontextmenu = null;
+        window.onpaste = null;
+    } catch(e) {}
+})();
 
 var socket = null;
 var currentRoomId = null;
@@ -556,7 +572,6 @@ function handleContextMenu(e) {
     return false;
 }
 
-// ИСПРАВЛЕНО: Логика удаления кабинета и архивации перенесена в изолированные функции
 function handleBtnArchive(e) {
     if (e && e.preventDefault) e.preventDefault();
     if (!currentRoomId) return false;
@@ -583,86 +598,90 @@ function handleBtnDeleteRoom(e) {
     return false;
 }
 
-// Регистрация всех глобальных и локальных событий через addEventListener / attachEvent
-if (document.addEventListener) {
-    document.addEventListener('mousedown', handleMouseDown, false);
-    document.addEventListener('contextmenu', handleContextMenu, false);
-    window.addEventListener('paste', handlePasteEvent, false);
-    if (inputMsg) { inputMsg.addEventListener('paste', handlePasteEvent, false); }
-    
-    // Подписка на кнопки архива и удаления
-    var btnArch = document.getElementById('btn-trigger-archive');
-    var btnDel = document.getElementById('btn-trigger-delete');
-    if (btnArch) btnArch.addEventListener('click', handleBtnArchive, false);
-    if (btnDel) btnDel.addEventListener('click', handleBtnDeleteRoom, false);
-} else if (document.attachEvent) {
-    document.attachEvent('onmousedown', handleMouseDown);
-    document.attachEvent('oncontextmenu', handleContextMenu);
-    window.attachEvent('onpaste', handlePasteEvent);
-    if (inputMsg) { inputMsg.attachEvent('onpaste', handlePasteEvent); }
-    
-    var btnArch = document.getElementById('btn-trigger-archive');
-    var btnDel = document.getElementById('btn-trigger-delete');
-    if (btnArch) btnArch.attachEvent('onclick', handleBtnArchive);
-    if (btnDel) btnDel.attachEvent('onclick', handleBtnDeleteRoom);
-}
+// Прямая привязка к дефолтным событиям для надежного перехвата в IE11 без наслоений addEventListener
+document.onmousedown = handleMouseDown;
+document.oncontextmenu = handleContextMenu;
+window.onpaste = handlePasteEvent;
+if (inputMsg) { inputMsg.onpaste = handlePasteEvent; }
 
-document.addEventListener('click', function() {
+var btnArch = document.getElementById('btn-trigger-archive');
+var btnDel = document.getElementById('btn-trigger-delete');
+if (btnArch) btnArch.onclick = handleBtnArchive;
+if (btnDel) btnDel.onclick = handleBtnDeleteRoom;
+
+document.onclick = function() {
     var menu = document.getElementById('custom-context-menu');
     if (menu) menu.style.display = 'none';
-});
+};
 
-document.getElementById('ctx-delete-msg').addEventListener('click', function() {
-    if (selectedMessageIdForCtx && currentRoomId) {
-        if (confirm("Удалить это сообщение для всех участников?")) {
-            socket.emit('delete_message_request', { 
-                message_id: parseInt(selectedMessageIdForCtx), 
-                room_id: parseInt(currentRoomId),
-                user_id: currentUserId,
-                role: currentUserRole
-            });
+var ctxDelBtn = document.getElementById('ctx-delete-msg');
+if (ctxDelBtn) {
+    ctxDelBtn.onclick = function() {
+        if (selectedMessageIdForCtx && currentRoomId) {
+            if (confirm("Удалить это сообщение для всех участников?")) {
+                socket.emit('delete_message_request', { 
+                    message_id: parseInt(selectedMessageIdForCtx), 
+                    room_id: parseInt(currentRoomId),
+                    user_id: currentUserId,
+                    role: currentUserRole
+                });
+            }
         }
-    }
-});
+    };
+}
 
 function openUserModal(t, cb) {
     document.getElementById('modal-action-title').innerText = t;
     var d = document.getElementById('modal-user-dropdown'); d.innerHTML = "";
     for (var i=0; i<globalUsersCache.length; i++) { d.innerHTML += '<option value="'+globalUsersCache[i].id_user+'">'+globalUsersCache[i].username+'</option>'; }
     document.getElementById('user-select-modal').style.display = 'flex';
-    document.getElementById('modal-submit-btn').addEventListener('click', function() { cb(d.value); closeUserModal(); });
+    document.getElementById('modal-submit-btn').onclick = function() { cb(d.value); closeUserModal(); };
 }
 function closeUserModal() { document.getElementById('user-select-modal').style.display = 'none'; }
-function openSecretModal(t, cb) { document.getElementById('secret-input-modal').style.display = 'flex'; document.getElementById('secret-modal-submit-btn').addEventListener('click', function() { cb(document.getElementById('modal-secret-field').value); closeSecretModal(); }); }
+function openSecretModal(t, cb) { document.getElementById('secret-input-modal').style.display = 'flex'; document.getElementById('secret-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-secret-field').value); closeSecretModal(); }; }
 function closeSecretModal() { document.getElementById('secret-input-modal').style.display = 'none'; }
-function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').addEventListener('click', function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }); }
+function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
 function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
 
-document.getElementById('btn-paste-screen').addEventListener('click', function() {
-    if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
-    inputMsg.focus();
-    try {
-        if (document.execCommand) { document.execCommand('paste'); }
-    } catch(err) {}
-});
+var btnPaste = document.getElementById('btn-paste-screen');
+if (btnPaste) {
+    btnPaste.onclick = function() {
+        if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
+        inputMsg.focus();
+        try { if (document.execCommand) { document.execCommand('paste'); } } catch(err) {}
+    };
+}
 
-document.getElementById('btn-add-participant').addEventListener('click', function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); });
-document.getElementById('btn-create-group').addEventListener('click', function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); });
-document.getElementById('btn-secret').addEventListener('click', function() {
-    if (!isSecretMode) { openSecretModal("Секретный ключ", function(k) { userSecretKey = k; isSecretMode = true; document.getElementById('btn-secret').className = 'btn-secret active'; document.getElementById('btn-secret').innerText = '🔒 Шифрование ВКЛ'; }); }
-    else { isSecretMode = false; this.className = 'btn-secret'; this.innerText = '🔒 Обычный режим'; }
-});
-document.getElementById('btn-send').addEventListener('click', sendMessage);
-document.getElementById('btn-file').addEventListener('click', function() { document.getElementById('file-input').click(); });
-document.getElementById('file-input').addEventListener('change', function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+var btnAddPart = document.getElementById('btn-add-participant');
+if (btnAddPart) { btnAddPart.onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); }; }
+
+var btnCrGrp = document.getElementById('btn-create-group');
+if (btnCrGrp) { btnCrGrp.onclick = function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); }; }
+
+var btnSecr = document.getElementById('btn-secret');
+if (btnSecr) {
+    btnSecr.onclick = function() {
+        if (!isSecretMode) { openSecretModal("Секретный ключ", function(k) { userSecretKey = k; isSecretMode = true; document.getElementById('btn-secret').className = 'btn-secret active'; document.getElementById('btn-secret').innerText = '🔒 Шифрование ВКЛ'; }); }
+        else { isSecretMode = false; this.className = 'btn-secret'; this.innerText = '🔒 Обычный режим'; }
+    };
+}
+
+var btnSnd = document.getElementById('btn-send');
+if (btnSnd) btnSnd.onclick = sendMessage;
+
+var btnFl = document.getElementById('btn-file');
+if (btnFl) { btnFl.onclick = function() { document.getElementById('file-input').click(); }; }
+
+var flInp = document.getElementById('file-input');
+if (flInp) { flInp.onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); }; }
 
 if (inputMsg) { 
-    inputMsg.addEventListener('keydown', function(e) { 
+    inputMsg.onkeydown = function(e) { 
         if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { 
-            e.preventDefault(); 
+            if (e.preventDefault) e.preventDefault(); else window.event.returnValue = false;
             sendMessage(); 
         } 
-    }); 
+    }; 
 }
 
 function parseHashAndAuthorize() {
@@ -677,9 +696,7 @@ function parseHashAndAuthorize() {
                     return;
                 }
                 var roleParam = p[3] || 'user';
-                if (roleParam !== 'user' && roleParam !== 'admin') {
-                    roleParam = 'user';
-                }
+                if (roleParam !== 'user' && roleParam !== 'admin') { roleParam = 'user'; }
                 apply1CAuth(p[0], p[1], p[2], roleParam);
             }
         }
@@ -689,38 +706,18 @@ function parseHashAndAuthorize() {
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
 
+// Полная деструкция перед выходом
 window.destroyChatBeforeClose = function() {
     try {
-        // Выводим визуальный лог для отладки в 1С
-        var container = document.getElementById('messages-container');
-        if (container) {
-            container.innerHTML = '<div style="color:orange; font-weight:bold; padding:20px; text-align:center;">⏳ Очистка памяти COM... Отключение сокетов...</div>';
-        }
-
-        if (socket) { 
-            socket.disconnect(); 
-        }
-        
-        if (document.removeEventListener) {
-            document.removeEventListener('mousedown', handleMouseDown, false);
-            document.removeEventListener('contextmenu', handleContextMenu, false);
-            window.removeEventListener('paste', handlePasteEvent, false);
-        }
-        
-        // Очищаем window от ссылок на сокеты
-        socket = null;
-        
+        if (socket) { socket.disconnect(); }
+        // Очищаем дефолтные свойства, чтобы разорвать ссылки COM в 1С
+        document.onmousedown = null;
+        document.oncontextmenu = null;
+        window.onpaste = null;
+        if (inputMsg) { inputMsg.onpaste = null; }
+        if (document.body) { document.body.innerHTML = ""; }
     } catch(e) {}
     return true;
-};
-
-window.onerror = function(message, source, lineno, colno, error) {
-    var logDiv = document.getElementById('messages-container');
-    if(logDiv) {
-        var errMsg = '<div style="color:red; padding:4px; border:1px solid red;">JS ERROR: ' + message + ' at line ' + lineno + '</div>';
-        logDiv.insertAdjacentHTML('afterbegin', errMsg);
-    }
-    return true; 
 };
 </script>
 </body>
