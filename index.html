@@ -29,9 +29,10 @@
     <div class="chat-window" id="chat-window">
         <div class="chat-header">
             <span id="current-chat-title">Выберите кабинет или сотрудника</span>
+            <!-- ИСПРАВЛЕНО: Убрали onclick из HTML-тегов, добавили id для addEventListener -->
             <div class="chat-actions" id="chat-management-actions" style="display: none;">
-                <button onclick="triggerArchive(); return false;" class="btn-small" style="background:#eab308;">📦 В архив</button>
-                <button onclick="triggerDeleteRoom(); return false;" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
+                <button id="btn-trigger-archive" class="btn-small" style="background:#eab308;">📦 В архив</button>
+                <button id="btn-trigger-delete" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
             </div>
         </div>
 
@@ -412,7 +413,6 @@ function downloadFile(url, filename) {
     try {
         window.open(fullUrl, '_blank', 'width=1,height=1,left=9999,top=9999,resizable=no,scrollbars=no,status=no');
     } catch(e) {
-        // ИСПРАВЛЕНО: Проверка на готовность document.body (замечание Алисы)
         if (document.body) {
             var downloadAnchor = document.createElement('a');
             downloadAnchor.href = fullUrl;
@@ -472,7 +472,6 @@ function handlePasteEvent(e) {
     return true;
 }
 
-// ИСПРАВЛЕНО: Заменили onmousedown на изолированный handleMouseDown (замечание Алисы)
 function handleMouseDown(e) {
     e = e || window.event;
     if (!e) return true;
@@ -517,7 +516,6 @@ function handleMouseDown(e) {
     return true;
 }
 
-// ИСПРАВЛЕНО: Заменили oncontextmenu на изолированный handleContextMenu (замечание Алисы)
 function handleContextMenu(e) {
     e = e || window.event;
     
@@ -558,17 +556,55 @@ function handleContextMenu(e) {
     return false;
 }
 
-// ИСПРАВЛЕНО: Регистрация всех глобальных событий через addEventListener / attachEvent
+// ИСПРАВЛЕНО: Логика удаления кабинета и архивации перенесена в изолированные функции
+function handleBtnArchive(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!currentRoomId) return false;
+    if (confirm("Перенести переписку кабинета в архивный файл и очистить текущий чат на сервере?")) {
+        socket.emit('archive_room_messages', { 
+            room_id: parseInt(currentRoomId),
+            user_id: currentUserId,
+            role: currentUserRole
+        });
+    }
+    return false;
+}
+
+function handleBtnDeleteRoom(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!currentRoomId) return false;
+    if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
+        socket.emit('delete_room_request', { 
+            room_id: parseInt(currentRoomId),
+            user_id: currentUserId,
+            role: currentUserRole
+        });
+    }
+    return false;
+}
+
+// Регистрация всех глобальных и локальных событий через addEventListener / attachEvent
 if (document.addEventListener) {
     document.addEventListener('mousedown', handleMouseDown, false);
     document.addEventListener('contextmenu', handleContextMenu, false);
     window.addEventListener('paste', handlePasteEvent, false);
     if (inputMsg) { inputMsg.addEventListener('paste', handlePasteEvent, false); }
+    
+    // Подписка на кнопки архива и удаления
+    var btnArch = document.getElementById('btn-trigger-archive');
+    var btnDel = document.getElementById('btn-trigger-delete');
+    if (btnArch) btnArch.addEventListener('click', handleBtnArchive, false);
+    if (btnDel) btnDel.addEventListener('click', handleBtnDeleteRoom, false);
 } else if (document.attachEvent) {
     document.attachEvent('onmousedown', handleMouseDown);
     document.attachEvent('oncontextmenu', handleContextMenu);
     window.attachEvent('onpaste', handlePasteEvent);
     if (inputMsg) { inputMsg.attachEvent('onpaste', handlePasteEvent); }
+    
+    var btnArch = document.getElementById('btn-trigger-archive');
+    var btnDel = document.getElementById('btn-trigger-delete');
+    if (btnArch) btnArch.attachEvent('onclick', handleBtnArchive);
+    if (btnDel) btnDel.attachEvent('onclick', handleBtnDeleteRoom);
 }
 
 document.addEventListener('click', function() {
@@ -620,7 +656,6 @@ document.getElementById('btn-send').addEventListener('click', sendMessage);
 document.getElementById('btn-file').addEventListener('click', function() { document.getElementById('file-input').click(); });
 document.getElementById('file-input').addEventListener('change', function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); });
 
-// ИСПРАВЛЕНО: Добавлена пропущенная закрывающая скобка круглая ")" в обработчике keydown (Критическая синтаксическая ошибка)
 if (inputMsg) { 
     inputMsg.addEventListener('keydown', function(e) { 
         if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { 
@@ -654,7 +689,7 @@ function parseHashAndAuthorize() {
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
 
-// ИСПРАВЛЕНО: Насильное удаление слушателей при закрытии обработки 1С
+// ИСПРАВЛЕНО: Полное и чистое выжигание контекстов и ссылок при уничтожении формы 1С
 window.destroyChatBeforeClose = function() {
     try {
         if (socket) { socket.disconnect(); }
@@ -664,11 +699,21 @@ window.destroyChatBeforeClose = function() {
             document.removeEventListener('contextmenu', handleContextMenu, false);
             window.removeEventListener('paste', handlePasteEvent, false);
             if (inputMsg) { inputMsg.removeEventListener('paste', handlePasteEvent, false); }
+            
+            var btnArch = document.getElementById('btn-trigger-archive');
+            var btnDel = document.getElementById('btn-trigger-delete');
+            if (btnArch) btnArch.removeEventListener('click', handleBtnArchive, false);
+            if (btnDel) btnDel.removeEventListener('click', handleBtnDeleteRoom, false);
         } else if (document.detachEvent) {
             document.detachEvent('onmousedown', handleMouseDown);
             document.detachEvent('oncontextmenu', handleContextMenu);
             window.detachEvent('onpaste', handlePasteEvent);
             if (inputMsg) { inputMsg.detachEvent('onpaste', handlePasteEvent); }
+            
+            var btnArch = document.getElementById('btn-trigger-archive');
+            var btnDel = document.getElementById('btn-trigger-delete');
+            if (btnArch) btnArch.detachEvent('onclick', handleBtnArchive);
+            if (btnDel) btnDel.detachEvent('onclick', handleBtnDeleteRoom);
         }
     } catch(e) {}
     return true;
