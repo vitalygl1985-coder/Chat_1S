@@ -75,7 +75,6 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* ГАРАНТИЯ ОТОБРАЖЕНИЯ МИНИАТЮРЫ СКРИНШОТА С КНОПКОЙ СКАЧАТЬ ПОД НЕЙ */
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
@@ -434,6 +433,8 @@
         });
 
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
+        
+        // ФИКС: Перерисовываем левое меню при получении триггера обновления структуры от сокетов
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
     }
 
@@ -446,7 +447,7 @@
 
     function processRoomsDivision(allRooms) {
         const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
-        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = "";
+        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
         
         allRooms.forEach(room => {
             const div = document.createElement('div'); div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
@@ -459,7 +460,13 @@
 
             const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
             div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
-            if (room.participants_count < 2) { inactiveContainer.appendChild(div); inactiveCount++; } else { activeContainer.appendChild(div); }
+            
+            // ТРЕБОВАНИЕ: Если участников меньше двух, комната улетает в блок неактивных
+            if (room.participants_count < 2) { 
+                inactiveContainer.appendChild(div); inactiveCount++; 
+            } else { 
+                activeContainer.appendChild(div); 
+            }
         });
         document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
     }
@@ -536,13 +543,9 @@
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
-    window.markMessageAsRead = function(msgId) { if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username }); };
-
-    // ТРЕБОВАНИЕ: Рендеринг миниатюры скриншота прямо внутри сообщения над кнопкой скачивания по ТЗ
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
-            // ИСПРАВЛЕНО: Полная поддержка расширений для безупречной инлайн-отрисовки скриншотов
             if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".gif") || lower.includes(".webp")) {
                 targetElement.innerHTML = `
                     <img src="${contentText}" alt="Скриншот" onclick="window.open('${contentText}', '_blank')">

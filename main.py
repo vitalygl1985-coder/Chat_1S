@@ -187,7 +187,6 @@ def get_session_by_token(token: str):
     finally: cur.close(); conn.close()
 
 
-# ─── ФАЙЛОВЫЙ И СТАТИЧЕСКИЙ СЕРВИС (ВЫНЕСЕН НАВЕРХ ДЛЯ ИСКЛЮЧЕНИЯ ОШИБКИ 404) ───
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -206,6 +205,9 @@ async def onec_auth(data: OneCAuthRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
+        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
+
         try:
             cur.execute(
                 "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
@@ -500,9 +502,12 @@ async def add_user_to_room(sid, data):
         conn.commit()
         cur.execute("SELECT rp.id_user, u.username, u.role FROM room_participants rp INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s", (room_id,))
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, room=f"room_{room_id}")
+        
+        # КРИТИЧЕСКИЙ ФИКС: Оповещаем абсолютно всех клиентов о необходимости перерисовать левую панель комнат
         await sio.emit('refresh_rooms_trigger')
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
+
 
 @sio.event
 async def remove_user_from_room(sid, data):
@@ -518,9 +523,13 @@ async def remove_user_from_room(sid, data):
         conn.commit()
         cur.execute("SELECT rp.id_user, u.username, u.role FROM room_participants rp INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s", (room_id,))
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, room=f"room_{room_id}")
+        
+        # КРИТИЧЕСКИЙ ФИКС: Принудительно заставляем ВСЕХ пользователей мессенджера обновить свои списки комнат в реальном времени.
+        # Теперь комната с 1 участником мгновенно улетит в неактивные у всех клиентов!
         await sio.emit('refresh_rooms_trigger')
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
+
 
 @sio.event
 async def delete_room_request(sid, data):
