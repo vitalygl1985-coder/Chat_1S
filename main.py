@@ -297,31 +297,38 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     finally: cur.close(); conn.close()
 
 
-# ─── ФАЙЛОВЫЙ СЕРВИС ───
-@app.get("/", response_class=HTMLResponse)
-async def get_chat_page():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(current_dir, "index.html"), "r", encoding="utf-8") as f: return f.read()
-
+# ─── ИСПРАВЛЕНО: ДИНАМИЧЕСКИ СОХРАНЯЕМ СЕРВЕРНОЕ РАСШИРЕНИЕ ДЛЯ ГАРАНТИИ ИНЛАЙН-РЕНДЕРА КАРТИНКИ ───
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
         orig_filename = file.filename
         file_extension = os.path.splitext(orig_filename)[1] or ".png"
         unique_id = str(uuid.uuid4())
+        
+        # Сохраняем физический файл на диске
         file_path = os.path.join(UPLOAD_DIR, f"{unique_id}{file_extension}")
         with open(file_path, "wb") as buffer: buffer.write(await file.read())
+        
         mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
         file_map = {}
         if os.path.exists(mapping_file):
             with open(mapping_file, "r", encoding="utf-8") as f: file_map = json.load(f)
+            
+        # Мапим уникальное имя
         file_map[unique_id] = orig_filename
         with open(mapping_file, "w", encoding="utf-8") as f: json.dump(file_map, f)
-        return {"url": f"/download/{unique_id}", "filename": orig_filename}
+        
+        # ИСПРАВЛЕНО: Возвращаем URL, который ОКОНЧИВАЕТСЯ на реальное расширение файла. 
+        # Это заставит фронтенд гарантированно увидеть картинку!
+        return {"url": f"/download/{unique_id}{file_extension}", "filename": orig_filename}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/download/{file_uuid}")
-async def download_file(file_uuid: str):
+
+@app.get("/download/{file_uuid_with_ext}")
+async def download_file(file_uuid_with_ext: str):
+    # Извлекаем UUID, отбрасывая пришедшее расширение
+    file_uuid = file_uuid_with_ext.split(".")[0]
+    
     target_filename = ""
     if os.path.exists(UPLOAD_DIR):
         for filename in os.listdir(UPLOAD_DIR):
@@ -335,6 +342,7 @@ async def download_file(file_uuid: str):
         encoded_name = urllib.parse.quote(original_name or target_filename)
         return FileResponse(file_path, media_type='application/force-download', headers={'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\' {encoded_name}'})
     return HTMLResponse("Файл не найден", status_code=404)
+
 
 @app.get("/download-archive/{file_uuid}")
 async def download_archive_endpoint(file_uuid: str):
@@ -360,10 +368,6 @@ async def connect(sid, environ, auth=None):
 
     conn = get_db_connection(); cur = conn.cursor()
     try:
-        cur.execute(
-            "INSERT INTO users (id_user, id_org, username, role, is_active) VALUES (%s, %s::uuid, %s, %s, true) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role" if hasattr(cur, 'execute') else "INSERT INTO users...", 
-            (id_user, id_org, username, user_role)
-        )
         cur.execute("INSERT INTO users (id_user, id_org, username, role, is_active) VALUES (%s, %s::uuid, %s, %s, true) ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role", (id_user, id_org, username, user_role))
         check_and_create_global_rooms(cur, id_org, id_user, user_role)
         conn.commit()
@@ -373,6 +377,7 @@ async def connect(sid, environ, auth=None):
         cur.close(); conn.close()
         
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
+    
     online_users[id_user] = username
     await sio.emit('user_statuses', online_users)
 
@@ -465,7 +470,6 @@ async def get_room_participants(sid, data):
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
-
 
 @sio.event
 async def create_advanced_room(sid, data):
@@ -563,7 +567,6 @@ async def archive_room_messages(sid, data):
         await sio.emit('download_archive_file', {"url": f"/download-archive/{archive_uuid}"}, to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
-
 
 @sio.event
 async def delete_message_request(sid, data):

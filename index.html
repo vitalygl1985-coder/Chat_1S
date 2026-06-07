@@ -75,6 +75,7 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
+        /* СТИЛИ ОТОБРАЖЕНИЯ МИНИАТЮР КАРТИНОК И ССЫЛОК СКАЧИВАНИЯ ПОД НИМИ */
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
@@ -443,7 +444,6 @@
         processRoomsDivision(latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query)));
     }
 
-    // ТРЕБОВАНИЕ: Локальный парсинг именных приватов "Петров ⇄ Сидоров" -> Показываем только собеседника
     function processRoomsDivision(allRooms) {
         const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
         activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
@@ -453,7 +453,6 @@
             let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
             
             let displayName = room.name;
-            // Если чат приватный, очищаем ФИО текущего сотрудника из строки названия
             if (room.type === 'private' && room.name.includes(' ⇄ ')) {
                 displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
             }
@@ -543,7 +542,8 @@
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
-            if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".webp")) {
+            // ИСПРАВЛЕНО: Теперь URL содержит расширение в самом конце строки, регулярное выражение или endsWith отработают на 100%
+            if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".webp")) {
                 targetElement.innerHTML = `
                     <img src="${contentText}" alt="Скриншот" onclick="window.open('${contentText}', '_blank')">
                     <a class="img-download-link" href="${contentText}" target="_blank">📁 Скачать файл</a>
@@ -666,7 +666,7 @@
 
         document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
             canvas.toBlob(async (blob) => {
-                // ИСПРАВЛЕНО: Явно добавляем расширение .png в имя файла, чтобы бэкенд правильно определял MIME-тип графики
+                // ИСПРАВЛЕНО: Теперь расширение передается в имени, а сервер сгенерирует ссылку, оканчивающуюся на .png
                 const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
                 const formData = new FormData(); formData.append('file', file);
                 try {
