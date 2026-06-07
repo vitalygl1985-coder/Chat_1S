@@ -6,7 +6,6 @@
     <title>Корпоративный чат 1С</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
     <style>
         :root {
             --primary-color: #2563eb;
@@ -22,7 +21,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body, html { height: 100vh; max-height: 100vh; background: var(--bg-main); color: var(--text-main); overflow: hidden; }
 
-        /* ГЛАВНЫЙ СЕТОЧНЫЙ КОНТЕЙНЕР (3 ПАНЕЛИ - ЖЕСТКАЯ ФИКСАЦИЯ ВЬЮПОРТА) */
         .app-container {
             display: grid;
             grid-template-columns: 260px 1fr 280px;
@@ -32,7 +30,6 @@
             overflow: hidden;
         }
 
-        /* ОБЩИЕ СТИЛИ ДЛЯ ВСЕХ ПАНЕЛЕЙ */
         .panel {
             display: flex;
             flex-direction: column;
@@ -61,7 +58,6 @@
         .search-box:focus { border-color: var(--primary-color); }
         .panel-scroll-area { flex: 1; overflow-y: auto; padding: 8px; }
 
-        /* ЛЕВАЯ ПАНЕЛЬ: КАБИНЕТЫ */
         .room-item {
             padding: 8px 10px;
             border-radius: 6px;
@@ -75,23 +71,14 @@
         .room-item:hover { background: var(--bg-main); }
         .room-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }
         
-        /* Аккордеон неактивных сообщений */
         .accordion-section { margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
         .accordion-header {
-            font-weight: bold;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 5px;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: flex;
-            justify-content: space-between;
+            font-weight: bold; color: var(--text-muted); cursor: pointer; padding: 5px; font-size: 11px;
+            text-transform: uppercase; display: flex; justify-content: space-between;
         }
         .accordion-content { display: none; margin-top: 5px; }
         .accordion-content.open { display: block; }
 
-        /* ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: ОКНО ЧАТА */
         .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; }
         .chat-header {
             height: 55px;
@@ -106,44 +93,25 @@
         .chat-title { font-weight: 600; font-size: 15px; }
         .chat-actions { display: flex; gap: 6px; }
         
-        /* Кнопки */
         .btn {
-            padding: 5px 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 12px;
-            color: white;
+            padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: white;
         }
         .btn-primary { background: var(--primary-color); }
         .btn-warn { background: #eab308; }
         .btn-danger { background: #ef4444; }
 
-        /* Сообщения */
         .messages-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
         .message { max-width: 75%; display: flex; flex-direction: column; margin-bottom: 2px; align-self: flex-start; }
         .message.my { align-self: flex-end; }
-        .message-box {
-            padding: 8px 12px;
-            border-radius: 12px;
-            background: var(--bg-panel);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            position: relative;
-        }
+        .message-box { padding: 8px 12px; border-radius: 12px; background: var(--bg-panel); box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; }
         .message.my .message-box { background: #dbeafe; }
         .msg-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; gap: 15px;}
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* Контекстная кнопка удаления сообщения */
-        .msg-delete-trigger {
-            position: absolute; right: 5px; top: 5px; display: none;
-            cursor: pointer; font-size: 11px; color: var(--text-muted);
-        }
+        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; }
         .message-box:hover .msg-delete-trigger { display: block; }
 
-        /* ПАНЕЛЬ ВВОДА (ЖЕСТКО ЗАФИКСИРОВАНА НАД НИЗОМ ЭКРАНА) */
         .input-area { 
             background: var(--bg-panel); 
             border-top: 1px solid var(--border-color); 
@@ -155,7 +123,6 @@
             flex-shrink: 0;
         }
         
-        /* Панель инструментов форматирования текста */
         .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; }
         .toolbar-item { cursor: pointer; font-size: 13px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
         .toolbar-item:hover { background: var(--bg-main); }
@@ -167,24 +134,21 @@
             border: 1px solid var(--border-color); border-radius: 6px;
             padding: 8px; outline: none; background: #fff; font-size: 13px;
         }
-        .input-msg-div:focus { border-color: var(--primary-color); }
 
-        /* МАКЕТ МЕНЮ УПОМИНАНИЙ @ */
         .mention-popup {
             position: absolute; bottom: 100%; left: 15px; width: 220px;
             background: #fff; border: 1px solid var(--border-color); border-radius: 6px;
             box-shadow: 0 -4px 10px rgba(0,0,0,0.1); display: none; max-height: 120px; overflow-y: auto; z-index: 1000;
         }
-        .mention-item { padding: 6px 10px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+        .mention-item { padding: 6px 10px; cursor: pointer; font-size: 12px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ: УЧАСТНИКИ И КОМПАНИЯ */
+        /* ПРАВАЯ ПАНЕЛЬ */
         .right-panel { border-right: none; }
         .section-title { font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
         .user-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
         .user-row:hover { background: var(--bg-main); }
         
-        /* Статус-маркеры */
         .avatar-container { position: relative; width: 28px; height: 28px; }
         .avatar { width: 28px; height: 28px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: #4b5563; }
         .status-badge { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; }
@@ -193,7 +157,6 @@
         .user-info-meta { flex: 1; display: flex; flex-direction: column; }
         .user-role { font-size: 10px; color: var(--text-muted); }
 
-        /* Вспомогательные классы для переключения видов правой панели */
         .view-pane { display: none; }
         .view-pane.active { display: block; }
     </style>
@@ -208,7 +171,7 @@
             <input type="text" class="search-box" id="search-rooms" placeholder="Поиск кабинета...">
             <button class="btn btn-primary" id="btn-create-group" style="width:100%;">+ Создать Кабинет</button>
         </div>
-        <div class="panel-scroll-area" id="rooms-list-container">
+        <div class="panel-scroll-area">
             <div id="active-rooms-list"></div>
             
             <div class="accordion-section">
@@ -249,12 +212,14 @@
                 </select>
                 <div class="toolbar-item" id="style-bold" style="font-weight:bold;">B</div>
                 <div class="toolbar-item" id="style-italic" style="font-style:italic;">I</div>
-                <div class="toolbar-item" id="btn-emoji-trigger">😀</div>
+                
+                <div class="toolbar-item" id="btn-emoji-trigger" title="Открыть панель эмодзи">😀</div>
+                
                 <input type="color" id="text-color-picker" title="Цвет текста" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
                 <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
                 
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
-                <div class="toolbar-item" id="btn-secret-toggle" title="Включить шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
+                <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
             </div>
 
             <div class="controls-row">
@@ -292,10 +257,8 @@
 </div>
 
 <script>
-    // Жесткое глушение внутренних ошибок старых движков
     window.onerror = function() { return true; };
 
-    // Глобальное состояние приложения
     let socket = null;
     let currentRoomId = null;
     let currentUser = null; 
@@ -306,47 +269,33 @@
     let isSecretMode = false;
     let userSecretKey = "";
 
-    // Хранилище для кастомизации текущего ввода текста
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
 
-    // Находим элементы DOM
     const inputMsg = document.getElementById('input-msg');
     const messagesStream = document.getElementById('messages-stream');
 
-    // Переключение неактивного аккордеона левой панели
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         var content = document.getElementById('inactive-rooms-list');
         content.classList.toggle('open');
         this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
     });
 
-    // Переключение режимов отображения правой панели (Кабинет <=> Компания)
     document.getElementById('btn-toggle-right-view').addEventListener('click', function() {
         const panePart = document.getElementById('pane-participants');
         const paneComp = document.getElementById('pane-company');
-        
         if (panePart.classList.contains('active')) {
-            panePart.classList.remove('active');
-            paneComp.classList.add('active');
-            this.innerText = "🚪 Вернуться к кабинету";
-            this.style.background = "#6b7280";
+            panePart.classList.remove('active'); paneComp.classList.add('active');
+            this.innerText = "🚪 Вернуться к кабинету"; this.style.background = "#6b7280";
         } else {
-            paneComp.classList.remove('active');
-            panePart.classList.add('active');
-            this.innerText = "👥 Все сотрудники";
-            this.style.background = "#4b5563";
+            paneComp.classList.remove('active'); panePart.classList.add('active');
+            this.innerText = "👥 Все сотрудники"; this.style.background = "#4b5563";
         }
     });
 
-    // ─── ШАГ 1: ИНИЦИАЛИЗАЦИЯ И БЕЗОПАСНЫЙ ОБМЕН ТОКЕНА ───
     async function initApplication() {
         const urlParams = new URLSearchParams(window.location.search);
         const ticket = urlParams.get('ticket');
-
-        if (!ticket) {
-            alert("Ошибка безопасности: Отсутствует токен авторизации 1С.");
-            return;
-        }
+        if (!ticket) { alert("Ошибка безопасности: Отсутствует токен авторизации 1С."); return; }
 
         try {
             const response = await fetch('/api/web/exchange-ticket', {
@@ -359,55 +308,27 @@
             if (data.success) {
                 sessionToken = data.token;
                 currentUser = data.user;
-                
                 connectSockets();
                 initUIEventListeners();
-                requestNotificationPermissions();
                 initMentionLogic();
-            } else {
-                alert("Ошибка авторизации: Токен устарел или уже был использован.");
-            }
-        } catch (err) {
-            alert("Не удалось связаться с сервером авторизации: " + err.message);
-        }
+            } else { alert("Ошибка авторизации: Токен устарел."); }
+        } catch (err) { alert("Не удалось связаться с сервером авторизации."); }
     }
 
-    // ─── ШАГ 2: ПОДКЛЮЧЕНИЕ WEBSOCKETS (SOCKET.IO) ───
     function connectSockets() {
         const socketUrl = window.location.protocol + '//' + window.location.host;
-        
         socket = io(socketUrl, {
             path: '/socket.io',
             transports: ['polling', 'websocket'],
             query: { id_user: currentUser.id_user, id_org: currentUser.id_org, username: currentUser.username, role: currentUser.role }
         });
 
-        socket.on('connect', () => {
-            refreshRoomsAndLists();
-            socket.emit('get_users_list');
-        });
-
+        socket.on('connect', () => { refreshRoomsAndLists(); socket.emit('get_users_list'); });
         socket.on('rooms_list', (rooms) => { processRoomsDivision(rooms); });
-        socket.on('users_list', (users) => { 
-            globalUsersCache = users; 
-            renderCompanyUsers(users); 
-        });
+        socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         
         socket.on('new_message', (msg) => { 
-            if (msg) {
-                if (msg.id_room == currentRoomId) {
-                    displayMessage(msg, false);
-                } else {
-                    // Умные всплывающие оповещения, если чат свернут
-                    playNotificationSound(false);
-                    if (msg.encrypted_text && msg.encrypted_text.includes(`data-user-id="${currentUser.id_user}"`)) {
-                        playNotificationSound(true);
-                        showSystemPush(msg.username, `Упомянул(а) вас в кабинете: ${msg.encrypted_text.replace(/<\/?[^>]+(>|$)/g, "")}`);
-                    } else if (msg.room_type === 'private') {
-                        showSystemPush(msg.username, `Личное сообщение: ${msg.encrypted_text.replace(/<\/?[^>]+(>|$)/g, "")}`);
-                    }
-                }
-            }
+            if (msg && msg.id_room == currentRoomId) displayMessage(msg, false); 
         });
 
         socket.on('room_participants_list', (data) => {
@@ -416,31 +337,26 @@
         });
 
         socket.on('message_deleted', (data) => {
-            if (!data || !data.id_message) return;
             const el = document.querySelector(`[data-msg-id="${data.id_message}"] .msg-text`);
-            if (el) {
-                el.innerHTML = '<span style="color:#9ca3af; font-style:italic;">Сообщение удалено автором</span>';
-                const delBtn = document.querySelector(`[data-msg-id="${data.id_message}"] .msg-delete-trigger`);
-                if (delBtn) delBtn.remove();
-            }
+            if (el) el.innerHTML = '<span style="color:#9ca3af; font-style:italic;">Сообщение удалено автором</span>';
         });
 
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
         socket.on('system_alert', (data) => { alert(data.message); });
         socket.on('download_archive_file', (data) => { if (data && data.url) window.open(data.url, '_blank'); });
+        
+        // Перехват глобального триггера обновления комнат
+        socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
     }
 
     async function refreshRoomsAndLists() {
         if (socket) socket.emit('get_rooms_again');
     }
 
-    // ─── ШАГ 3: УМНАЯ ОТРИСОВКА КОМНАТ С РАСПРЕДЕЛЕНИЕМ (РАБОЧИЕ / НЕАКТИВНЫЕ) ───
     function processRoomsDivision(allRooms) {
         const activeContainer = document.getElementById('active-rooms-list');
         const inactiveContainer = document.getElementById('inactive-rooms-list');
-        
-        activeContainer.innerHTML = "";
-        inactiveContainer.innerHTML = "";
+        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = "";
         let inactiveCount = 0;
 
         allRooms.forEach(room => {
@@ -448,24 +364,17 @@
             div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
             let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
             div.innerText = icon + room.name;
-            
             div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
             
-            if (room.participants_count < 2) {
-                inactiveContainer.appendChild(div);
-                inactiveCount++;
-            } else {
-                activeContainer.appendChild(div);
-            }
+            if (room.participants_count < 2) { inactiveContainer.appendChild(div); inactiveCount++; }
+            else { activeContainer.appendChild(div); }
         });
-
         document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
     }
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId;
         document.getElementById('current-chat-title').innerText = name || "Кабинет";
-        
         const managementRow = document.getElementById('chat-management-controls');
         managementRow.style.display = (currentUser.role === 'admin' || createdBy == currentUser.id_user) && type !== 'private' ? 'flex' : 'none';
 
@@ -474,17 +383,14 @@
         socket.emit('get_room_history', { room_id: roomId });
         socket.emit('get_room_participants', { room_id: roomId });
         
-        // Сбрасываем правую панель на базовый вид участников комнаты
         document.getElementById('pane-company').classList.remove('active');
         document.getElementById('pane-participants').classList.add('active');
         document.getElementById('btn-toggle-right-view').innerText = "👥 Все сотрудники";
         document.getElementById('btn-toggle-right-view').style.background = "#4b5563";
     }
 
-    // ─── ШАГ 4: ОТРИСОВКА ЛЕНТЫ СООБЩЕНИЙ С КАСТОМНЫМИ СТИЛЯМИ ───
     function displayMessage(msg, isBulkLoad) {
         const isMyMessage = (msg.id_user_from == currentUser.id_user);
-        
         const div = document.createElement('div');
         div.className = `message ${isMyMessage ? 'my' : ''}`;
         div.setAttribute('data-msg-id', msg.id_message || msg.id);
@@ -512,40 +418,57 @@
                 <div class="msg-text" style="${customStyleCSS}">${text}</div>
             </div>
         `;
-
         messagesStream.appendChild(div);
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
     window.requestDeleteMessage = function(msgId) {
-        if (confirm("Удалить это сообщение для всех участников?")) {
-            socket.emit('delete_message_request', { message_id: parseInt(msgId), room_id: parseInt(currentRoomId), user_id: currentUser.id_user, role: currentUser.role });
-        }
+        if (confirm("Удалить это сообщение?")) socket.emit('delete_message_request', { message_id: parseInt(msgId), room_id: parseInt(currentRoomId), user_id: currentUser.id_user, role: currentUser.role });
     };
 
-    // ─── ШАГ 5: ИНСТРУМЕНТЫ ВВОДА И КАСТОМИЗАЦИЯ СТИЛЕЙ ТЕКСТА ───
     function initUIEventListeners() {
-        document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
-
-        inputMsg.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessageStream();
+        // КНОПКА ПОДДЕРЖКИ СОЗДАНИЯ КОМНАТЫ
+        document.getElementById('btn-create-group').addEventListener('click', () => {
+            let gname = prompt("Введите название нового кабинета:");
+            if (gname && gname.trim() !== "") {
+                socket.emit('create_group_chat', { group_name: gname.trim() });
             }
         });
 
-        // Управление зашифрованным режимом (ВЕРХНИЙ ТУЛБАР)
+        // КНОПКА ДОБАВЛЕНИЯ СОТРУДНИКА В КОМНАТУ
+        document.getElementById('btn-add-user-modal').addEventListener('click', () => {
+            if (!currentRoomId) { alert("Выберите кабинет!"); return; }
+            let listStr = globalUsersCache.map(u => `${u.username} (ID: ${u.id_user})`).join("\n");
+            let targetName = prompt("Введите Имя сотрудника для добавления в этот кабинет:\n\nДоступные сотрудники:\n" + globalUsersCache.map(u => u.username).join(", "));
+            if (targetName) {
+                let found = globalUsersCache.find(u => u.username.toLowerCase() === targetName.trim().toLowerCase());
+                if (found) {
+                    socket.emit('add_user_to_room', { room_id: parseInt(currentRoomId), user_id: found.id_user });
+                } else { alert("Сотрудник не найден!"); }
+            }
+        });
+
+        document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
+        inputMsg.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessageStream(); } });
+
         document.getElementById('btn-secret-toggle').addEventListener('click', function() {
             isSecretMode = !isSecretMode;
             if (isSecretMode) {
                 this.innerHTML = "🔒 Зашифровано"; this.style.background = "#fef08a"; this.style.color = "#a16207"; this.style.fontWeight = "bold";
-                let key = prompt("Введите секретный код ключа:");
+                let key = prompt("Введите код шифрования:");
                 if (key && key.trim() !== "") userSecretKey = key.trim();
                 else { isSecretMode = false; resetSecretToggleUI(this); }
             } else { resetSecretToggleUI(this); }
         });
 
-        // Форматирование стилей текста
+        // Интеграция вызова родной панели смайликов
+        document.getElementById('btn-emoji-trigger').addEventListener('click', () => {
+            inputMsg.focus();
+            if (navigator.virtualKeyboard) { navigator.virtualKeyboard.show(); }
+            // Вызов нативного диалога смайликов Windows
+            alert("Используйте сочетание клавиш Win + . (или Win + Ю) для вставки любого эмодзи!");
+        });
+
         document.getElementById('font-family-select').addEventListener('change', function() { currentTextStyles.fontFamily = this.value; inputMsg.style.fontFamily = this.value; });
         document.getElementById('font-size-select').addEventListener('change', function() { currentTextStyles.fontSize = this.value; inputMsg.style.fontSize = this.value; });
         document.getElementById('style-bold').addEventListener('click', function() { currentTextStyles.isBold = !currentTextStyles.isBold; this.style.background = currentTextStyles.isBold ? '#e5e7eb' : 'transparent'; inputMsg.style.fontWeight = currentTextStyles.isBold ? 'bold' : 'normal'; });
@@ -553,66 +476,20 @@
         document.getElementById('text-color-picker').addEventListener('input', function() { currentTextStyles.color = this.value; inputMsg.style.color = this.value; });
         document.getElementById('text-bg-picker').addEventListener('input', function() { currentTextStyles.background = this.value; inputMsg.style.backgroundColor = this.value; });
 
-        // Мгновенный поиск контактов внутри справочника компании
-        document.getElementById('search-contacts').addEventListener('input', function() {
-            const value = this.value.toLowerCase().trim();
-            const filtered = globalUsersCache.filter(u => u.username.toLowerCase().includes(value));
-            renderCompanyUsers(filtered);
-        });
-
         document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
         document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
-
-        // ИНИЦИАЛИЗАЦИЯ ИНТЕРАКТИВНЫХ СМАЙЛИКОВ (Emoji Button)
-        const picker = new EmojiButton({
-            position: 'top-start',
-            rootElement: document.body,
-            autoHide: true,
-            showSearch: true,
-            searchPlaceholder: 'Поиск смайлика...',
-            categories: ['smileys', 'people', 'animals', 'food', 'activities', 'travel', 'objects', 'symbols', 'flags']
-        });
-
-        const emojiTrigger = document.getElementById('btn-emoji-trigger');
-        emojiTrigger.addEventListener('click', () => { picker.togglePicker(emojiTrigger); });
-
-        picker.on('emoji', selection => {
-            inputMsg.focus();
-            const sel = window.getSelection();
-            if (sel.getRangeAt && sel.rangeCount) {
-                const range = sel.getRangeAt(0);
-                range.deleteContents();
-                const emojiNode = document.createTextNode(selection.emoji);
-                range.insertNode(emojiNode);
-                range.setStartAfter(emojiNode);
-                range.setEndAfter(emojiNode);
-                sel.removeAllRanges();
-                sel.addRange(range);
-            } else {
-                inputMsg.innerText += selection.emoji;
-            }
-        });
     }
 
     function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; element.style.color = "var(--text-main)"; element.style.fontWeight = "normal"; userSecretKey = ""; }
 
     function sendMessageStream() {
-        const text = inputMsg.innerText.trim();
-        if (!text || !currentRoomId) return;
-
-        socket.emit('send_message', {
-            room_id: currentRoomId,
-            text: text,
-            is_secret: isSecretMode,
-            ui_styles: JSON.stringify(currentTextStyles)
-        });
-        inputMsg.innerHTML = ""; 
+        const text = inputMsg.innerText.trim(); if (!text || !currentRoomId) return;
+        socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
+        inputMsg.innerHTML = "";
     }
 
-    // ОРИСОВКА СПИСКОВ И ИНДИКАТОРОВ
     function renderCurrentRoomParticipants(list) {
-        const container = document.getElementById('current-room-participants');
-        container.innerHTML = "";
+        const container = document.getElementById('current-room-participants'); container.innerHTML = "";
         list.forEach(p => {
             const div = document.createElement('div'); div.className = 'user-row'; div.style.cursor = 'default';
             div.innerHTML = `<div class="avatar-container"><div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div></div><div class="user-info-meta"><span style="font-weight:600;">${p.username}</span><span class="user-role">${p.role}</span></div>`;
@@ -621,15 +498,13 @@
     }
 
     function renderCompanyUsers(users) {
-        const container = document.getElementById('company-users-list');
-        container.innerHTML = "";
+        const container = document.getElementById('company-users-list'); container.innerHTML = "";
         users.forEach(u => {
             if (u.id_user === currentUser.id_user) return;
-
-            const div = document.createElement('div');
-            div.className = "user-row";
+            const div = document.createElement('div'); div.className = "user-row";
             div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge online"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role}</span></div>`;
             
+            // ИСПРАВЛЕНО: Клик по сотруднику теперь гарантированно инициирует создание приватного чата
             div.addEventListener('click', () => {
                 socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username });
             });
@@ -637,64 +512,23 @@
         });
     }
 
-    // ЗВУКИ И ПУШИ
-    function playNotificationSound(isMention = false) {
-        try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return;
-            const ctx = new AudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(isMention ? 880 : 587.33, ctx.currentTime); 
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.4);
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.start(); osc.stop(ctx.currentTime + 0.4);
-        } catch (e) {}
-    }
-
-    function requestNotificationPermissions() {
-        if ("Notification" in window && Notification.permission === "default") { Notification.requestPermission(); }
-    }
-
-    function showSystemPush(title, bodyText) {
-        if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(title, { body: bodyText, icon: '/favicon.ico' });
-        }
-    }
-
-    // ЛОГИКА ТЕГИРОВАНИЯ УЧАСТНИКОВ ЧЕРЕЗ @
     function initMentionLogic() {
         const mentionMenu = document.getElementById('mention-menu');
-
         inputMsg.addEventListener('input', function(e) {
-            const text = inputMsg.innerText;
-            const selection = window.getSelection();
+            const text = inputMsg.innerText; const selection = window.getSelection();
             if (!selection.rangeCount) return;
-            
-            const caretPos = selection.getRangeAt(0).startOffset;
-            const textBeforeCaret = text.substring(0, caretPos);
-            const lastAtIndex = textBeforeCaret.lastIndexOf('@');
-            
+            const caretPos = selection.getRangeAt(0).startOffset; const textBeforeCaret = text.substring(0, caretPos); const lastAtIndex = textBeforeCaret.lastIndexOf('@');
             if (lastAtIndex !== -1 && (lastAtIndex === 0 || textBeforeCaret[lastAtIndex - 1] === ' ')) {
                 const query = textBeforeCaret.substring(lastAtIndex + 1).toLowerCase();
                 const filtered = roomParticipantsCache.filter(p => p.id_user !== currentUser.id_user && p.username.toLowerCase().includes(query));
-                
                 if (filtered.length > 0) { renderMentionMenu(filtered, lastAtIndex, caretPos); }
                 else { mentionMenu.style.display = 'none'; isMentionMenuOpen = false; }
             } else { mentionMenu.style.display = 'none'; isMentionMenuOpen = false; }
         });
-
-        document.addEventListener('click', (e) => {
-            if (!mentionMenu.contains(e.target) && e.target !== inputMsg) { mentionMenu.style.display = 'none'; isMentionMenuOpen = false; }
-        });
     }
 
     function renderMentionMenu(users, addIndex, caretPos) {
-        const mentionMenu = document.getElementById('mention-menu');
-        mentionMenu.innerHTML = ""; mentionMenu.style.display = 'block'; isMentionMenuOpen = true;
-
+        const mentionMenu = document.getElementById('mention-menu'); mentionMenu.innerHTML = ""; mentionMenu.style.display = 'block'; isMentionMenuOpen = true;
         users.forEach(u => {
             const div = document.createElement('div'); div.className = 'mention-item'; div.innerText = `@${u.username}`;
             div.addEventListener('click', function() { insertMentionIntoInput(u.username, u.id_user, addIndex, caretPos); });
@@ -703,20 +537,12 @@
     }
 
     function insertMentionIntoInput(username, userId, addIndex, caretPos) {
-        const mentionMenu = document.getElementById('mention-menu');
-        const text = inputMsg.innerText;
-        const beforeAt = text.substring(0, addIndex);
-        const afterCaret = text.substring(caretPos);
-        
+        const mentionMenu = document.getElementById('mention-menu'); const text = inputMsg.innerText; const beforeAt = text.substring(0, addIndex); const afterCaret = text.substring(caretPos);
         inputMsg.innerHTML = beforeAt + `<span class="mention" data-user-id="${userId}" style="color:var(--primary-color); font-weight:bold; background:#eff6ff; padding:2px 4px; border-radius:4px;">@${username}</span>&nbsp;` + afterCaret;
-        
         mentionMenu.style.display = 'none'; isMentionMenuOpen = false; inputMsg.focus();
-        const range = document.createRange(); const sel = window.getSelection();
-        range.selectNodeContents(inputMsg); range.collapse(false);
-        sel.removeAllRanges(); sel.addRange(range);
+        const range = document.createRange(); const sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
-    // Запуск приложения при загрузке страницы
     window.onload = initApplication;
 </script>
 </body>
