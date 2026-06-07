@@ -671,6 +671,15 @@ window.destroyChatBeforeClose = function() {
     return true;
 };
 
+window.onerror = function(message, source, lineno, colno, error) {
+    var logDiv = document.getElementById('messages-container');
+    if(logDiv) {
+        var errMsg = '<div style="color:red; padding:4px; border:1px solid red;">JS ERROR: ' + message + ' at line ' + lineno + '</div>';
+        logDiv.insertAdjacentHTML('afterbegin', errMsg);
+    }
+    return true; // Предотвратить всплытие ошибки в 1С
+};
+
 </script>
 </body>
 </html>
