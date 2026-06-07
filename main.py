@@ -34,7 +34,7 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-# ─── СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ ───
+# ─── ГЛОБАЛЬНЫЙ СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ ───
 online_users = {}       # id_user -> username
 message_reads = {}      # id_message -> list of usernames
 
@@ -78,6 +78,7 @@ def clean_uuid(org_id_str):
         return "00000000-0000-0000-0000-000000000001"
 
 
+# ─── ИСПРАВЛЕНО: ЕДИНАЯ ИОЛИРОВАННАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ КОМНАТ ───
 def check_and_create_global_rooms(cur, id_org, user_id, user_role):
     """
     Проверяет и создает системные комнаты ОБЩИЙ и АДМИН для организации.
@@ -125,6 +126,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
         )
 
 
+# ─── ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ СТРУКТУРЫ БД ───
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -197,13 +199,27 @@ def get_session_by_token(token: str):
     finally: cur.close(); conn.close()
 
 
+# ─── REST API: АВТОРИЗАЦИЯ 1С (ГЕНЕРАЦИЯ БЕЗОПАСНОГО ТИКЕТА) ───
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
-    import traceback
+    import traceback  # Гарантируем наличие модуля для логирования
     validated_org = clean_uuid(data.id_org)
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
+        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
+
+        try:
+            cur.execute(
+                "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
+                (validated_org, f"Организация {validated_org[:8]}")
+            )
+        except psycopg2.Error:
+            conn.rollback()
+            conn = get_db_connection()
+            cur = conn.cursor()
+
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
@@ -220,16 +236,20 @@ async def onec_auth(data: OneCAuthRequest):
         )
 
         conn.commit()
+        print(f"УСПЕШНО: Тикет сгенерирован")
         return {"success": True, "token": one_time_ticket}
+        
     except Exception as e:
         conn.rollback()
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        print("!!! КРИТИЧЕСКАЯ ОШИБКА В ЭНДПОИНТЕ /api/1c/auth !!!")
+        traceback.print_exc() 
+        raise HTTPException(status_code=500, detail=f"Database or internal crash: {str(e)}")
     finally:
         cur.close()
         conn.close()
 
 
+# ─── REST API: ОБМЕН ТИКЕТА НА СЕССИЮ ВЕБА ───
 @app.post("/api/web/exchange-ticket")
 async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     conn = get_db_connection()
@@ -331,6 +351,7 @@ async def download_file(file_uuid: str):
 
 @app.get("/download-archive/{file_uuid}")
 async def download_archive_endpoint(file_uuid: str):
+    mapping_file = os.getenv("UPLOAD_DIR", "uploads") + "/file_map.json"
     mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
     with open(mapping_file, "r", encoding="utf-8") as f: file_map = json.load(f)
     target_filename = ""
@@ -412,12 +433,12 @@ async def get_room_history(sid, data):
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at FROM messages m LEFT JOIN users u ON m.id_user_from = u.id_user WHERE m.id_room = %s ORDER BY m.created_at ASC LIMIT 100", (room_id,))
+        cur.execute("SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at FROM messages m LEFT JOIN users u ON m.id_user_from = u.id_user WHERE m.id_room = %s ORDER m.created_at ASC LIMIT 100", (room_id,))
         messages = cur.fetchall()
         for m in messages:
             msg_id = m['id_message']
             if m['created_at']: m['created_at'] = m['created_at'].isoformat()
-            # Насыщаем историю отметками прочтений
+            # Насыщаем историю отметками прочтений из ОЗУ
             m['reads'] = message_reads.get(msg_id, [])
         await sio.emit('room_history', {'messages': messages}, to=sid)
     except Exception as e: print(e)
@@ -439,7 +460,8 @@ async def send_message(sid, data):
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
 
-# ТРЕБОВАНИЕ: Логика обработки кликов ручного прочтения («Лайков»)
+
+# ТРЕБОВАНИЕ: Сборщик лайков ручного прочтения (Исправлено, добавляет в том числе текущего пользователя)
 @sio.event
 async def message_read_click(sid, data):
     msg_id = data.get('message_id')
@@ -453,6 +475,7 @@ async def message_read_click(sid, data):
         message_reads[msg_id].append(username)
         
     await sio.emit('message_read_update', {'message_id': msg_id, 'users_list': message_reads[msg_id]})
+
 
 @sio.event
 async def get_room_participants(sid, data):
@@ -546,7 +569,7 @@ async def delete_message_request(sid, data):
     try:
         cur.execute("SELECT id_user_from FROM messages WHERE id_message = %s", (message_id,))
         msg = cur.fetchone()
-        if msg and (user_role == 'admin' || str(msg['id_user_from']) == str(user_id)):
+        if msg and (user_role == 'admin' or str(msg['id_user_from']) == str(user_id)):
             cur.execute("DELETE FROM messages WHERE id_message = %s", (message_id,))
             conn.commit(); await sio.emit('message_deleted', {"id_message": message_id}, room=f"room_{room_id}")
     except Exception as e: print(e)
@@ -590,7 +613,7 @@ async def create_private_chat(sid, data):
 async def disconnect(sid):
     session = await sio.get_session(sid)
     if session and 'id_user' in session:
-        # ТРЕБОВАНИЕ: Удаление из онлайна
+        # Убираем юзера из онлайна при дисконнекте
         online_users.pop(session['id_user'], None)
         await sio.emit('user_statuses', online_users)
 

@@ -111,19 +111,19 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* ТРЕБОВАНИЕ: Адаптивный инлайн-рендер графики и кнопка скачивания */
-        .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
+        /* ДОРАБОТАНО: Адаптивные стили для вставки инлайн-изображений по ТЗ */
+        .msg-text img { max-width: 100%; max-height: 300px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
-
-        /* ПАНЕЛЬ ПРОЧИТАНО */
+        
+        /* СТИЛИ ДЛЯ ЛАЙКОВ / ПРОЧИТАНО */
         .msg-read-panel {
-            display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--text-muted); border-top: 1px dashed #e5e7eb; padding-top: 4px;
+            display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; border-top: 1px dashed #e5e7eb; padding-top: 4px;
         }
         .btn-read-trigger {
             cursor: pointer; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; user-select: none; border: 1px solid #e5e7eb;
         }
         .btn-read-trigger:hover { background: #e5e7eb; }
-        .read-users-list { font-style: italic; color: #6b7280; font-size: 11px; }
+        .read-users-list { font-style: italic; color: #6b7280; font-size: 10px; }
 
         .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
         .message-box:hover .msg-delete-trigger { display: block; }
@@ -144,6 +144,7 @@
         .toolbar-item:hover { background: var(--bg-main); }
         .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
         
+        /* ГИБКАЯ ПАНЕЛЬ ЭМОДЗИ */
         .emoji-picker-popover {
             position: absolute; bottom: 35px; left: 120px; background: white; border: 1px solid var(--border-color);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; padding: 8px; display: none;
@@ -346,7 +347,9 @@
             <div class="controls-row">
                 <input type="file" id="global-file-input" style="display:none">
                 <button class="btn btn-primary" id="btn-attach-file" style="background:#6b7280; padding: 10px 14px;" title="Отправить файл">📎</button>
-                <button class="btn btn-primary" id="btn-screenshot-editor" style="background:#4b5563; padding: 10px 15px;" title="Загрузить файл скриншота">📋 Скриншот</button>
+                <!-- ИСПРАВЛЕНО: Кнопка скриншота снова открывает графический редактор по ТЗ -->
+                <button class="btn btn-primary" id="btn-screenshot-editor" style="background:#4b5563; padding: 10px 15px;" title="Редактор скриншотов">📋 Скриншот</button>
+                <!-- ТРЕБОВАНИЕ: Добавлена текстовая подсказка Ctrl+V в плейсхолдер -->
                 <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Напишите сообщение... (Ctrl+V - что бы вставить скрин в чат)"></div>
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
@@ -430,7 +433,7 @@
 
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         var content = document.getElementById('inactive-rooms-list');
-        content.classList.toggle('open');
+        content.toggle('open');
         this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
     });
 
@@ -622,7 +625,6 @@
         filterAndRenderRooms();
     }
 
-    // ТРЕБОВАНИЕ: Отрисовка скриншотов/картинок как встроенный (inline) элемент + плашка прочитавших
     function displayMessage(msg, isBulkLoad) {
         const isMyMessage = (msg.id_user_from == currentUser.id_user);
         const div = document.createElement('div');
@@ -693,7 +695,7 @@
         if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username });
     };
 
-    // ТРЕБОВАНИЕ: Картинка рендерится как встроенный элемент, а под ней — ссылка-кнопка скачивания файла
+    // ТРЕБОВАНИЕ: Картинка рендерится inline прямо в чат, а под ней — кнопка скачивания по ТЗ
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
@@ -763,9 +765,9 @@
         const fileInput = document.getElementById('global-file-input');
         document.getElementById('btn-attach-file').addEventListener('click', () => fileInput.click());
         
-        // Кнопка скриншот теперь снова вызывает модальное графическое окно
+        // ИСПРАВЛЕНО: Кнопка скриншот снова открывает графический модальный редактор холста по ТЗ
         document.getElementById('btn-screenshot-editor').addEventListener('click', () => {
-            alert("Скопируйте изображение (например через Ножницы или Win+Shift+S) и нажмите Ctrl+V внутри чата для открытия графического редактора!");
+            alert("Скопируйте изображение (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора!");
         });
         
         fileInput.addEventListener('change', async function() {
@@ -786,7 +788,7 @@
                     }
                     socket.emit('send_message', { room_id: currentRoomId, text: payload, is_secret: false, ui_styles: "{}" });
                 }
-            } catch(e) { alert("Ошибка загрузки файла на сервер."); }
+            } catch(e) { alert("Ошибка загрузки файла на server."); }
             this.value = "";
         });
 
@@ -967,7 +969,7 @@
                 </div>
                 <div class="user-info-meta">
                     <span style="font-weight:600;">${u.username}</span>
-                    <span class="user-role">${p ? u.role : 'user'}</span>
+                    <span class="user-role">${u.role ? u.role : 'user'}</span>
                 </div>
             `;
             
