@@ -75,7 +75,6 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* ИСПРАВЛЕНО: Рендер встроенной инлайн-картинки скриншота сверху над кнопкой скачивания по ТЗ */
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
@@ -93,7 +92,6 @@
         .toolbar-item:hover { background: var(--bg-main); }
         .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
         
-        /* ИСПРАВЛЕНО: КАТЕГОРИЗИРОВАННОЕ МЕНЮ ЭМОДЗИ КАК В TELEGRAM */
         .emoji-picker-popover {
             position: absolute; bottom: 35px; left: 120px; background: white; border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 8px; padding: 0; display: none;
@@ -343,7 +341,6 @@
     const canvas = document.getElementById('editor-canvas');
     const ctx = canvas.getContext('2d');
 
-    // Наборы расширенных эмодзи по категориям (Аналог Telegram)
     const emojiCategories = {
         smile: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓'],
         work: ['💼','📁','📂','📅','📆','📊','📈','📉','📜','📋','📌','📍','📎','📎','📏','📐','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🛠️','🔧','⚙️','💻','🖥️','🖨️','🖱️','🖲️','📱','☎️','📞'],
@@ -384,7 +381,6 @@
         } catch (err) { alert("Не удалось связаться с сервером."); }
     }
 
-    // Рендер расширенной сетки эмодзи
     function renderEmojiGrid(category) {
         const grid = document.getElementById('emoji-grid'); grid.innerHTML = "";
         const emojis = emojiCategories[category] || [];
@@ -447,13 +443,22 @@
         processRoomsDivision(latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query)));
     }
 
+    // ТРЕБОВАНИЕ: Локальный парсинг именных приватов "Петров ⇄ Сидоров" -> Показываем только собеседника
     function processRoomsDivision(allRooms) {
         const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
         activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
+        
         allRooms.forEach(room => {
             const div = document.createElement('div'); div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
             let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
-            const labelSpan = document.createElement('span'); labelSpan.innerText = icon + room.name; div.appendChild(labelSpan);
+            
+            let displayName = room.name;
+            // Если чат приватный, очищаем ФИО текущего сотрудника из строки названия
+            if (room.type === 'private' && room.name.includes(' ⇄ ')) {
+                displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
+            }
+
+            const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
             div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
             if (room.participants_count < 2) { inactiveContainer.appendChild(div); inactiveCount++; } else { activeContainer.appendChild(div); }
         });
@@ -462,7 +467,13 @@
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId; roomCreatorId = createdBy; roomSystemType = type;
-        document.getElementById('current-chat-title').innerText = name || "Кабинет";
+        
+        let headerName = name;
+        if (type === 'private' && name.includes(' ⇄ ')) {
+            headerName = name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
+        }
+        document.getElementById('current-chat-title').innerText = headerName || "Кабинет";
+        
         const managementRow = document.getElementById('chat-management-controls');
         managementRow.style.display = (currentUser.role === 'admin' || roomCreatorId == currentUser.id_user) && roomSystemType !== 'private' ? 'flex' : 'none';
         messagesStream.innerHTML = "";
@@ -487,7 +498,6 @@
             }
         } catch(e) {}
 
-        // ТРЕБОВАНИЕ: Кнопка удаления сообщений доступна ТОЛЬКО непосредственному автору (админы лишены чужого права)
         let deleteBtnHtml = "";
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
@@ -529,7 +539,7 @@
 
     window.markMessageAsRead = function(msgId) { if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username }); };
 
-    // ТРЕБОВАНИЕ: Корректный инлайн рендер скриншота/изображения прямо внутри сообщения, а под ним кнопка скачивания файла
+    // ТРЕБОВАНИЕ: Рендеринг миниатюры скриншота прямо внутри сообщения над кнопкой скачивания по ТЗ
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
@@ -574,7 +584,6 @@
         document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
         inputMsg.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessageStream(); } });
 
-        // ТРЕБОВАНИЕ: Ctrl+V открывает встроенный холст-редактор, редактируем, отправляем, оно улетает инлайн и текстовое поле очищается
         window.addEventListener('paste', (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let index in items) {
@@ -608,7 +617,6 @@
             } else { resetSecretToggleUI(this); }
         });
 
-        // Показ и скрытие меню эмодзи
         const emojiPopover = document.getElementById('emoji-popover');
         document.getElementById('btn-emoji-trigger').addEventListener('click', (e) => { e.stopPropagation(); emojiPopover.style.display = emojiPopover.style.display === 'flex' ? 'none' : 'flex'; });
         document.addEventListener('click', () => emojiPopover.style.display = 'none');
@@ -658,6 +666,7 @@
 
         document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
             canvas.toBlob(async (blob) => {
+                // ИСПРАВЛЕНО: Явно добавляем расширение .png в имя файла, чтобы бэкенд правильно определял MIME-тип графики
                 const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
                 const formData = new FormData(); formData.append('file', file);
                 try {
@@ -672,7 +681,7 @@
         });
     }
 
-    function openEditorWithBlob(blob) { if(!currentRoomId) return; const url = URL.createObjectURL(blob); baseImageObj = new Image(); baseImageObj.onload = function() { canvas.width = baseImageObj.width; canvas.height = baseImageObj.height; redrawCanvasBase(); screenshotModal.classList.add('open'); URL.revokeObjectURL(url); }; baseImageObj.src = url; }
+    function openEditorWithBlob(blob) { if(!currentRoomId) { alert("Выберите чат!"); return; } const url = URL.createObjectURL(blob); baseImageObj = new Image(); baseImageObj.onload = function() { canvas.width = baseImageObj.width; canvas.height = baseImageObj.height; redrawCanvasBase(); screenshotModal.classList.add('open'); URL.revokeObjectURL(url); }; baseImageObj.src = url; }
     function redrawCanvasBase() { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(baseImageObj, 0, 0); }
 
     function renderCreateRoomUsers(users) {
@@ -719,7 +728,6 @@
         }
     };
 
-    // ТРЕБОВАНИЕ: Список сотрудников — при клике запускается сокет создания приватного чата
     function renderCompanyUsers(users) {
         const container = document.getElementById('company-users-list'); container.innerHTML = "";
         users.forEach(u => {

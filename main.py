@@ -53,6 +53,15 @@ class OneCMessageRequest(BaseModel):
 class WebTicketExchangeRequest(BaseModel):
     ticket: str
 
+class Base64ImageRequest(BaseModel):
+    room_id: int
+    base64_data: str
+    filename: str
+
+class AdminAuthRequest(BaseModel):
+    id_user: str
+    id_org: str
+
 
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
@@ -68,30 +77,51 @@ def clean_uuid(org_id_str):
 
 
 def check_and_create_global_rooms(cur, id_org, user_id, user_role):
-    cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", (id_org,))
+    cur.execute(
+        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
+        (id_org,)
+    )
     room_general = cur.fetchone()
     
     if not room_general:
-        cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', %s) RETURNING id_room", (id_org, user_id))
+        cur.execute(
+            "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', %s) RETURNING id_room", 
+            (id_org, user_id)
+        )
         room_general = cur.fetchone()
     
     general_room_id = room_general['id_room'] if isinstance(room_general, dict) else room_general[0]
-    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
+    
+    cur.execute(
+        "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+        (general_room_id, user_id)
+    )
 
     if user_role == 'admin':
-        cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", (id_org,))
+        cur.execute(
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", 
+            (id_org,)
+        )
         room_admin = cur.fetchone()
         
         if not room_admin:
-            cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', %s) RETURNING id_room", (id_org, user_id))
+            cur.execute(
+                "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', %s) RETURNING id_room", 
+                (id_org, user_id)
+            )
             room_admin = cur.fetchone()
         
         admin_room_id = room_admin['id_room'] if isinstance(room_admin, dict) else room_admin[0]
-        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
+        
+        cur.execute(
+            "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+            (admin_room_id, user_id)
+        )
 
 
 def init_db():
-    conn = get_db_connection(); cur = conn.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -141,14 +171,19 @@ def init_db():
             );
         """)
         conn.commit()
-    except Exception as e: print(f"Ошибка БД: {e}"); conn.rollback()
-    finally: cur.close(); conn.close()
+    except Exception as e:
+        print(f"Ошибка инициализации БД: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
 
 init_db()
 
 def get_session_by_token(token: str):
     if not token: return None
-    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM api_sessions WHERE token = %s", (token,))
         return cur.fetchone()
@@ -158,9 +193,24 @@ def get_session_by_token(token: str):
 
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
+    import traceback
     validated_org = clean_uuid(data.id_org)
-    conn = get_db_connection(); cur = conn.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
+        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
+        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
+
+        try:
+            cur.execute(
+                "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
+                (validated_org, f"Организация {validated_org[:8]}")
+            )
+        except psycopg2.Error:
+            conn.rollback()
+            conn = get_db_connection()
+            cur = conn.cursor()
+
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
@@ -171,32 +221,56 @@ async def onec_auth(data: OneCAuthRequest):
 
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
-        cur.execute("INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
-                    (one_time_ticket, data.id_user, validated_org, data.username, data.role))
+        cur.execute(
+            "INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
+            (one_time_ticket, data.id_user, validated_org, data.username, data.role)
+        )
+
         conn.commit()
         return {"success": True, "token": one_time_ticket}
-    except Exception as e: conn.rollback(); raise HTTPException(status_code=500, detail=str(e))
-    finally: cur.close(); conn.close()
+    except Exception as e:
+        conn.rollback()
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 
 @app.post("/api/web/exchange-ticket")
 async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
-    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '30 seconds'", (data.ticket,))
         ticket_data = cur.fetchone()
-        if not ticket_data: raise HTTPException(status_code=403, detail="Билет авторизации истек.")
+        if not ticket_data: 
+            raise HTTPException(status_code=403, detail="Билет авторизации истек или не существует.")
             
         cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
         session_token = secrets.token_hex(32)
         
         cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (ticket_data['id_user'],))
-        cur.execute("INSERT INTO api_sessions (token, id_user, id_org, username, role) VALUES (%s, %s, %s, %s, %s)", 
-                    (session_token, ticket_data['id_user'], ticket_data['id_org'], ticket_data['username'], ticket_data['role']))
+        cur.execute(
+            "INSERT INTO api_sessions (token, id_user, id_org, username, role) VALUES (%s, %s, %s, %s, %s)", 
+            (session_token, ticket_data['id_user'], ticket_data['id_org'], ticket_data['username'], ticket_data['role'])
+        )
         conn.commit()
-        return {"success": True, "token": session_token, "user": {"id_user": ticket_data['id_user'], "username": ticket_data['username'], "role": ticket_data['role'], "id_org": str(ticket_data['id_org'])}}
-    except Exception as e: conn.rollback(); raise HTTPException(status_code=500, detail=str(e))
-    finally: cur.close(); conn.close()
+        return {
+            "success": True, 
+            "token": session_token, 
+            "user": {
+                "id_user": ticket_data['id_user'], 
+                "username": ticket_data['username'], 
+                "role": ticket_data['role'], 
+                "id_org": str(ticket_data['id_org'])
+            }
+        }
+    except Exception as e: 
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally: 
+        cur.close(); conn.close()
 
 
 @app.get("/api/web/rooms")
@@ -215,11 +289,15 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
         """
         cur.execute(query, (str(session['id_org']), session['id_user']))
         all_rooms = cur.fetchall()
-        return {"active": [r for r in all_rooms if r['participants_count'] >= 2], "inactive_text_group": [r for r in all_rooms if r['participants_count'] < 2]}
+        return {
+            "active": [r for r in all_rooms if r['participants_count'] >= 2], 
+            "inactive_text_group": [r for r in all_rooms if r['participants_count'] < 2]
+        }
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
     finally: cur.close(); conn.close()
 
 
+# ─── ФАЙЛОВЫЙ СЕРВИС ───
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -268,7 +346,7 @@ async def download_archive_endpoint(file_uuid: str):
     return FileResponse(path=os.path.join(UPLOAD_DIR, target_filename), media_type="application/json", headers={'Content-Disposition': f'attachment; filename="{urllib.parse.quote(file_map[file_uuid])}"'})
 
 
-# ─── СОБЫТИЯ SOCKET.IO ───
+# ─── СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO ───
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -277,16 +355,23 @@ async def connect(sid, environ, auth=None):
     id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
     username = urllib.parse.unquote(params.get('username', ''))
     user_role = urllib.parse.unquote(params.get('role', 'user'))
+    
     if not id_user: return False
 
     conn = get_db_connection(); cur = conn.cursor()
     try:
+        cur.execute(
+            "INSERT INTO users (id_user, id_org, username, role, is_active) VALUES (%s, %s::uuid, %s, %s, true) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role" if hasattr(cur, 'execute') else "INSERT INTO users...", 
+            (id_user, id_org, username, user_role)
+        )
         cur.execute("INSERT INTO users (id_user, id_org, username, role, is_active) VALUES (%s, %s::uuid, %s, %s, true) ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role", (id_user, id_org, username, user_role))
         check_and_create_global_rooms(cur, id_org, id_user, user_role)
         conn.commit()
-    except Exception: conn.rollback()
-    finally: cur.close(); conn.close()
-    
+    except Exception: 
+        conn.rollback()
+    finally: 
+        cur.close(); conn.close()
+        
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
     online_users[id_user] = username
     await sio.emit('user_statuses', online_users)
@@ -380,6 +465,7 @@ async def get_room_participants(sid, data):
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
+
 
 @sio.event
 async def create_advanced_room(sid, data):
@@ -478,7 +564,7 @@ async def archive_room_messages(sid, data):
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
 
-# ТРЕБОВАНИЕ: Удалять сообщения может только отправитель (админы лишены права тереть чужое)
+
 @sio.event
 async def delete_message_request(sid, data):
     message_id, room_id, user_id, user_role = data.get('message_id'), data.get('room_id'), data.get('user_id'), data.get('role', 'user')
@@ -487,7 +573,6 @@ async def delete_message_request(sid, data):
     try:
         cur.execute("SELECT id_user_from FROM messages WHERE id_message = %s", (message_id,))
         msg = cur.fetchone()
-        # ИСПРАВЛЕНО: Условие 'user_role == admin' полностью удалено из проверки на удаление сообщений
         if msg and str(msg['id_user_from']) == str(user_id):
             cur.execute("DELETE FROM messages WHERE id_message = %s", (message_id,))
             conn.commit()
