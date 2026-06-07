@@ -770,7 +770,7 @@ async def create_group_chat(sid, data):
         conn.rollback()
     finally: 
         cur.close(); conn.close()
-        
+
 @sio.event
 async def create_private_chat(sid, data):
     target_user_id, target_username = data.get('target_user_id'), data.get('target_username'); session = await sio.get_session(sid)
@@ -790,4 +790,30 @@ async def create_private_chat(sid, data):
 @sio.event
 async def disconnect(sid): pass
 
+@app.get("/", response_class=HTMLResponse)
+async def get_chat_page():
+    # Получаем абсолютный путь, чтобы исключить проблемы с рабочим каталогом на Railway
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, "index.html")
+    
+    if not os.path.exists(file_path):
+        # Если файла нет, возвращаем понятный HTML-текст вместо системного 404
+        error_html = f"""
+        <html>
+        <body style="font-family:sans-serif; padding:50px; text-align:center; background:#fafafa;">
+            <h2 style="color:#ef4444;">🚨 КРИТИЧЕСКАЯ ОШИБКА СБОРКИ</h2>
+            <p>Файл <b>index.html</b> не найден в корневом каталоге сервера Railway!</p>
+            <p style="color:#6b7280; font-size:13px;">Текущий путь поиска: {file_path}</p>
+            <p style="margin-top:20px;">Проверьте, добавлен ли файл в ваш Git-репозиторий.</p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=error_html, status_code=200)
+        
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return HTMLResponse(content=f"<h3>Ошибка чтения index.html: {str(e)}</h3>", status_code=500)
+    
 app.mount("/socket.io", socket_app)
