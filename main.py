@@ -355,7 +355,7 @@ async def get_rooms_again(sid):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         query = """
-            SELECT DISTINCT r.id_room, r.name, r.type, r.id_org, r.created_by,
+            SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
             FROM rooms r
             INNER JOIN room_participants rp ON r.id_room = rp.id_room
