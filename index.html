@@ -30,7 +30,7 @@
             overflow: hidden;
         }
 
-        /* ТРЕБОВАНИЕ: Нижний слой ссылок из админки чата и 1С */
+        /* ТРЕБОВАНИЕ: Нижний слой ссылок из админки чата и веб-клиента 1С */
         .system-footer-links {
             height: 25px;
             background: #e5e7eb;
@@ -107,7 +107,7 @@
             flex-shrink: 0;
         }
         
-        /* ТРЕБОВАНИЕ: Информационная плашка пользователя вверху чата */
+        /* ТРЕБОВАНИЕ: Текущий сотрудник чата отображается в шапке сверху по центру */
         .chat-title-area { display: flex; flex-direction: column; }
         .chat-title { font-weight: 600; font-size: 15px; }
         .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; }
@@ -131,6 +131,7 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
+        /* ТРЕБОВАНИЕ: Скриншот в более мелком адаптивном варианте (inline-картинка) */
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
@@ -202,6 +203,7 @@
         .view-pane { display: none; }
         .view-pane.active { display: block; }
 
+        /* МОДАЛЬНЫЕ ОКНА */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000;
@@ -218,10 +220,41 @@
             border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 4px;
         }
         .modal-user-item:hover { background: var(--bg-main); }
-        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
-        .btn-decrypt-inline { background: #f59e0b; padding: 2px 8px; border-radius: 4px; border: none; color: white; font-size: 11px; cursor: pointer; font-weight: bold; margin-left: 5px; }
+
+        .screenshot-modal-window {
+            width: 85vw; height: 85vh; max-width: 1000px; background: white; border-radius: 12px;
+            display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden;
+        }
+        .editor-container {
+            flex: 1; display: flex; background: #333; overflow: hidden; justify-content: center; align-items: center; position: relative;
+        }
+        .canvas-wrapper {
+            position: relative; max-width: 100%; max-height: 100%; overflow: auto; padding: 10px;
+        }
+        canvas { background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: block; cursor: crosshair; }
+        .editor-toolbar {
+            padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb;
+            display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+        }
+        .editor-tool-btn {
+            padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px;
+            cursor: pointer; font-size: 12px; font-weight: 500;
+        }
+        .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
         
+        .btn-decrypt-inline {
+            background: #f59e0b; padding: 2px 8px; border-radius: 4px; border: none; color: white;
+            font-size: 11px; cursor: pointer; font-weight: bold; margin-left: 5px;
+        }
+        .btn-decrypt-inline:hover { background: #d97706; }
+        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
         .participant-checkbox { width: 16px; height: 16px; cursor: pointer; }
+        
+        /* СТИЛЬ КНОПКИ УДАЛЕНИЯ УЧАСТНИКА ИЗ КАБИНЕТА */
+        .btn-remove-participant {
+            border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 4px;
+        }
+        .btn-remove-participant:hover { background: #ffeeeb; }
     </style>
 </head>
 <body>
@@ -237,7 +270,7 @@
             <input type="text" class="search-box" id="new-room-name" placeholder="Введите имя комнаты...">
         </div>
         <div style="padding: 10px 15px 5px 15px; font-size:11px; font-weight:bold; color:var(--text-muted); text-transform:uppercase;">
-            Выберите участников (минимум 1):
+            Выберите участников (минимум 1 сотрудник):
         </div>
         <div class="modal-body" id="create-room-users-container" style="max-height: 250px;"></div>
         <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
@@ -257,6 +290,42 @@
             <input type="text" class="search-box" id="search-modal-users" placeholder="Поиск по имени...">
         </div>
         <div class="modal-body" id="modal-users-container"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="screenshot-modal">
+    <div class="screenshot-modal-window">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">🎨 Графический редактор скриншотов</span>
+            <span id="btn-close-screenshot-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div class="editor-toolbar">
+            <button class="editor-tool-btn active" id="tool-draw">✏️ Кисть</button>
+            <button class="editor-tool-btn" id="tool-text">🔤 Текст (Клик на холст)</button>
+            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
+                <span>Цвет:</span>
+                <input type="color" id="editor-color" value="#ef4444" style="width:24px; height:24px; border:none; cursor:pointer;">
+            </div>
+            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
+                <span>Размер:</span>
+                <select id="editor-size" style="padding:2px; font-size:12px;">
+                    <option value="3">3 px</option>
+                    <option value="5" selected>5 px</option>
+                    <option value="10">10 px</option>
+                    <option value="15">15 px</option>
+                </select>
+            </div>
+            <button class="editor-tool-btn" id="btn-editor-clear" style="margin-left:auto; background:#fca5a5; color:#7f1d1d;">🗑️ Очистить правки</button>
+        </div>
+        <div class="editor-container">
+            <div class="canvas-wrapper">
+                <canvas id="editor-canvas"></canvas>
+            </div>
+        </div>
+        <div class="modal-header" style="border-top: 1px solid var(--border-color); border-bottom:none; justify-content:flex-end; gap:10px;">
+            <button class="btn" id="btn-cancel-screenshot" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-success" id="btn-submit-screenshot" style="padding:7px 20px;">💾 Отправить в чат</button>
+        </div>
     </div>
 </div>
 
@@ -301,6 +370,7 @@
                     <option value="Segoe UI">Стандартный</option>
                     <option value="Courier New">Широкий (Код)</option>
                     <option value="Georgia">Строгий</option>
+                    <option value="Impact">Жирный акцент</option>
                 </select>
                 <select id="font-size-select">
                     <option value="13px">13px</option>
@@ -309,13 +379,14 @@
                 </select>
                 <div class="toolbar-item" id="style-bold" style="font-weight:bold;">B</div>
                 <div class="toolbar-item" id="style-italic" style="font-style:italic;">I</div>
+                
                 <div class="toolbar-item" id="btn-emoji-trigger" title="Эмодзи">😀</div>
                 <div class="emoji-picker-popover" id="emoji-popover"></div>
 
-                <input type="color" id="text-color-picker" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
-                <input type="color" id="text-bg-picker" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
+                <input type="color" id="text-color-picker" title="Цвет текста" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
+                <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
-                <div class="toolbar-item" id="btn-secret-toggle" style="font-size: 12px;">🔓 Открыто</div>
+                <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
             </div>
 
             <div class="controls-row">
@@ -353,25 +424,24 @@
 <script>
     window.onerror = function() { return true; };
 
-    let socket = null;
-    let currentRoomId = null;
-    let currentUser = null; 
-    let sessionToken = null;
-    let globalUsersCache = []; 
-    let roomParticipantsCache = []; 
-    let latestRoomsListCache = [];
-    let onlineUsersCache = {}; 
-    let messageReadsMap = {}; 
-    let isSecretMode = false;
-    let userSecretKey = "";
+    let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
+    let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
+    let onlineUsersCache = {}, messageReadsMap = {};
+    let isMentionMenuOpen = false, isSecretMode = false, userSecretKey = "";
+    let roomCreatorId = null, roomSystemType = "";
 
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
+    
+    let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
 
     const inputMsg = document.getElementById('input-msg');
     const messagesStream = document.getElementById('messages-stream');
     const createRoomModal = document.getElementById('create-room-modal');
+    const screenshotModal = document.getElementById('screenshot-modal');
+    const canvas = document.getElementById('editor-canvas');
+    const ctx = canvas.getContext('2d');
 
-    const popularEmojis = ['😀', '😂', '👍', '🔥', '🎉', '💩', '🚀', '❤️', '👀', '✅', '❌'];
+    const popularEmojis = ['😀', '😂', '👍', '🔥', '🎉', '💩', '🚀', '❤️', '👀', '💼', '✅', '❌'];
 
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         var content = document.getElementById('inactive-rooms-list');
@@ -407,13 +477,14 @@
                 sessionToken = data.token;
                 currentUser = data.user;
                 
-                // Отображаем текущего сотрудника в шапке
+                // Рендер верхней плашки ФИО
                 document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
                 
                 buildEmojiPicker();
                 connectSockets();
                 initUIEventListeners();
                 initMentionLogic();
+                initScreenshotEditorLogic();
             } else { alert("Ошибка авторизации: Токен устарел."); }
         } catch (err) { alert("Не удалось связаться с сервером авторизации."); }
     }
@@ -476,16 +547,15 @@
             }
         });
 
-        // ИСПРАВЛЕНО: Безопасная очистка текста при удалении сообщения без деформации структуры чата и полей ввода
+        // ИСПРАВЛЕНО: Безопасный рендер без инъекции ломающегося DOM-дерева по ТЗ
         socket.on('message_deleted', (data) => {
             const el = document.querySelector(`[data-msg-id="${data.id_message}"] .msg-text`);
             if (el) {
-                el.innerText = ""; 
-                const span = document.createElement('span');
-                span.style.color = "#9ca3af";
-                span.style.fontStyle = "italic";
-                span.innerText = "Сообщение удалено автором";
-                el.appendChild(span);
+                el.innerText = "";
+                const innerSpan = document.createElement('span');
+                innerSpan.style.color = "#9ca3af"; innerSpan.style.fontStyle = "italic";
+                innerSpan.innerText = "Сообщение удалено автором";
+                el.appendChild(innerSpan);
             }
         });
 
@@ -499,8 +569,7 @@
 
     function filterAndRenderRooms() {
         const query = document.getElementById('search-rooms').value.toLowerCase().trim();
-        const filtered = latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query));
-        processRoomsDivision(filtered);
+        processRoomsDivision(latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query)));
     }
 
     function processRoomsDivision(allRooms) {
@@ -529,9 +598,14 @@
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId;
+        roomCreatorId = createdBy;
+        roomSystemType = type;
+
         document.getElementById('current-chat-title').innerText = name || "Кабинет";
+        
+        // ТРЕБОВАНИЕ: Панель архив/удалить чат доступна ТОЛЬКО владельцу (автору) или admin
         const managementRow = document.getElementById('chat-management-controls');
-        managementRow.style.display = (currentUser.role === 'admin' || createdBy == currentUser.id_user) && type !== 'private' ? 'flex' : 'none';
+        managementRow.style.display = (currentUser.role === 'admin' || roomCreatorId == currentUser.id_user) && roomSystemType !== 'private' ? 'flex' : 'none';
 
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId });
@@ -561,7 +635,12 @@
             }
         } catch(e) {}
 
-        let deleteBtnHtml = (isMyMessage || currentUser.role === 'admin') ? `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>` : "";
+        // ТРЕБОВАНИЕ: Кнопка удаления сообщений доступна СТРОГО только автору (или роли admin)
+        let deleteBtnHtml = "";
+        if (currentUser.role === 'admin' || String(msg.id_user_from) === String(currentUser.id_user)) {
+            deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
+        }
+        
         const readsList = messageReadsMap[msgId] || [];
 
         div.innerHTML = `
@@ -576,24 +655,20 @@
             </div>
         `;
         messagesStream.appendChild(div);
-
         const textBlock = document.getElementById(`text-container-${msgId}`);
 
         if (msg.is_user_encrypted) {
             textBlock.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:12px;">🔒 Зашифрованное сообщение</span>`;
             const decryptBtn = document.createElement('button');
-            decryptBtn.className = 'btn-decrypt-inline';
-            decryptBtn.innerText = '🔑 Ввести код';
+            decryptBtn.className = 'btn-decrypt-inline'; decryptBtn.innerText = '🔑 Ввести код';
             decryptBtn.onclick = function() {
                 let inputKey = prompt("Введите код для расшифровки этого сообщения:");
                 if (inputKey && inputKey.trim() !== "") {
                     try {
                         let bytes = CryptoJS.AES.decrypt(rawText, inputKey.trim());
                         let decryptedText = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decryptedText) {
-                            renderProcessedText(textBlock, decryptedText);
-                            decryptBtn.remove();
-                        } else { alert("Неверный код шифрования!"); }
+                        if (decryptedText) { renderProcessedText(textBlock, decryptedText); decryptBtn.remove(); }
+                        else { alert("Неверный код шифрования!"); }
                     } catch(err) { alert("Ошибка расшифровки."); }
                 }
             };
@@ -601,7 +676,6 @@
         } else {
             renderProcessedText(textBlock, rawText);
         }
-
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
@@ -609,7 +683,7 @@
         if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username });
     };
 
-    // ТРЕБОВАНИЕ: Объединение скриншота/картинки и кнопки скачивания в один узел сообщения
+    // ТРЕБОВАНИЕ: Объединение инлайн-картинки скриншота и кнопки скачивания в теле сообщения по ТЗ
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
@@ -622,9 +696,7 @@
                 const parts = contentText.split('|');
                 targetElement.innerHTML = `📁 <a href="${parts[0]}" target="_blank" style="color:var(--primary-color); font-weight:600;">${parts[1] || "Скачать файл"}</a>`;
             }
-        } else {
-            targetElement.innerHTML = contentText;
-        }
+        } else { targetElement.innerHTML = contentText; }
     }
 
     window.requestDeleteMessage = function(msgId) {
@@ -632,9 +704,6 @@
     };
 
     function initUIEventListeners() {
-        document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
-
-        // ТРЕБОВАНИЕ: Логика открытия модального диалога расширенного создания комнат
         document.getElementById('btn-open-create-modal').addEventListener('click', () => {
             createRoomModal.classList.add('open');
             renderCreateRoomUsers(globalUsersCache);
@@ -643,7 +712,7 @@
         document.getElementById('btn-close-room-modal').addEventListener('click', () => createRoomModal.classList.remove('open'));
         document.getElementById('btn-cancel-room-creation').addEventListener('click', () => createRoomModal.classList.remove('open'));
         
-        // ТРЕБОВАНИЕ: Проверка на имя и выбор хотя бы одного участника перед отправкой на бэк
+        // ТРЕБОВАНИЕ: Проверка на обязательный выбор имени и минимум одного участника перед отправкой на сервер
         document.getElementById('btn-confirm-room-creation').addEventListener('click', () => {
             const rName = document.getElementById('new-room-name').value.trim();
             const checkedBoxes = document.querySelectorAll('.participant-checkbox:checked');
@@ -662,57 +731,34 @@
         const modal = document.getElementById('add-user-modal');
         document.getElementById('btn-add-user-modal').addEventListener('click', () => {
             if (!currentRoomId) { alert("Выберите кабинет!"); return; }
-            modal.classList.add('open');
-            renderModalUsers(globalUsersCache);
+            modal.classList.add('open'); renderModalUsers(globalUsersCache);
         });
-
         document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
-
         document.getElementById('search-modal-users').addEventListener('input', function() {
             renderModalUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim())));
         });
 
         document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
-        
-        inputMsg.addEventListener('keydown', (e) => { 
-            if (e.key === 'Enter' && !e.shiftKey) { 
-                e.preventDefault(); 
-                sendMessageStream(); 
-            } 
-        });
+        inputMsg.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessageStream(); } });
 
-        // ТРЕБОВАНИЕ: Ctrl+V ловит скриншот из буфера и автоматически пушит его в чат без задержек в один клик
-        window.addEventListener('paste', async (e) => {
+        // ТРЕБОВАНИЕ: Перехват Ctrl+V — открывает встроенный редактор, рисуем, нажимаем отправить, улетает инлайн и очищается поле ввода!
+        window.addEventListener('paste', (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let index in items) {
                 const item = items[index];
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
-                    if (!currentRoomId) { alert("Сначала выберите рабочий чат для вставки скриншота!"); return; }
-                    const blob = item.getAsFile();
-                    const formData = new FormData();
-                    formData.append('file', blob, `screenshot_${Date.now()}.png`);
-                    
-                    try {
-                        const res = await fetch('/upload', { method: 'POST', body: formData });
-                        const meta = await res.json();
-                        if (meta.url) {
-                            socket.emit('send_message', { room_id: currentRoomId, text: meta.url, is_secret: false, ui_styles: "{}" });
-                        }
-                    } catch(err) { alert("Сбой автоматической отправки скриншота."); }
+                    openEditorWithBlob(item.getAsFile());
                 }
             }
         });
 
         const fileInput = document.getElementById('global-file-input');
         document.getElementById('btn-attach-file').addEventListener('click', () => fileInput.click());
-        
         fileInput.addEventListener('change', async function() {
             if (this.files.length === 0) return;
-            const formData = new FormData();
-            formData.append('file', this.files[0]);
+            const formData = new FormData(); formData.append('file', this.files[0]);
             try {
-                const res = await fetch('/upload', { method: 'POST', body: formData });
-                const meta = await res.json();
+                const res = await fetch('/upload', { method: 'POST', body: formData }); const meta = await res.json();
                 if (meta.url) {
                     let ext = meta.filename.split('.').pop().toLowerCase();
                     let payload = ['png','jpg','jpeg','gif','webp'].includes(ext) ? meta.url : `${meta.url}|${meta.filename}`;
@@ -726,19 +772,13 @@
             isSecretMode = !isSecretMode;
             if (isSecretMode) {
                 let key = prompt("Задайте секретный код:");
-                if (key && key.trim() !== "") {
-                    userSecretKey = key.trim();
-                    this.innerHTML = "🔒 Зашифровано"; 
-                    this.style.background = "#fef08a";
-                } else { isSecretMode = false; resetSecretToggleUI(this); }
+                if (key && key.trim() !== "") { userSecretKey = key.trim(); this.innerHTML = "🔒 Зашифровано"; this.style.background = "#fef08a"; }
+                else { isSecretMode = false; resetSecretToggleUI(this); }
             } else { resetSecretToggleUI(this); }
         });
 
         const emojiPopover = document.getElementById('emoji-popover');
-        document.getElementById('btn-emoji-trigger').addEventListener('click', (e) => {
-            e.stopPropagation();
-            emojiPopover.style.display = emojiPopover.style.display === 'grid' ? 'none' : 'grid';
-        });
+        document.getElementById('btn-emoji-trigger').addEventListener('click', (e) => { e.stopPropagation(); emojiPopover.style.display = emojiPopover.style.display === 'grid' ? 'none' : 'grid'; });
         document.addEventListener('click', () => emojiPopover.style.display = 'none');
 
         document.getElementById('font-family-select').addEventListener('change', function() { currentTextStyles.fontFamily = this.value; inputMsg.style.fontFamily = this.value; });
@@ -760,27 +800,57 @@
     
     function sendMessageStream() {
         let text = inputMsg.innerHTML.trim(); if (!text || !currentRoomId) return;
-        if (isSecretMode && userSecretKey) {
-            text = CryptoJS.AES.encrypt(inputMsg.innerText.trim(), userSecretKey).toString();
-        }
+        if (isSecretMode && userSecretKey) { text = CryptoJS.AES.encrypt(inputMsg.innerText.trim(), userSecretKey).toString(); }
         socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
         inputMsg.innerHTML = "";
         isSecretMode = false;
         resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
     }
 
-    // ТРЕБОВАНИЕ: Рендер списка чекбоксов в модальном окне создания комнат
+    function initScreenshotEditorLogic() {
+        document.getElementById('btn-close-screenshot-modal').addEventListener('click', () => screenshotModal.classList.remove('open'));
+        document.getElementById('btn-cancel-screenshot').addEventListener('click', () => screenshotModal.classList.remove('open'));
+        const toolDraw = document.getElementById('tool-draw'), toolText = document.getElementById('tool-text');
+        toolDraw.addEventListener('click', () => { currentEditorTool = 'draw'; toolDraw.classList.add('active'); toolText.classList.remove('active'); });
+        toolText.addEventListener('click', () => { currentEditorTool = 'text'; toolText.classList.add('active'); toolDraw.classList.remove('active'); });
+        document.getElementById('btn-editor-clear').addEventListener('click', () => { if(baseImageObj) redrawCanvasBase(); });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (currentEditorTool === 'draw') { isDrawing = true; [lastX, lastY] = [e.offsetX, e.offsetY]; }
+            else {
+                let userText = prompt("Введите текст подписи:");
+                if (userText) { ctx.font = `bold ${document.getElementById('editor-size').value * 3}px Arial`; ctx.fillStyle = document.getElementById('editor-color').value; ctx.fillText(userText.trim(), e.offsetX, e.offsetY); }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => { if (!isDrawing || currentEditorTool !== 'draw') return; ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(e.offsetX, e.offsetY); ctx.strokeStyle = document.getElementById('editor-color').value; ctx.lineWidth = document.getElementById('editor-size').value; ctx.lineCap = 'round'; ctx.stroke(); [lastX, lastY] = [e.offsetX, e.offsetY]; });
+        canvas.addEventListener('mouseup', () => isDrawing = false);
+
+        document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
+            canvas.toBlob(async (blob) => {
+                const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
+                const formData = new FormData(); formData.append('file', file);
+                try {
+                    const res = await fetch('/upload', { method: 'POST', body: formData }); const meta = await res.json();
+                    if (meta.url) {
+                        socket.emit('send_message', { room_id: currentRoomId, text: meta.url, is_secret: false, ui_styles: "{}" });
+                        screenshotModal.classList.remove('open');
+                        inputMsg.innerHTML = ""; // Очищаем поле ввода
+                    }
+                } catch(err) {}
+            }, 'image/png');
+        });
+    }
+
+    function openEditorWithBlob(blob) { if(!currentRoomId) { alert("Выберите чат!"); return; } const url = URL.createObjectURL(blob); baseImageObj = new Image(); baseImageObj.onload = function() { canvas.width = baseImageObj.width; canvas.height = baseImageObj.height; redrawCanvasBase(); screenshotModal.classList.add('open'); URL.revokeObjectURL(url); }; baseImageObj.src = url; }
+    function redrawCanvasBase() { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(baseImageObj, 0, 0); }
+
     function renderCreateRoomUsers(users) {
-        const container = document.getElementById('create-room-users-container');
-        container.innerHTML = "";
+        const container = document.getElementById('create-room-users-container'); container.innerHTML = "";
         users.forEach(u => {
             if (u.id_user === currentUser.id_user) return;
-            const div = document.createElement('div');
-            div.className = 'modal-user-item';
-            div.innerHTML = `
-                <span><b>${u.username}</b> (${u.role})</span>
-                <input type="checkbox" class="participant-checkbox" value="${u.id_user}">
-            `;
+            const div = document.createElement('div'); div.className = 'modal-user-item';
+            div.innerHTML = `<span><b>${u.username}</b> (${u.role})</span><input type="checkbox" class="participant-checkbox" value="${u.id_user}">`;
             container.appendChild(div);
         });
     }
@@ -799,15 +869,39 @@
         });
     }
 
+    // ТРЕБОВАНИЕ: Рендер участников с кнопкой КРЕСТИКА И УДАЛЕНИЯ сотрудника (только владельцу или роли admin)
     function renderCurrentRoomParticipants(list) {
         const container = document.getElementById('current-room-participants'); container.innerHTML = "";
         list.forEach(p => {
             const div = document.createElement('div'); div.className = 'user-row'; div.style.cursor = 'default';
             const isOnline = !!onlineUsersCache[p.id_user];
-            div.innerHTML = `<div class="avatar-container"><div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${p.username}</span><span class="user-role">${p.role}</span></div>`;
+            
+            let removeActionHtml = "";
+            // Если текущий юзер — создатель или admin (и это не он сам), выводим кнопку "-" удаления из кабинета
+            if ((currentUser.role === 'admin' || roomCreatorId == currentUser.id_user) && p.id_user !== currentUser.id_user) {
+                removeActionHtml = `<button class="btn-remove-participant" onclick="event.stopPropagation(); requestRemoveUser('${p.id_user}')">❌</button>`;
+            }
+
+            div.innerHTML = `
+                <div class="avatar-container">
+                    <div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div>
+                    <div class="status-badge ${isOnline ? 'online' : 'offline'}"></div>
+                </div>
+                <div class="user-info-meta">
+                    <span style="font-weight:600;">${p.username}</span>
+                    <span class="user-role">${p.role}</span>
+                </div>
+                ${removeActionHtml}
+            `;
             container.appendChild(div);
         });
     }
+
+    window.requestRemoveUser = function(targetUserId) {
+        if (confirm("Исключить данного сотрудника из этого рабочего кабинета?")) {
+            socket.emit('remove_user_from_room', { room_id: parseInt(currentRoomId), target_user_id: targetUserId });
+        }
+    };
 
     function renderCompanyUsers(users) {
         const container = document.getElementById('company-users-list'); container.innerHTML = "";
@@ -815,10 +909,8 @@
             if (u.id_user === currentUser.id_user) return;
             const div = document.createElement('div'); div.className = "user-row";
             const isOnline = !!onlineUsersCache[u.id_user];
-            div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role}</span></div>`;
-            div.addEventListener('click', () => {
-                socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username });
-            });
+            div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role ? u.role : 'user'}</span></div>`;
+            div.addEventListener('click', () => { socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username }); });
             container.appendChild(div);
         });
     }
