@@ -748,17 +748,29 @@ async def delete_message_request(sid, data):
 
 @sio.event
 async def create_group_chat(sid, data):
-    group_name = data.get('group_name'); if not group_name: return
-    session = await sio.get_session(sid); room_type = 'admin_group' if session['role'] == 'admin' else 'group'
-    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    group_name = data.get('group_name')
+    if not group_name: 
+        return
+        
+    session = await sio.get_session(sid)
+    room_type = 'admin_group' if session['role'] == 'admin' else 'group'
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, %s, %s, %s) RETURNING id_room", (session['id_org'], room_type, group_name, session['id_user']))
         new_room = cur.fetchone()
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (new_room['id_room'], session['id_user']))
-        conn.commit(); await sio.emit('private_chat_created', {'id_room': new_room['id_room']}, to=sid)
-    except Exception as e: conn.rollback()
-    finally: cur.close(); conn.close()
-
+        conn.commit()
+        
+        # ИСПРАВЛЕНО: Передаем ID созданной комнаты в триггер
+        await sio.emit('private_chat_created', {'id_room': new_room['id_room']}, to=sid)
+        await sio.emit('refresh_rooms_trigger', {"deleted_room_id": int(new_room['id_room'])})
+    except Exception as e: 
+        conn.rollback()
+    finally: 
+        cur.close(); conn.close()
+        
 @sio.event
 async def create_private_chat(sid, data):
     target_user_id, target_username = data.get('target_user_id'), data.get('target_username'); session = await sio.get_session(sid)
