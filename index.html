@@ -347,10 +347,22 @@
         signs: ['✅','❌','➕','➖','➗','✖️','❓','❔','❗','❕','⚠️','🚫','💯','🔔','🔕','🎵','🎶','🏁','🚩','🔥','🚀','👍','👎','✊','👊','✌️','👌','🤝','👏','🙌','🙏','👀','⭐']
     };
 
-    document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-        var content = document.getElementById('inactive-rooms-list');
-        content.toggle('open');
-        this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
+    // ИСПРАВЛЕНО: Надежное переключение аккордеона
+document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+    const content = document.getElementById('inactive-rooms-list');
+    const header = this;
+    
+    // Переключаем класс
+    content.classList.toggle('open');
+    
+    // Меняем состояние видимости принудительно, если CSS не сработал
+    if (content.classList.contains('open')) {
+        content.style.display = 'block';
+        header.querySelector('span:last-child').innerText = '(...) ▲';
+    } else {
+        content.style.display = 'none';
+        header.querySelector('span:last-child').innerText = '(' + document.getElementById('inactive-count').innerText.match(/\d+/) + ') ▼';
+    }
     });
 
     document.getElementById('btn-toggle-right-view').addEventListener('click', function() {
