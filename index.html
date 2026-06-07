@@ -109,7 +109,7 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; }
+        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
         .message-box:hover .msg-delete-trigger { display: block; }
 
         .input-area { 
@@ -159,9 +159,40 @@
 
         .view-pane { display: none; }
         .view-pane.active { display: block; }
+
+        /* ИСПРАВЛЕНО: СТИЛИ МОДАЛЬНОГО ОКНА ВЫБОРА СОТРУДНИКОВ (БЕЗ ТЕКСТОВЫХ ОКН) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-window {
+            width: 380px; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column; max-height: 80vh; overflow: hidden;
+        }
+        .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
+        .modal-user-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 8px;
+            border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 4px;
+        }
+        .modal-user-item:hover { background: var(--bg-main); }
     </style>
 </head>
 <body>
+
+<div class="modal-overlay" id="add-user-modal">
+    <div class="modal-window">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">Выберите сотрудника</span>
+            <span id="btn-close-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 10px; border-bottom: 1px solid var(--border-color);">
+            <input type="text" class="search-box" id="search-modal-users" placeholder="Поиск по имени...">
+        </div>
+        <div class="modal-body" id="modal-users-container"></div>
+    </div>
+</div>
 
 <div class="app-container">
     
@@ -171,9 +202,8 @@
             <input type="text" class="search-box" id="search-rooms" placeholder="Поиск кабинета...">
             <button class="btn btn-primary" id="btn-create-group" style="width:100%;">+ Создать Кабинет</button>
         </div>
-        <div class="panel-scroll-area">
+        <div class="panel-scroll-area" id="rooms-list-container">
             <div id="active-rooms-list"></div>
-            
             <div class="accordion-section">
                 <div class="accordion-header" id="inactive-accordion-trigger">
                     <span>Неактивные сообщения</span>
@@ -212,12 +242,9 @@
                 </select>
                 <div class="toolbar-item" id="style-bold" style="font-weight:bold;">B</div>
                 <div class="toolbar-item" id="style-italic" style="font-style:italic;">I</div>
-                
-                <div class="toolbar-item" id="btn-emoji-trigger" title="Открыть панель эмодзи">😀</div>
-                
+                <div class="toolbar-item" id="btn-emoji-trigger" title="Эмодзи">😀</div>
                 <input type="color" id="text-color-picker" title="Цвет текста" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
                 <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
-                
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
                 <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
             </div>
@@ -226,9 +253,7 @@
                 <input type="file" id="global-file-input" style="display:none">
                 <button class="btn btn-primary" id="btn-attach-file" style="background:#6b7280; padding: 10px 14px;" title="Отправить файл">📎</button>
                 <button class="btn btn-primary" id="btn-screenshot-editor" style="background:#4b5563; padding: 10px 15px;" title="Редактор скриншотов">📋 Скриншот</button>
-                
                 <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Напишите сообщение..."></div>
-                
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
@@ -239,18 +264,15 @@
             <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
         </div>
         <div class="panel-scroll-area">
-            
             <div id="pane-participants" class="view-pane active">
                 <div class="section-title">В этом кабинете <button id="btn-add-user-modal" style="border:none; background:none; color:var(--primary-color); cursor:pointer; font-weight:bold; font-size:13px; float:right;">+</button></div>
                 <div id="current-room-participants"></div>
             </div>
-            
             <div id="pane-company" class="view-pane">
                 <input type="text" class="search-box" id="search-contacts" placeholder="Быстрый поиск коллеги..." style="margin-bottom: 10px;">
                 <div class="section-title">Все сотрудники компании</div>
                 <div id="company-users-list"></div>
             </div>
-            
         </div>
     </div>
 
@@ -303,7 +325,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticket: ticket })
             });
-
             const data = await response.json();
             if (data.success) {
                 sessionToken = data.token;
@@ -344,8 +365,6 @@
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
         socket.on('system_alert', (data) => { alert(data.message); });
         socket.on('download_archive_file', (data) => { if (data && data.url) window.open(data.url, '_blank'); });
-        
-        // Перехват глобального триггера обновления комнат
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
     }
 
@@ -427,25 +446,27 @@
     };
 
     function initUIEventListeners() {
-        // КНОПКА ПОДДЕРЖКИ СОЗДАНИЯ КОМНАТЫ
+        // СОЗДАНИЕ КОМНАТЫ
         document.getElementById('btn-create-group').addEventListener('click', () => {
             let gname = prompt("Введите название нового кабинета:");
-            if (gname && gname.trim() !== "") {
-                socket.emit('create_group_chat', { group_name: gname.trim() });
-            }
+            if (gname && gname.trim() !== "") socket.emit('create_group_chat', { group_name: gname.trim() });
         });
 
-        // КНОПКА ДОБАВЛЕНИЯ СОТРУДНИКА В КОМНАТУ
+        // ИСПРАВЛЕНО: ОТКРЫТИЕ ВЕБ-МОДАЛЬНОГО ОКНА ВМЕСТО PROMPT
+        const modal = document.getElementById('add-user-modal');
         document.getElementById('btn-add-user-modal').addEventListener('click', () => {
             if (!currentRoomId) { alert("Выберите кабинет!"); return; }
-            let listStr = globalUsersCache.map(u => `${u.username} (ID: ${u.id_user})`).join("\n");
-            let targetName = prompt("Введите Имя сотрудника для добавления в этот кабинет:\n\nДоступные сотрудники:\n" + globalUsersCache.map(u => u.username).join(", "));
-            if (targetName) {
-                let found = globalUsersCache.find(u => u.username.toLowerCase() === targetName.trim().toLowerCase());
-                if (found) {
-                    socket.emit('add_user_to_room', { room_id: parseInt(currentRoomId), user_id: found.id_user });
-                } else { alert("Сотрудник не найден!"); }
-            }
+            modal.classList.add('open');
+            renderModalUsers(globalUsersCache);
+        });
+
+        document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
+
+        // Живой поиск внутри модального окна выбора сотрудников
+        document.getElementById('search-modal-users').addEventListener('input', function() {
+            const val = this.value.toLowerCase().trim();
+            const filtered = globalUsersCache.filter(u => u.username.toLowerCase().includes(val));
+            renderModalUsers(filtered);
         });
 
         document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
@@ -461,12 +482,8 @@
             } else { resetSecretToggleUI(this); }
         });
 
-        // Интеграция вызова родной панели смайликов
         document.getElementById('btn-emoji-trigger').addEventListener('click', () => {
-            inputMsg.focus();
-            if (navigator.virtualKeyboard) { navigator.virtualKeyboard.show(); }
-            // Вызов нативного диалога смайликов Windows
-            alert("Используйте сочетание клавиш Win + . (или Win + Ю) для вставки любого эмодзи!");
+            alert("Нажмите Win + . (или Win + Ю) для вызова удобного встроенного смайл-меню!");
         });
 
         document.getElementById('font-family-select').addEventListener('change', function() { currentTextStyles.fontFamily = this.value; inputMsg.style.fontFamily = this.value; });
@@ -476,8 +493,13 @@
         document.getElementById('text-color-picker').addEventListener('input', function() { currentTextStyles.color = this.value; inputMsg.style.color = this.value; });
         document.getElementById('text-bg-picker').addEventListener('input', function() { currentTextStyles.background = this.value; inputMsg.style.backgroundColor = this.value; });
 
+        document.getElementById('search-contacts').addEventListener('input', function() {
+            const value = this.value.toLowerCase().trim();
+            renderCompanyUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(value)));
+        });
+
         document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
-        document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
+        document.getElementById('btn-danger'/*btn-delete-room*/).addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
     }
 
     function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; element.style.color = "var(--text-main)"; element.style.fontWeight = "normal"; userSecretKey = ""; }
@@ -486,6 +508,31 @@
         const text = inputMsg.innerText.trim(); if (!text || !currentRoomId) return;
         socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
         inputMsg.innerHTML = "";
+    }
+
+    // ИСПРАВЛЕНО: ОТРИСОВКА ОКОН ДЛЯ КЛИКАБЕЛЬНОГО ВЫБОРА ИСКЛЮЧАЯ ОШИБКИ ВВОДА
+    function renderModalUsers(users) {
+        const container = document.getElementById('modal-users-container');
+        container.innerHTML = "";
+        
+        users.forEach(u => {
+            // Не показываем тех, кто уже есть в комнате
+            if (roomParticipantsCache.some(p => p.id_user === u.id_user)) return;
+
+            const div = document.createElement('div');
+            div.className = 'modal-user-item';
+            div.innerHTML = `
+                <span><b>${u.username}</b> (${u.role})</span>
+                <button class="btn btn-primary" style="padding: 3px 8px; font-size: 11px;">Добавить</button>
+            `;
+            
+            div.querySelector('button').addEventListener('click', () => {
+                socket.emit('add_user_to_room', { room_id: parseInt(currentRoomId), user_id: u.id_user });
+                document.getElementById('add-user-modal').remove('open'/*classList.remove*/);
+                document.getElementById('add-user-modal').classList.remove('open');
+            });
+            container.appendChild(div);
+        });
     }
 
     function renderCurrentRoomParticipants(list) {
@@ -504,7 +551,6 @@
             const div = document.createElement('div'); div.className = "user-row";
             div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge online"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role}</span></div>`;
             
-            // ИСПРАВЛЕНО: Клик по сотруднику теперь гарантированно инициирует создание приватного чата
             div.addEventListener('click', () => {
                 socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username });
             });
