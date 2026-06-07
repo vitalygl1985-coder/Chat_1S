@@ -218,8 +218,32 @@ async def onec_auth(data: OneCAuthRequest):
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (data.id_user, validated_org, data.username, data.role))
 
-        # Вызываем логику автопроверки и генерации комнат ОБЩИЙ/АДМИН
-        check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
+     # Вызываем логику автопроверки и генерации комнат ОБЩИЙ/АДМИН
+    # ИСПРАВЛЕНО: Безопасное чтение кортежей из стандартного курсора базы данных
+    def check_and_create_global_rooms(cur, id_org, user_id, user_role):
+    # 1. Проверяем / Создаем комнату ОБЩИЙ
+    cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", (id_org,))
+    room_general = cur.fetchone()
+    
+    if not room_general:
+        cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', 'system') RETURNING id_room", (id_org,))
+        room_general = cur.fetchone()
+    
+    # Читаем ID через индекс [0], так как курсор возвращает кортеж
+    general_room_id = room_general[0]
+    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
+
+    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем комнату АДМИН
+    if user_role == 'admin':
+        cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", (id_org,))
+        room_admin = cur.fetchone()
+        
+        if not room_admin:
+            cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', 'system') RETURNING id_room", (id_org,))
+            room_admin = cur.fetchone()
+        
+        admin_room_id = room_admin[0]
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
 
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
