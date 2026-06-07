@@ -38,7 +38,7 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-# ─── МОДЕЛИ ДАННЫХ PYDANTIC ───
+# ─── ВСЕ МОДЕЛИ ДАННЫХ PYDANTIC ───
 class OneCAuthRequest(BaseModel):
     id_user: str
     id_org: str
@@ -74,7 +74,33 @@ class ExecuteSqlRequest(BaseModel):
     sql: str
 
 
-# ─── ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ИНИЦИАЛИЗАЦИЯ БД ───
+# ─── ИСПРАВЛЕНО: ФУНКЦИЯ ВЫНЕСЕНА В ЧИСТОЕ ПРОСТРАНСТВО КОДА ───
+def check_and_create_global_rooms(cur, id_org, user_id, user_role):
+    # 1. Проверяем / Создаем комнату ОБЩИЙ
+    cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", (id_org,))
+    room_general = cur.fetchone()
+    
+    if not room_general:
+        cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', 'system') RETURNING id_room", (id_org,))
+        room_general = cur.fetchone()
+    
+    general_room_id = room_general[0]
+    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
+
+    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем комнату АДМИН
+    if user_role == 'admin':
+        cur.execute("SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", (id_org,))
+        room_admin = cur.fetchone()
+        
+        if not room_admin:
+            cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', 'system') RETURNING id_room", (id_org,))
+            room_admin = cur.fetchone()
+        
+        admin_room_id = room_admin[0]
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
+
+
+# ─── ВСЕ ОСТАЛЬНЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ───
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
     if url and url.startswith("postgres://"):
