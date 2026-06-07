@@ -689,23 +689,27 @@ function parseHashAndAuthorize() {
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
 
-// ИСПРАВЛЕНО: Полное и чистое выжигание контекстов и ссылок при уничтожении формы 1С
 window.destroyChatBeforeClose = function() {
     try {
+        // Выводим визуальный лог для отладки в 1С
+        var container = document.getElementById('messages-container');
+        if (container) {
+            container.innerHTML = '<div style="color:orange; font-weight:bold; padding:20px; text-align:center;">⏳ Очистка памяти COM... Отключение сокетов...</div>';
+        }
+
         if (socket) { 
-            socket.disconnect(); // Ломаем соединение с сервером
+            socket.disconnect(); 
         }
         
-        // Отвязываем слушатели событий
         if (document.removeEventListener) {
             document.removeEventListener('mousedown', handleMouseDown, false);
             document.removeEventListener('contextmenu', handleContextMenu, false);
+            window.removeEventListener('paste', handlePasteEvent, false);
         }
         
-        // ВЫЖИГАНИЕ КЭША: Полностью стираем html-код страницы перед закрытием формы
-        if (document.body) {
-            document.body.innerHTML = "";
-        }
+        // Очищаем window от ссылок на сокеты
+        socket = null;
+        
     } catch(e) {}
     return true;
 };
