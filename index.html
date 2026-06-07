@@ -661,14 +661,13 @@ function parseHashAndAuthorize() {
 window.onload = parseHashAndAuthorize;
 window.onhashchange = parseHashAndAuthorize;
 
-// Функция для экстренного и чистого закрытия чата из 1С
+// Заглушка на случай, если 1С вызовет эту функцию при закрытии
 window.destroyChatBeforeClose = function() {
-    try {
-        if (socket) {
-            socket.disconnect(); // Насильно отключаем сокеты
-        }
-    } catch(e) {}
-    return true;
+    console.log("Destroy called from 1C");
+    if (socket) {
+        try { socket.disconnect(); } catch(e) {}
+        socket = null;
+    }
 };
 
 window.onerror = function(message, source, lineno, colno, error) {
