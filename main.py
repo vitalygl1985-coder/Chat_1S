@@ -205,37 +205,40 @@ async def onec_auth(data: OneCAuthRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # 1. Сохраняем или обновляем пользователя в единой транзакции
+        # Логируем входящие данные для контроля
+        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
+        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
+
+        # 1. Сохраняем или обновляем пользователя
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (data.id_user, validated_org, data.username, data.role))
 
-        # 2. Распределяем по глобальным комнатам (ОБЩИЙ / АДМИН)
+        # 2. Распределяем по глобальным комнатам
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
 
-        # 3. Генерируем одноразовый тикет (ВЫНЕСЕНО ИЗ-ПОД УСЛОВИЯ АДМИНА — ТЕПЕРЬ ДЛЯ ВСЕХ)
+        # 3. Генерируем тикет
         one_time_ticket = secrets.token_hex(32)
-        
-        # Очищаем старые неиспользованные тикеты этого пользователя
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
-        
-        # Записываем новый тикет в базу
         cur.execute(
             "INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
             (one_time_ticket, data.id_user, validated_org, data.username, data.role)
         )
 
-        # 4. Фиксируем изменения в базе данных для любого типа роли
         conn.commit()
-        
-        # 5. Возвращаем тикет в 1С
+        print(f"УСПЕШНО: Тикет сгенерирован")
         return {"success": True, "token": one_time_ticket}
         
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        # КРИТИЧЕСКИ ВАЖНО: Выводим полную ошибку со стеком вызовов прямо в консоль/логи сервера
+        print("!!! КРИТИЧЕСКАЯ ОШИБКА В ЭНДПОИНТЕ /api/1c/auth !!!")
+        traceback.print_exc() 
+        
+        # Возвращаем детальное описание ошибки клиенту, чтобы сразу увидеть её в ответе 1С
+        raise HTTPException(status_code=500, detail=f"Database or internal crash: {str(e)}")
     finally:
         cur.close()
         conn.close()
