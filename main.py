@@ -588,4 +588,5 @@ async def disconnect(sid):
     if session and 'id_user' in session:
         online_users.pop(session['id_user'], None)
         await sio.emit('user_statuses', online_users)
+
 app.mount("/socket.io", socket_app)
