@@ -77,10 +77,10 @@ def clean_uuid(org_id_str):
 # ─── ИСПРАВЛЕНО: ЕДИНАЯ ИОЛИРОВАННАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ КОМНАТ ───
 def check_and_create_global_rooms(cur, id_org, user_id, user_role):
     """
-    Проверяет и создает системные комнаты ОБЩИЙ и АДМИН для организации.
-    Гарантирует автоматическое добавление пользователей в соответствии с их ролями.
+    Универсальная и безопасная проверка/создание системных комнат.
+    Работает с любыми типами курсоров (стандартный и RealDictCursor).
     """
-    # 1. Проверяем / Создаем комнату ОБЩИЙ (тип: admin_group)
+    # 1. Проверяем / Создаем комнату ОБЩИЙ
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
         (id_org,)
@@ -94,15 +94,15 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
         )
         room_general = cur.fetchone()
     
-    general_room_id = room_general[0]
+    # Универсальное чтение: если dict — берем по ключу, если tuple/list — по индексу
+    general_room_id = room_general['id_room'] if isinstance(room_general, dict) else room_general[0]
     
-    # Добавляем вошедшего пользователя (user или admin) в ОБЩИЙ кабинет
     cur.execute(
         "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
         (general_room_id, user_id)
     )
 
-    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем скрытую комнату АДМИН
+    # 2. Проверяем / Создаем комнату АДМИН
     if user_role == 'admin':
         cur.execute(
             "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", 
@@ -117,9 +117,8 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
             )
             room_admin = cur.fetchone()
         
-        admin_room_id = room_admin[0]
+        admin_room_id = room_admin['id_room'] if isinstance(room_admin, dict) else room_admin[0]
         
-        # Привязываем админа к админскому кабинету
         cur.execute(
             "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
             (admin_room_id, user_id)
