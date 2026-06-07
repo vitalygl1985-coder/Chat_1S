@@ -205,26 +205,34 @@ async def onec_auth(data: OneCAuthRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Сохраняем или обновляем пользователя
+        # 1. Сохраняем или обновляем пользователя в единой транзакции
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (data.id_user, validated_org, data.username, data.role))
 
-        # Вызываем единственную глобальную функцию проверки/создания комнат
+        # 2. Распределяем по глобальным комнатам (ОБЩИЙ / АДМИН)
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
 
-        # Создаем одноразовый тикет обмена для фронтенда
+        # 3. Генерируем одноразовый тикет (ВЫНЕСЕНО ИЗ-ПОД УСЛОВИЯ АДМИНА — ТЕПЕРЬ ДЛЯ ВСЕХ)
         one_time_ticket = secrets.token_hex(32)
+        
+        # Очищаем старые неиспользованные тикеты этого пользователя
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
+        
+        # Записываем новый тикет в базу
         cur.execute(
             "INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
             (one_time_ticket, data.id_user, validated_org, data.username, data.role)
         )
 
+        # 4. Фиксируем изменения в базе данных для любого типа роли
         conn.commit()
+        
+        # 5. Возвращаем тикет в 1С
         return {"success": True, "token": one_time_ticket}
+        
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
