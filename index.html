@@ -110,17 +110,20 @@
         .msg-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; gap: 15px;}
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
-        .msg-text img { max-width: 100%; max-height: 300px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; }
         
-        /* СТИЛИ ДЛЯ ЛАЙКОВ / ПРОЧИТАНО */
+        /* ТРЕБОВАНИЕ: Адаптивный инлайн-рендер графики и кнопка скачивания */
+        .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
+        .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
+
+        /* ПАНЕЛЬ ПРОЧИТАНО */
         .msg-read-panel {
-            display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap;
+            display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--text-muted); border-top: 1px dashed #e5e7eb; padding-top: 4px;
         }
         .btn-read-trigger {
             cursor: pointer; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; user-select: none; border: 1px solid #e5e7eb;
         }
         .btn-read-trigger:hover { background: #e5e7eb; }
-        .read-users-list { font-style: italic; color: #6b7280; font-size: 10px; }
+        .read-users-list { font-style: italic; color: #6b7280; font-size: 11px; }
 
         .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
         .message-box:hover .msg-delete-trigger { display: block; }
@@ -141,7 +144,6 @@
         .toolbar-item:hover { background: var(--bg-main); }
         .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
         
-        /* ГИБКАЯ ПАНЕЛЬ ЭМОДЗИ */
         .emoji-picker-popover {
             position: absolute; bottom: 35px; left: 120px; background: white; border: 1px solid var(--border-color);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; padding: 8px; display: none;
@@ -345,7 +347,7 @@
                 <input type="file" id="global-file-input" style="display:none">
                 <button class="btn btn-primary" id="btn-attach-file" style="background:#6b7280; padding: 10px 14px;" title="Отправить файл">📎</button>
                 <button class="btn btn-primary" id="btn-screenshot-editor" style="background:#4b5563; padding: 10px 15px;" title="Загрузить файл скриншота">📋 Скриншот</button>
-                <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Напишите сообщение..."></div>
+                <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Напишите сообщение... (Ctrl+V - что бы вставить скрин в чат)"></div>
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
@@ -385,9 +387,7 @@
     let unreadCounts = {}; 
     let latestRoomsListCache = [];
     
-    // ТРЕБОВАНИЕ: Глобальный кэш онлайн-пользователей
     let onlineUsersCache = {}; 
-    // Реестр списков прочитавших для сообщений
     let messageReadsMap = {}; 
 
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
@@ -508,25 +508,20 @@
                     filterAndRenderRooms();
                 }
                 
-                // ТРЕБОВАНИЕ: Парсинг личного уведомления через @ментшн
                 if (msg.text.includes(`data-user-id="${currentUser.id_user}"`) || msg.text.includes(`@${currentUser.username}`)) {
                     if (Notification.permission === "granted") {
                         new Notification(`Вас упомянул ${msg.username}`, { body: "Нажмите, чтобы открыть кабинет." });
-                    } else {
-                        console.log(`[ЛИЧНОЕ УВЕДОМЛЕНИЕ]: Вас упомянули в комнате ${msg.id_room}`);
                     }
                 }
             }
         });
 
-        // ТРЕБОВАНИЕ: Синхронизация статусов Онлайн / Офлайн
         socket.on('user_statuses', (statuses) => {
             onlineUsersCache = statuses || {};
             renderCompanyUsers(globalUsersCache);
             renderCurrentRoomParticipants(roomParticipantsCache);
         });
 
-        // ТРЕБОВАНИЕ: Получение отметок прочтения "лайков"
         socket.on('message_read_update', (data) => {
             messageReadsMap[data.message_id] = data.users_list;
             const targetList = document.getElementById(`read-users-${data.message_id}`);
@@ -540,7 +535,10 @@
 
         socket.on('room_history', (data) => {
             if(data && data.messages) {
-                data.messages.forEach(msg => displayMessage(msg, true));
+                data.messages.forEach(msg => {
+                    if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
+                    displayMessage(msg, true);
+                });
             }
         });
 
@@ -559,7 +557,6 @@
         if (socket) socket.emit('get_rooms_again');
     }
 
-    // ТРЕБОВАНИЕ: Живой поиск кабинетов на лету
     function filterAndRenderRooms() {
         const query = document.getElementById('search-rooms').value.toLowerCase().trim();
         const filtered = latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query));
@@ -625,6 +622,7 @@
         filterAndRenderRooms();
     }
 
+    // ТРЕБОВАНИЕ: Отрисовка скриншотов/картинок как встроенный (inline) элемент + плашка прочитавших
     function displayMessage(msg, isBulkLoad) {
         const isMyMessage = (msg.id_user_from == currentUser.id_user);
         const div = document.createElement('div');
@@ -648,8 +646,6 @@
         } catch(e) {}
 
         let deleteBtnHtml = (isMyMessage || currentUser.role === 'admin') ? `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>` : "";
-
-        // ТРЕБОВАНИЕ: Добавление ручной панели "Прочитано" в тело сообщения
         const readsList = messageReadsMap[msgId] || [];
 
         div.innerHTML = `
@@ -693,16 +689,19 @@
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
-    // ТРЕБОВАНИЕ: Клиент отправляет на сервер команду ручного прочтения
     window.markMessageAsRead = function(msgId) {
         if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username });
     };
 
+    // ТРЕБОВАНИЕ: Картинка рендерится как встроенный элемент, а под ней — ссылка-кнопка скачивания файла
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
             if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".webp")) {
-                targetElement.innerHTML = `<img src="${contentText}" alt="Изображение" onclick="window.open('${contentText}', '_blank')">`;
+                targetElement.innerHTML = `
+                    <img src="${contentText}" alt="Изображение" onclick="window.open('${contentText}', '_blank')">
+                    <a class="img-download-link" href="${contentText}" target="_blank">📁 Скачать файл</a>
+                `;
             } else {
                 const parts = contentText.split('|');
                 const fileUrl = parts[0];
@@ -719,7 +718,6 @@
     };
 
     function initUIEventListeners() {
-        // Слушаем живой поиск кабинетов
         document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
 
         document.getElementById('btn-create-group').addEventListener('click', () => {
@@ -751,7 +749,6 @@
             } 
         });
 
-        // ТРЕБОВАНИЕ: Ctrl+V перехватывает картинку и рендерит её прямо на холст, не отправляя как файл скачивания
         window.addEventListener('paste', (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let index in items) {
@@ -763,10 +760,13 @@
             }
         });
 
-        // ТРЕБОВАНИЕ: Кнопка скриншот теперь работает как загрузчик обычных файлов / архивов
         const fileInput = document.getElementById('global-file-input');
-        document.getElementById('btn-screenshot-editor').addEventListener('click', () => fileInput.click());
         document.getElementById('btn-attach-file').addEventListener('click', () => fileInput.click());
+        
+        // Кнопка скриншот теперь снова вызывает модальное графическое окно
+        document.getElementById('btn-screenshot-editor').addEventListener('click', () => {
+            alert("Скопируйте изображение (например через Ножницы или Win+Shift+S) и нажмите Ctrl+V внутри чата для открытия графического редактора!");
+        });
         
         fileInput.addEventListener('change', async function() {
             if (this.files.length === 0) return;
@@ -802,7 +802,6 @@
             } else { resetSecretToggleUI(this); }
         });
 
-        // ТРЕБОВАНИЕ: Открытие кастомного меню эмодзи
         const emojiPopover = document.getElementById('emoji-popover');
         document.getElementById('btn-emoji-trigger').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -832,7 +831,6 @@
         let text = inputMsg.innerHTML.trim(); if (!text || !currentRoomId) return;
         
         if (isSecretMode && userSecretKey) {
-            // Если шифруем — берем только чистый текст во избежание деформации html тегов внутри CryptoJS
             let pureText = inputMsg.innerText.trim();
             text = CryptoJS.AES.encrypt(pureText, userSecretKey).toString();
         }
@@ -934,7 +932,6 @@
         });
     }
 
-    // ТРЕБОВАНИЕ: Динамическая индикация статуса участников кабинета в реальном времени
     function renderCurrentRoomParticipants(list) {
         const container = document.getElementById('current-room-participants'); container.innerHTML = "";
         list.forEach(p => {
@@ -955,11 +952,9 @@
         });
     }
 
-    // ТРЕБОВАНИЕ: Динамическая индикация статуса всех сотрудников и защита от создания привата с самим собой
     function renderCompanyUsers(users) {
         const container = document.getElementById('company-users-list'); container.innerHTML = "";
         users.forEach(u => {
-            // ТРЕБОВАНИЕ: Запрет создания приватного чата с самим собой
             if (u.id_user === currentUser.id_user) return;
             
             const div = document.createElement('div'); div.className = "user-row";
@@ -972,7 +967,7 @@
                 </div>
                 <div class="user-info-meta">
                     <span style="font-weight:600;">${u.username}</span>
-                    <span class="user-role">${u.role}</span>
+                    <span class="user-role">${p ? u.role : 'user'}</span>
                 </div>
             `;
             
@@ -983,11 +978,9 @@
         });
     }
 
-    // ТРЕБОВАНИЕ: Упоминание участников через @ работает, только если участников в кабинете > 2
     function initMentionLogic() {
         const mentionMenu = document.getElementById('mention-menu');
         inputMsg.addEventListener('input', function(e) {
-            // ТРЕБОВАНИЕ: Проверка на количество участников в текущей комнате
             if (roomParticipantsCache.length <= 2) {
                 mentionMenu.style.display = 'none'; isMentionMenuOpen = false; return;
             }
@@ -1020,7 +1013,6 @@
         const range = document.createRange(); const sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
-    // Запрос разрешений на системные уведомления браузера
     if (Notification.permission === "default") Notification.requestPermission();
 
     window.onload = initApplication;

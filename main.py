@@ -34,6 +34,10 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
+# ─── СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ ───
+online_users = {}       # id_user -> username
+message_reads = {}      # id_message -> list of usernames
+
 # ─── PYDANTIC МОДЕЛИ ДАННЫХ ───
 class OneCAuthRequest(BaseModel):
     id_user: str
@@ -74,13 +78,11 @@ def clean_uuid(org_id_str):
         return "00000000-0000-0000-0000-000000000001"
 
 
-# ─── ИСПРАВЛЕНО: ЕДИНАЯ ИОЛИРОВАННАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ КОМНАТ ───
 def check_and_create_global_rooms(cur, id_org, user_id, user_role):
     """
     Проверяет и создает системные комнаты ОБЩИЙ и АДМИН для организации.
     Использует user_id текущего сотрудника в качестве создателя, чтобы избежать конфликтов Foreign Key.
     """
-    # 1. Проверяем / Создаем комнату ОБЩИЙ (тип: admin_group)
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
         (id_org,)
@@ -88,7 +90,6 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
     room_general = cur.fetchone()
     
     if not room_general:
-        # ИСПРАВЛЕНО: Вместо 'system' передаем реальный user_id, прошедший проверку внешнего ключа
         cur.execute(
             "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', %s) RETURNING id_room", 
             (id_org, user_id)
@@ -97,13 +98,11 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
     
     general_room_id = room_general['id_room'] if isinstance(room_general, dict) else room_general[0]
     
-    # Добавляем пользователя в ОБЩИЙ кабинет
     cur.execute(
         "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
         (general_room_id, user_id)
     )
 
-    # 2. Если заходит АДМИНИСТРАТОР — проверяем / создаем скрытую комнату АДМИН
     if user_role == 'admin':
         cur.execute(
             "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", 
@@ -112,7 +111,6 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
         room_admin = cur.fetchone()
         
         if not room_admin:
-            # ИСПРАВЛЕНО: Здесь также указываем user_id администратора как создателя
             cur.execute(
                 "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', %s) RETURNING id_room", 
                 (id_org, user_id)
@@ -121,14 +119,12 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
         
         admin_room_id = room_admin['id_room'] if isinstance(room_admin, dict) else room_admin[0]
         
-        # Привязываем админа к админскому кабинету
         cur.execute(
             "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
             (admin_room_id, user_id)
         )
 
 
-# ─── ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ СТРУКТУРЫ БД ───
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -201,41 +197,21 @@ def get_session_by_token(token: str):
     finally: cur.close(); conn.close()
 
 
-# ─── REST API: АВТОРИЗАЦИЯ 1С (ГЕНЕРАЦИЯ БЕЗОПАСНОГО ТИКЕТА) ───
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
-    import traceback  # Гарантируем наличие модуля для логирования
+    import traceback
     validated_org = clean_uuid(data.id_org)
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
-        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
-
-        # [ИСПРАВЛЕНО]: Проверяем и динамически создаем организацию, чтобы удовлетворить Foreign Key
-        try:
-            cur.execute(
-                "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
-                (validated_org, f"Организация {validated_org[:8]}")
-            )
-        except psycopg2.Error:
-            # Если таблицы organizations вообще нет или структура иная — пропускаем, 
-            # но если foreign key жестко требует её наличия, этот INSERT спасет транзакцию.
-            conn.rollback()
-            conn = get_db_connection()
-            cur = conn.cursor()
-
-        # 1. Сохраняем или обновляем пользователя
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
             VALUES (%s, %s::uuid, %s, %s, true)
             ON CONFLICT (id_user) DO UPDATE SET username = EXCLUDED.username, role = EXCLUDED.role, id_org = EXCLUDED.id_org
         """, (data.id_user, validated_org, data.username, data.role))
 
-        # 2. Распределяем по глобальным комнатам
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
 
-        # 3. Генерируем тикет
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
         cur.execute(
@@ -244,20 +220,16 @@ async def onec_auth(data: OneCAuthRequest):
         )
 
         conn.commit()
-        print(f"УСПЕШНО: Тикет сгенерирован")
         return {"success": True, "token": one_time_ticket}
-        
     except Exception as e:
         conn.rollback()
-        print("!!! КРИТИЧЕСКАЯ ОШИБКА В ЭНДПОИНТЕ /api/1c/auth !!!")
-        traceback.print_exc() 
-        raise HTTPException(status_code=500, detail=f"Database or internal crash: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         cur.close()
         conn.close()
 
 
-# ─── REST API: ОБМЕН ТИКЕТА НА СЕССИЮ ВЕБА ───
 @app.post("/api/web/exchange-ticket")
 async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     conn = get_db_connection()
@@ -393,6 +365,10 @@ async def connect(sid, environ, auth=None):
         cur.close(); conn.close()
         
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
+    
+    # ТРЕБОВАНИЕ: Фиксация и рассылка статуса Online
+    online_users[id_user] = username
+    await sio.emit('user_statuses', online_users)
 
 @sio.event
 async def join_room_pool(sid, data):
@@ -439,7 +415,10 @@ async def get_room_history(sid, data):
         cur.execute("SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at FROM messages m LEFT JOIN users u ON m.id_user_from = u.id_user WHERE m.id_room = %s ORDER BY m.created_at ASC LIMIT 100", (room_id,))
         messages = cur.fetchall()
         for m in messages:
+            msg_id = m['id_message']
             if m['created_at']: m['created_at'] = m['created_at'].isoformat()
+            # Насыщаем историю отметками прочтений
+            m['reads'] = message_reads.get(msg_id, [])
         await sio.emit('room_history', {'messages': messages}, to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
@@ -454,10 +433,26 @@ async def send_message(sid, data):
         cur.execute("INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted, ui_styles) VALUES (%s, %s, %s, %s, %s) RETURNING id_message, id_room, id_user_from, encrypted_text, is_user_encrypted, ui_styles, created_at", (room_id, session['id_user'], text, is_secret, ui_styles))
         new_msg = cur.fetchone(); conn.commit()
         new_msg['username'] = session['username']
+        new_msg['reads'] = []
         if new_msg['created_at']: new_msg['created_at'] = new_msg['created_at'].isoformat()
         await sio.emit('new_message', new_msg, room=f"room_{room_id}")
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
+
+# ТРЕБОВАНИЕ: Логика обработки кликов ручного прочтения («Лайков»)
+@sio.event
+async def message_read_click(sid, data):
+    msg_id = data.get('message_id')
+    username = data.get('username')
+    if not msg_id or not username: return
+    
+    if msg_id not in message_reads:
+        message_reads[msg_id] = []
+    
+    if username not in message_reads[msg_id]:
+        message_reads[msg_id].append(username)
+        
+    await sio.emit('message_read_update', {'message_id': msg_id, 'users_list': message_reads[msg_id]})
 
 @sio.event
 async def get_room_participants(sid, data):
@@ -551,7 +546,7 @@ async def delete_message_request(sid, data):
     try:
         cur.execute("SELECT id_user_from FROM messages WHERE id_message = %s", (message_id,))
         msg = cur.fetchone()
-        if msg and (user_role == 'admin' or str(msg['id_user_from']) == str(user_id)):
+        if msg and (user_role == 'admin' || str(msg['id_user_from']) == str(user_id)):
             cur.execute("DELETE FROM messages WHERE id_message = %s", (message_id,))
             conn.commit(); await sio.emit('message_deleted', {"id_message": message_id}, room=f"room_{room_id}")
     except Exception as e: print(e)
@@ -592,6 +587,11 @@ async def create_private_chat(sid, data):
     finally: cur.close(); conn.close()
 
 @sio.event
-async def disconnect(sid): pass
+async def disconnect(sid):
+    session = await sio.get_session(sid)
+    if session and 'id_user' in session:
+        # ТРЕБОВАНИЕ: Удаление из онлайна
+        online_users.pop(session['id_user'], None)
+        await sio.emit('user_statuses', online_users)
 
 app.mount("/socket.io", socket_app)
