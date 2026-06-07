@@ -75,7 +75,7 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* СТИЛИ ОТОБРАЖЕНИЯ МИНИАТЮР КАРТИНОК И ССЫЛОК СКАЧИВАНИЯ ПОД НИМИ */
+        /* ТРЕБОВАНИЕ: Адаптивная инлайн-миниатюра скриншота */
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
@@ -344,13 +344,13 @@
 
     const emojiCategories = {
         smile: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓'],
-        work: ['💼','📁','📂','📅','📆','📊','📈','📉','📜','📋','📌','📍','📎','📎','📏','📐','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🛠️','🔧','⚙️','💻','🖥️','🖨️','🖱️','🖲️','📱','☎️','📞'],
+        work: ['💼','📁','📂','📅','📆','📊','📈','📉','📜','📋','📌','📍','📎','📍','📏','📐','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🛠️','🔧','⚙️','💻','🖥️','🖨️','🖱️','🖲️','📱','☎️','📞'],
         signs: ['✅','❌','➕','➖','➗','✖️','❓','❔','❗','❕','⚠️','🚫','💯','🔔','🔕','🎵','🎶','🏁','🚩','🔥','🚀','👍','👎','✊','👊','✌️','👌','🤝','👏','🙌','🙏','👀','⭐']
     };
 
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         var content = document.getElementById('inactive-rooms-list');
-        content.classList.toggle('open');
+        content.toggle('open');
         this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
     });
 
@@ -444,9 +444,10 @@
         processRoomsDivision(latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query)));
     }
 
+    // ТРЕБОВАНИЕ: Локальный именной парсинг — Петров видит Сидорова, Сидоров видит Петрова
     function processRoomsDivision(allRooms) {
         const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
-        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
+        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = "";
         
         allRooms.forEach(room => {
             const div = document.createElement('div'); div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
@@ -497,6 +498,7 @@
             }
         } catch(e) {}
 
+        // ТРЕБОВАНИЕ: Кнопка удаления доступна ТОЛЬКО непосредственному автору сообщения
         let deleteBtnHtml = "";
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
@@ -538,12 +540,12 @@
 
     window.markMessageAsRead = function(msgId) { if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username }); };
 
-    // ТРЕБОВАНИЕ: Рендеринг миниатюры скриншота прямо внутри сообщения над кнопкой скачивания по ТЗ
+    // ТРЕБОВАНИЕ: Корректное инлайн-отображение миниатюры скриншота + кнопка скачивания строго ПОД ним
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
-            // ИСПРАВЛЕНО: Теперь URL содержит расширение в самом конце строки, регулярное выражение или endsWith отработают на 100%
-            if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".webp")) {
+            // ИСПРАВЛЕНО: Поскольку бэкенд возвращает ссылку, содержащую расширение (.png / .jpg), инлайн рендер сработает безупречно
+            if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".gif") || lower.includes(".webp")) {
                 targetElement.innerHTML = `
                     <img src="${contentText}" alt="Скриншот" onclick="window.open('${contentText}', '_blank')">
                     <a class="img-download-link" href="${contentText}" target="_blank">📁 Скачать файл</a>
@@ -666,7 +668,7 @@
 
         document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
             canvas.toBlob(async (blob) => {
-                // ИСПРАВЛЕНО: Теперь расширение передается в имени, а сервер сгенерирует ссылку, оканчивающуюся на .png
+                // ИСПРАВЛЕНО: Явно пишем .png, сервер заберет его, свяжет и отдаст URL с расширением для стопроцентного инлайна
                 const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
                 const formData = new FormData(); formData.append('file', file);
                 try {

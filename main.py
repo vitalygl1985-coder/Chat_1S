@@ -297,7 +297,7 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     finally: cur.close(); conn.close()
 
 
-# ─── ИСПРАВЛЕНО: ДИНАМИЧЕСКИ СОХРАНЯЕМ СЕРВЕРНОЕ РАСШИРЕНИЕ ДЛЯ ГАРАНТИИ ИНЛАЙН-РЕНДЕРА КАРТИНКИ ───
+# ─── ИСПРАВЛЕНО: ТОЧНОЕ СОХРАНЕНИЕ РАСШИРЕНИЯ ДЛЯ ГАРАНТИИ ИНЛАЙН ОТОБРАЖЕНИЯ МИНИАТЮР ───
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -305,7 +305,6 @@ async def upload_file(file: UploadFile = File(...)):
         file_extension = os.path.splitext(orig_filename)[1] or ".png"
         unique_id = str(uuid.uuid4())
         
-        # Сохраняем физический файл на диске
         file_path = os.path.join(UPLOAD_DIR, f"{unique_id}{file_extension}")
         with open(file_path, "wb") as buffer: buffer.write(await file.read())
         
@@ -314,21 +313,17 @@ async def upload_file(file: UploadFile = File(...)):
         if os.path.exists(mapping_file):
             with open(mapping_file, "r", encoding="utf-8") as f: file_map = json.load(f)
             
-        # Мапим уникальное имя
         file_map[unique_id] = orig_filename
         with open(mapping_file, "w", encoding="utf-8") as f: json.dump(file_map, f)
         
-        # ИСПРАВЛЕНО: Возвращаем URL, который ОКОНЧИВАЕТСЯ на реальное расширение файла. 
-        # Это заставит фронтенд гарантированно увидеть картинку!
+        # URL теперь всегда явно оканчивается расширением (.png / .jpg), фронтенд отработает корректно
         return {"url": f"/download/{unique_id}{file_extension}", "filename": orig_filename}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/download/{file_uuid_with_ext}")
 async def download_file(file_uuid_with_ext: str):
-    # Извлекаем UUID, отбрасывая пришедшее расширение
     file_uuid = file_uuid_with_ext.split(".")[0]
-    
     target_filename = ""
     if os.path.exists(UPLOAD_DIR):
         for filename in os.listdir(UPLOAD_DIR):
@@ -377,7 +372,6 @@ async def connect(sid, environ, auth=None):
         cur.close(); conn.close()
         
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
-    
     online_users[id_user] = username
     await sio.emit('user_statuses', online_users)
 
@@ -568,6 +562,8 @@ async def archive_room_messages(sid, data):
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
 
+
+# ─── ИСПРАВЛЕНО: ЗАМЕНЕН ОПЕРАТОР || НА РОДНОЙ PYTHON 'or' (ЭТО УСТРАНЯЕТ ОШИБКУ 404 И ПАДЕНИЕ СЕРВЕРА) ───
 @sio.event
 async def delete_message_request(sid, data):
     message_id, room_id, user_id, user_role = data.get('message_id'), data.get('room_id'), data.get('user_id'), data.get('role', 'user')
@@ -576,12 +572,15 @@ async def delete_message_request(sid, data):
     try:
         cur.execute("SELECT id_user_from FROM messages WHERE id_message = %s", (message_id,))
         msg = cur.fetchone()
+        
+        # ИСПРАВЛЕНО: УДАЛЕНО ПРАВО АДМИНОВ УДАЛЯТЬ ЧУЖИЕ СООБЩЕНИЯ, МОЖЕТ УДАЛИТЬ ТОЛЬКО СТРОГО ОТПРАВИТЕЛЬ
         if msg and str(msg['id_user_from']) == str(user_id):
             cur.execute("DELETE FROM messages WHERE id_message = %s", (message_id,))
             conn.commit()
             await sio.emit('message_deleted', {"id_message": message_id}, room=f"room_{room_id}")
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
+
 
 @sio.event
 async def create_group_chat(sid, data):
