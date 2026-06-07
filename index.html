@@ -75,7 +75,7 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
         
-        /* ТРЕБОВАНИЕ: Адаптивная инлайн-миниатюра скриншота */
+        /* ГАРАНТИЯ ОТОБРАЖЕНИЯ МИНИАТЮРЫ СКРИНШОТА С КНОПКОЙ СКАЧАТЬ ПОД НЕЙ */
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
         .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
@@ -344,7 +344,7 @@
 
     const emojiCategories = {
         smile: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓'],
-        work: ['💼','📁','📂','📅','📆','📊','📈','📉','📜','📋','📌','📍','📎','📍','📏','📐','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🛠️','🔧','⚙️','💻','🖥️','🖨️','🖱️','🖲️','📱','☎️','📞'],
+        work: ['💼','📁','📂','📅','📆','📊','📈','📉','📜','📋','📌','📍','📎','📎','📏','📐','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🛠️','🔧','⚙️','💻','🖥️','🖨️','🖱️','🖲️','📱','☎️','📞'],
         signs: ['✅','❌','➕','➖','➗','✖️','❓','❔','❗','❕','⚠️','🚫','💯','🔔','🔕','🎵','🎶','🏁','🚩','🔥','🚀','👍','👎','✊','👊','✌️','👌','🤝','👏','🙌','🙏','👀','⭐']
     };
 
@@ -444,7 +444,6 @@
         processRoomsDivision(latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query)));
     }
 
-    // ТРЕБОВАНИЕ: Локальный именной парсинг — Петров видит Сидорова, Сидоров видит Петрова
     function processRoomsDivision(allRooms) {
         const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
         activeContainer.innerHTML = ""; inactiveContainer.innerHTML = "";
@@ -498,7 +497,6 @@
             }
         } catch(e) {}
 
-        // ТРЕБОВАНИЕ: Кнопка удаления доступна ТОЛЬКО непосредственному автору сообщения
         let deleteBtnHtml = "";
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
@@ -540,11 +538,11 @@
 
     window.markMessageAsRead = function(msgId) { if(socket) socket.emit('message_read_click', { message_id: msgId, username: currentUser.username }); };
 
-    // ТРЕБОВАНИЕ: Корректное инлайн-отображение миниатюры скриншота + кнопка скачивания строго ПОД ним
+    // ТРЕБОВАНИЕ: Рендеринг миниатюры скриншота прямо внутри сообщения над кнопкой скачивания по ТЗ
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
-            // ИСПРАВЛЕНО: Поскольку бэкенд возвращает ссылку, содержащую расширение (.png / .jpg), инлайн рендер сработает безупречно
+            // ИСПРАВЛЕНО: Полная поддержка расширений для безупречной инлайн-отрисовки скриншотов
             if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".gif") || lower.includes(".webp")) {
                 targetElement.innerHTML = `
                     <img src="${contentText}" alt="Скриншот" onclick="window.open('${contentText}', '_blank')">
@@ -668,7 +666,6 @@
 
         document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
             canvas.toBlob(async (blob) => {
-                // ИСПРАВЛЕНО: Явно пишем .png, сервер заберет его, свяжет и отдаст URL с расширением для стопроцентного инлайна
                 const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
                 const formData = new FormData(); formData.append('file', file);
                 try {

@@ -15,10 +15,6 @@ import secrets
 
 app = FastAPI()
 
-@app.get("/style.css")
-async def get_style():
-    return FileResponse("style.css", media_type="text/css")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -191,6 +187,18 @@ def get_session_by_token(token: str):
     finally: cur.close(); conn.close()
 
 
+# ─── ФАЙЛОВЫЙ И СТАТИЧЕСКИЙ СЕРВИС (ВЫНЕСЕН НАВЕРХ ДЛЯ ИСКЛЮЧЕНИЯ ОШИБКИ 404) ───
+@app.get("/", response_class=HTMLResponse)
+async def get_chat_page():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(current_dir, "index.html"), "r", encoding="utf-8") as f: 
+        return f.read()
+
+@app.get("/style.css")
+async def get_style():
+    return FileResponse("style.css", media_type="text/css")
+
+
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
     import traceback
@@ -198,9 +206,6 @@ async def onec_auth(data: OneCAuthRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
-        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
-
         try:
             cur.execute(
                 "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
@@ -297,7 +302,6 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     finally: cur.close(); conn.close()
 
 
-# ─── ИСПРАВЛЕНО: ТОЧНОЕ СОХРАНЕНИЕ РАСШИРЕНИЯ ДЛЯ ГАРАНТИИ ИНЛАЙН ОТОБРАЖЕНИЯ МИНИАТЮР ───
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -316,7 +320,6 @@ async def upload_file(file: UploadFile = File(...)):
         file_map[unique_id] = orig_filename
         with open(mapping_file, "w", encoding="utf-8") as f: json.dump(file_map, f)
         
-        # URL теперь всегда явно оканчивается расширением (.png / .jpg), фронтенд отработает корректно
         return {"url": f"/download/{unique_id}{file_extension}", "filename": orig_filename}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
@@ -562,8 +565,6 @@ async def archive_room_messages(sid, data):
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
 
-
-# ─── ИСПРАВЛЕНО: ЗАМЕНЕН ОПЕРАТОР || НА РОДНОЙ PYTHON 'or' (ЭТО УСТРАНЯЕТ ОШИБКУ 404 И ПАДЕНИЕ СЕРВЕРА) ───
 @sio.event
 async def delete_message_request(sid, data):
     message_id, room_id, user_id, user_role = data.get('message_id'), data.get('room_id'), data.get('user_id'), data.get('role', 'user')
@@ -572,15 +573,12 @@ async def delete_message_request(sid, data):
     try:
         cur.execute("SELECT id_user_from FROM messages WHERE id_message = %s", (message_id,))
         msg = cur.fetchone()
-        
-        # ИСПРАВЛЕНО: УДАЛЕНО ПРАВО АДМИНОВ УДАЛЯТЬ ЧУЖИЕ СООБЩЕНИЯ, МОЖЕТ УДАЛИТЬ ТОЛЬКО СТРОГО ОТПРАВИТЕЛЬ
         if msg and str(msg['id_user_from']) == str(user_id):
             cur.execute("DELETE FROM messages WHERE id_message = %s", (message_id,))
             conn.commit()
             await sio.emit('message_deleted', {"id_message": message_id}, room=f"room_{room_id}")
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
-
 
 @sio.event
 async def create_group_chat(sid, data):
