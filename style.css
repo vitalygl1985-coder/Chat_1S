@@ -1,37 +1,49 @@
+/* --- СТИЛЬ 100LETNIK.MD --- */
 :root {
-    --brand-green: #28a745;
+    --brand-green: #28a745 !important;
     --bg-light: #f4f7f6;
 }
 
-/* Применяем фирменный шрифт сайта */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
 * { font-family: 'Roboto', sans-serif !important; }
 
-/* Убираем синие акценты */
-.header, .btn-send, #send-btn, .pane-header, #pane-header-main, button {
-    background-color: var(--brand-green) !important;
+/* Зеленая шапка и кнопки */
+.header, .pane-header, #pane-header-main, .btn-primary, #send-btn { 
+    background-color: var(--brand-green) !important; 
 }
 
-/* Бабблы сообщений */
-.message.my .message-content { background: #d4edda !important; border: 1px solid #c8e6c9 !important; }
+/* Сообщения */
+.message.my .message-box { 
+    background: #d4edda !important; 
+    border: 1px solid #c8e6c9 !important; 
+}
 .msg-author { color: var(--brand-green) !important; }
 
-/* Стилизация логотипа-ссылки */
-#chat-logo { cursor: pointer; transition: opacity 0.2s; }
-#chat-logo:hover { opacity: 0.7; }
-
-/* Кнопка (i) */
+/* Кнопка (i) - идеальный вид без рамок */
 button.btn-info-user {
     all: unset !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 24px !important; height: 24px !important;
+    width: 24px !important;
+    height: 24px !important;
     cursor: pointer !important;
     margin-left: 8px !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     color: var(--brand-green) !important;
 }
-button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; height: 22px; }
+button.btn-info-user svg {
+    stroke: var(--brand-green) !important;
+    width: 24px !important;
+    height: 24px !important;
+    stroke-width: 2px !important;
+    fill: none !important;
+}
+button.btn-info-user:hover { opacity: 0.6 !important; }
 
-/* Нижняя панель (убираем ссылку на сайт, оставляем 1С) */
-.system-footer-links { background: #fff; padding: 5px 15px; border-top: 1px solid #ddd; }
+/* Нижняя панель */
+.system-footer-links { background: #fff !important; border-top: 2px solid var(--brand-green) !important; }
+.system-footer-links a { color: var(--brand-green) !important; }
