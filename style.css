@@ -22,6 +22,8 @@ body { height: 100vh; display: flex; flex-direction: column; background-color: #
 /* Основное окно чата */
 .chat-window { flex: 1; display: flex; flex-direction: column; background-color: #f9fafb; position: relative; }
 .chat-header { padding: 14px 16px; background-color: #ffffff; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+.chat-header { display: flex; align-items: center; padding: 10px; }
+#chat-logo { object-fit: contain; }
 #current-chat-title { font-size: 14px; font-weight: bold; color: #111827; }
 .chat-actions { display: flex; gap: 6px; }
 
@@ -126,5 +128,46 @@ button.btn-info-user svg {
     align-items: center !important;
     flex-wrap: nowrap !important;
 }
+
+.system-footer-links {
+    display: flex;
+    gap: 20px;
+    padding: 8px 15px;
+    background: #f8f9fa;
+    border-top: 1px solid #e5e7eb;
+    font-size: 12px;
+}
+.system-footer-links a {
+    color: #28a745; /* Зеленый цвет сайта 100ЛЕТНИК */
+    text-decoration: none;
+    font-weight: 500;
+}
+.system-footer-links a:hover { text-decoration: underline; }
+
+/* Основной брендовый цвет */
+:root {
+    --brand-green: #28a745;
+}
+
+/* Шапка кабинетов */
+.pane-header, #pane-header-main { 
+    background-color: var(--brand-green) !important; 
+    color: white !important; 
+}
+
+/* Кнопка отправки */
+#send-btn { 
+    background-color: var(--brand-green) !important; 
+    border-color: var(--brand-green) !important;
+}
+
+/* Сообщения текущего пользователя (светло-зеленые) */
+.message.my .message-box { 
+    background-color: #e8f5e9 !important; 
+    border-color: #c8e6c9 !important; 
+}
+
+/* Акцентные элементы (иконки, ссылки) */
+.btn-info-user { color: var(--brand-green) !important; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }

@@ -243,6 +243,8 @@
 
     <div class="panel chat-panel">
         <div class="chat-header">
+            <img id="chat-logo" src="/static/logo.png" alt="Лого" style="height:40px; margin-right:10px;">
+            <span>Корпоративный чат 1С</span>
             <div class="chat-title-area">
                 <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
                 <div class="chat-user-identity" id="header-user-identity">Загрузка сессии...</div>
@@ -318,7 +320,8 @@
 </div>
 
 <div class="system-footer-links">
-    <div id="footer-admin-block"><a href="/admin-panel" target="_blank">⚙️ Панель администратора чата</a></div>
+    <div id="footer-admin-block"><a href="/admin" target="_blank">⚙️ Панель администратора чата</a></div>
+    <div id="footer-site-block"><a href="https://100letnik.md" target="_blank">💊 Сайт 100ЛЕТНИК</a></div>
     <div id="footer-onec-block"><a href="https://onec.company.local/trade" target="_blank">🌐 Запуск веб-клиента 1С:Предприятие</a></div>
 </div>
 
@@ -401,6 +404,12 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
 
     function closeUserInfoModal() {
         document.getElementById('userInfoModal').style.display = 'none';
+    }
+
+    function updateLogo() {
+        const logo = document.getElementById('chat-logo');
+        // Добавляем timestamp, чтобы браузер не брал старую картинку из кэша
+        logo.src = "/static/logo.png?v=" + new Date().getTime();
     }
 
     async function initApplication() {

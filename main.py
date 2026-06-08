@@ -420,6 +420,13 @@ async def upload_file(file: UploadFile = File(...)):
         return {"url": f"/download/{unique_id}{file_extension}", "filename": orig_filename}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/admin/upload-logo")
+async def upload_logo(file: UploadFile = File(...)):
+    # Сохраняем файл в папку static/
+    file_location = f"static/logo.png"
+    with open(file_location, "wb+") as file_object:
+        file_object.write(file.file.read())
+    return {"info": f"Логотип обновлен: {file_location}"}
 
 @app.get("/download/{file_uuid_with_ext}")
 async def download_file(file_uuid_with_ext: str):
