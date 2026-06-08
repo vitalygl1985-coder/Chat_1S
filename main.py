@@ -34,12 +34,19 @@ if not os.path.exists(UPLOAD_DIR):
 online_users = {}       
 message_reads = {}      
 
+class ShopInfo(BaseModel):
+    address: Optional[str] = ""
+    phones: Optional[str] = ""
+    schedule: Optional[str] = ""
+    note: Optional[str] = ""
+
 class OneCAuthRequest(BaseModel):
     id_user: str
     id_org: str
     username: str
     role: str = "user"
     shop_name: Optional[str] = None
+    shop_info: Optional[ShopInfo] = None
 
 class OneCMessageRequest(BaseModel):
     room_id: int
@@ -58,6 +65,7 @@ class Base64ImageRequest(BaseModel):
 class AdminAuthRequest(BaseModel):
     id_user: str
     id_org: str
+
 
 
 def get_db_connection():
@@ -179,6 +187,13 @@ def init_db():
                 role VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS shops (
+                shop_name VARCHAR(255) PRIMARY KEY,
+                address TEXT,
+                phones TEXT,
+                schedule TEXT,
+                note TEXT
+            );
         """)
         conn.commit()
     except Exception as e:
@@ -216,7 +231,15 @@ async def get_style():
 def sync_user_shop_room(cur, id_org, user_id, shop_name):
     if not shop_name or shop_name.strip() == "":
         return
-    
+    # 1. Обновляем или вставляем данные магазина в таблицу shops
+    if shop_info:
+        cur.execute("""
+            INSERT INTO shops (shop_name, address, phones, schedule, note)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (shop_name) DO UPDATE SET 
+            address = EXCLUDED.address, phones = EXCLUDED.phones, 
+            schedule = EXCLUDED.schedule, note = EXCLUDED.note
+        """, (shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note))   
     # Ищем комнату магазина
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
@@ -288,6 +311,25 @@ async def onec_auth(data: OneCAuthRequest):
         cur.close()
         conn.close()
 
+@app.get("/api/web/user-info/{user_id}")
+async def get_user_info(user_id: str, x_token: Optional[str] = Header(None)):
+    session = get_session_by_token(x_token)
+    if not session: raise HTTPException(status_code=401)
+    
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Находим магазин сотрудника (через комнату типа 'group' с его именем)
+        cur.execute("""
+            SELECT r.name as shop_name, s.address, s.phones, s.schedule, s.note
+            FROM room_participants rp
+            JOIN rooms r ON rp.id_room = r.id_room
+            LEFT JOIN shops s ON r.name = s.shop_name
+            WHERE rp.id_user = %s AND r.type = 'group'
+            LIMIT 1
+        """, (user_id,))
+        return cur.fetchone() or {"error": "Информация о магазине не найдена"}
+    finally: cur.close(); conn.close()
 
 @app.post("/api/web/exchange-ticket")
 async def exchange_ticket_for_session(data: WebTicketExchangeRequest):

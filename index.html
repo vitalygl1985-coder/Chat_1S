@@ -377,6 +377,18 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         }
     });
 
+    async function showUserInfo(userId) {
+        try {
+            const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
+            const data = await res.json();
+            if (data.shop_name) {
+                alert(`Магазин: ${data.shop_name}\nАдрес: ${data.address}\nТел: ${data.phones}\nГрафик: ${data.schedule}\nПрим: ${data.note}`);
+            } else {
+                alert("Информация о магазине не заполнена.");
+            }
+        } catch(e) { console.error(e); }
+    }
+
     async function initApplication() {
         const urlParams = new URLSearchParams(window.location.search);
         const ticket = urlParams.get('ticket');
@@ -556,6 +568,9 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                     <span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>
                 </div>
             </div>
+            <div class="avatar-container">...</div>
+            <div class="user-info-meta">...</div>
+            <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${u.id_user}')">i</button>
         `;
         messagesStream.appendChild(div);
         const textBlock = document.getElementById(`text-container-${msgId}`);
