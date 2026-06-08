@@ -483,24 +483,32 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
     }
     // ИСПРАВЛЕНО: Логика отображения кнопки управления комнатой и доступа к ней
+    // 1. Исправленный обработчик аккордеона
+document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+    var content = document.getElementById('inactive-rooms-list');
+    // Исправлено: .toggle -> .classList.toggle
+    content.classList.toggle('open');
+    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
+});
+
+    // 2. Исправленная функция выбора комнаты
     function selectRoomById(roomId, name, type, createdBy) {
-        currentRoomId = roomId;
+        currentRoomId = roomId; 
         roomCreatorId = createdBy; 
         roomSystemType = type;
-        unreadCounts[roomId] = 0; 
         
+        // Безопасное отображение заголовка для приватов
         let headerName = name;
         if (type === 'private' && name.includes(' ⇄ ')) {
             headerName = name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
         }
-        document.getElementById('current-chat-title').innerText = headerName || "Кабинет";       
-        // ТРЕБОВАНИЕ: Кнопка удаления доступна ТОЛЬКО автору комнаты
+        document.getElementById('current-chat-title').innerText = headerName || "Кабинет";
+        
+        // Управление кнопками: приводим к строкам для безопасного сравнения
         const managementRow = document.getElementById('chat-management-controls');
         const isOwner = (String(roomCreatorId) === String(currentUser.id_user));
         const isAdmin = (currentUser.role === 'admin');
 
-        // Если это личный кабинет (группа), удаляет только создатель. 
-        // Если это админский кабинет, удаляет админ.
         if ((roomSystemType === 'admin_group' && isAdmin) || (roomSystemType === 'group' && isOwner)) {
             managementRow.style.display = 'flex';
         } else {
@@ -508,11 +516,9 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         }
 
         messagesStream.innerHTML = "";
-        socket.emit('join_room_pool', { room_id: roomId });
-        socket.emit('get_room_history', { room_id: roomId });
+        socket.emit('join_room_pool', { room_id: roomId }); 
+        socket.emit('get_room_history', { room_id: roomId }); 
         socket.emit('get_room_participants', { room_id: roomId });
-        
-        filterAndRenderRooms();
     }
 
     function displayMessage(msg, isBulkLoad) {
