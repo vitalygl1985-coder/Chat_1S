@@ -96,31 +96,35 @@ button:hover, .btn-small:hover { opacity: 0.9; }
     transition: background 0.1s ease;
 }
 
+/* Компактная иконка (i) */
 .btn-info-user {
-    border: none; background: #e5e7eb; border-radius: 50%; width: 18px; height: 18px;
-    font-size: 10px; cursor: pointer; color: #4b5563; font-weight: bold; margin-left: 5px;
+    background: transparent !important; /* Убираем фон */
+    border: none !important;           /* Убираем рамку */
+    cursor: pointer !important;
+    padding: 0 !important;
+    margin-left: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #ff6600 !important;         /* Твой оранжевый */
+    width: 24px !important;            /* Размер как на скрине */
+    height: 24px !important;
+    vertical-align: middle !important;
 }
-.btn-info-user:hover { background: #d1d5db; }
 
-/* Кнопка (i) */
-.btn-info-user {
-    background: none;
-    border: 1px solid #ddd;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 12px;
-    cursor: pointer;
-    color: #f97316; /* оранжевый цвет */
-    font-weight: bold;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    margin-left: 8px;
-    vertical-align: middle;
+/* При наведении делаем легкую прозрачность вместо изменения фона */
+.btn-info-user:hover {
+    opacity: 0.7;
+    background: none !important;
 }
-.btn-info-user:hover { background: #fff7ed; border-color: #f97316; }
+
+/* Чтобы SVG внутри кнопки идеально вписывался */
+.btn-info-user svg {
+    width: 22px; 
+    height: 22px;
+    stroke: currentColor;
+    stroke-width: 2px;
+}
 
 /* Компактная панель */
 .msg-read-panel {
