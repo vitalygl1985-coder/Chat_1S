@@ -62,11 +62,19 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 }
 
 /* 3. Фикс кнопки прикрепления (чтобы она не лезла в кнопки удаления) */
+/* Принудительная очистка фона для кнопки прикрепления */
 #btn-attach-file {
     background: transparent !important;
+    background-color: transparent !important;
     border: none !important;
-    padding: 0 !important;
-    margin-right: 10px;
+    box-shadow: none !important;
+    outline: none !important;
+    filter: none !important;
+}
+/* На случай, если кнопка имеет класс btn или btn-primary */
+.btn-primary#btn-attach-file {
+    background: transparent !important;
+    background-color: transparent !important;
 }
 /* Настройка кнопок-картинок */
 #btn-archive-room, #btn-delete-room {
