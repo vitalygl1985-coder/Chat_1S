@@ -566,11 +566,15 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                 <div class="msg-read-panel">
                     <span class="btn-read-trigger" onclick="markMessageAsRead(${msgId})">👁️ Прочитано</span>
                     <span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>
+                    <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${msg.id_user_from}')">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </button>
                 </div>
             </div>
-            <div class="avatar-container">...</div>
-            <div class="user-info-meta">...</div>
-            <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${msg.id_user_from}')">i</button>
         `;
         messagesStream.appendChild(div);
         const textBlock = document.getElementById(`text-container-${msgId}`);

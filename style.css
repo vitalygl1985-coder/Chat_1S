@@ -92,4 +92,32 @@ button:hover, .btn-small:hover { opacity: 0.9; }
 }
 .btn-info-user:hover { background: #d1d5db; }
 
+/* Кнопка (i) */
+.btn-info-user {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #f97316; /* оранжевый цвет */
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+.btn-info-user:hover { background: #fff7ed; border-color: #f97316; }
+
+/* Компактная панель */
+.msg-read-panel {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    margin-top: 5px;
+}
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
