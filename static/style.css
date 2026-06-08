@@ -23,14 +23,18 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 /* 4. Исправление логотипа, чтобы не ломал верстку */
 #chat-logo { max-height: 30px !important; width: auto !important; }
 
+/* Полностью убираем любые фоны и рамки для иконки змеи */
 #btn-attach-file {
-    width: 38px !important;
-    height: 38px !important;
-    border-radius: 8px !important;
-    padding: 0 !important;
+    background-color: transparent !important;
     border: none !important;
-    background-color: transparent !important; /* Убираем зеленый фон */
-    transition: opacity 0.2s;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Увеличение размера для всех кнопок-иконок */
+#btn-archive-room, #btn-delete-room {
+    height: 45px !important; /* Увеличили высоту */
+    width: auto !important;
 }
 
 #btn-attach-file:hover {
@@ -38,11 +42,12 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 }
 
 /* Показываем плейсхолдер, когда div пуст */
+/* Этот код заставляет плейсхолдер работать в div */
 .input-msg-div:empty:before {
     content: attr(placeholder);
     color: #9ca3af;
     pointer-events: none;
-    display: block; /* Чтобы текст не "прыгал" при вводе */
+    display: block;
 }
 
 /* Убираем плейсхолдер, как только пользователь начинает писать */
