@@ -21,7 +21,11 @@ button.btn-info-user {
 button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; height: 22px; }
 
 /* 4. Исправление логотипа, чтобы не ломал верстку */
-#chat-logo { max-height: 30px !important; width: auto !important; }
+#chat-logo {
+    height: 50px !important;  /* Устанавливаем высоту */
+    width: auto !important;   /* Сохраняем пропорции */
+    display: block !important;
+}
 
 /* Увеличиваем кнопки управления в шапке */
 #btn-archive-room, #btn-delete-room {
