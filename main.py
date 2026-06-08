@@ -3,7 +3,7 @@ import json
 import uuid
 import urllib.parse
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, UploadFile, File, Header
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
@@ -14,6 +14,12 @@ from psycopg2.extras import RealDictCursor
 import secrets
 
 app = FastAPI()
+
+@app.exception_handler(422)
+async def validation_exception_handler(request: Request, exc):
+    # Выводим в лог детальную ошибку, чтобы понять, какое поле JSON не нравится Pydantic
+    print(f"Ошибка валидации JSON: {exc.errors()}") 
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,10 +49,10 @@ class ShopInfo(BaseModel):
 class OneCAuthRequest(BaseModel):
     id_user: str
     id_org: str
-    username: str
-    role: str = "user"
+    username: Optional[str] = ""
+    role: Optional[str] = "user"
     shop_name: Optional[str] = None
-    shop_info: Optional[ShopInfo] = None
+    shop_info: Optional[ShopInfo] = None # Pydantic теперь будет ждать объект
 
 class OneCMessageRequest(BaseModel):
     room_id: int
