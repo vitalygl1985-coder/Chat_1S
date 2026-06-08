@@ -200,6 +200,14 @@ def init_db():
                 schedule TEXT,
                 note TEXT
             );
+            CREATE TABLE IF NOT EXISTS user_shop_info (
+                id_user VARCHAR(255) PRIMARY KEY,
+                shop_name TEXT,
+                address TEXT,
+                phones TEXT,
+                schedule TEXT,
+                note TEXT
+            );                    
         """)
         conn.commit()
     except Exception as e:
@@ -240,12 +248,13 @@ def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
     # 1. Обновляем или вставляем данные магазина в таблицу shops
     if shop_info:
         cur.execute("""
-            INSERT INTO shops (shop_name, address, phones, schedule, note)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (shop_name) DO UPDATE SET 
-            address = EXCLUDED.address, phones = EXCLUDED.phones, 
-            schedule = EXCLUDED.schedule, note = EXCLUDED.note
-        """, (shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note))   
+            INSERT INTO user_shop_info (id_user, shop_name, address, phones, schedule, note)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id_user) DO UPDATE SET 
+            shop_name = EXCLUDED.shop_name, address = EXCLUDED.address, 
+            phones = EXCLUDED.phones, schedule = EXCLUDED.schedule, note = EXCLUDED.note
+        """, (user_id, shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note)
+        )  
     # Ищем комнату магазина
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
@@ -325,16 +334,9 @@ async def get_user_info(user_id: str, x_token: Optional[str] = Header(None)):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Находим магазин сотрудника (через комнату типа 'group' с его именем)
-        cur.execute("""
-            SELECT r.name as shop_name, s.address, s.phones, s.schedule, s.note
-            FROM room_participants rp
-            JOIN rooms r ON rp.id_room = r.id_room
-            LEFT JOIN shops s ON r.name = s.shop_name
-            WHERE rp.id_user = %s AND r.type = 'group'
-            LIMIT 1
-        """, (user_id,))
-        return cur.fetchone() or {"error": "Информация о магазине не найдена"}
+        # Берем данные конкретного сотрудника из новой таблицы
+        cur.execute("SELECT * FROM user_shop_info WHERE id_user = %s", (user_id,))
+        return cur.fetchone() or {"error": "Информация не найдена"}
     finally: cur.close(); conn.close()
 
 @app.post("/api/web/exchange-ticket")
