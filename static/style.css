@@ -23,12 +23,16 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 /* 4. Исправление логотипа, чтобы не ломал верстку */
 #chat-logo { max-height: 30px !important; width: auto !important; }
 
-/* Увеличение размера для всех кнопок-иконок */
+/* Увеличиваем кнопки управления в шапке */
 #btn-archive-room, #btn-delete-room {
-    height: 45px !important; /* Увеличили высоту */
-    width: auto !important;
+    height: 48px !important; /* Увеличенный размер */
+    width: 48px !important;
+    cursor: pointer !important;
+    transition: transform 0.2s;
 }
-
+#btn-archive-room:hover, #btn-delete-room:hover {
+    transform: scale(1.1); /* Легкий зум при наведении */
+}
 #btn-attach-file:hover {
     opacity: 0.6; /* Легкое затемнение при наведении */
 }
@@ -47,11 +51,12 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
     display: none;
 }
 
-/* 1. Возвращаем фон чата */
+/* Применяем фон к области сообщений */
 .messages-container {
-    background-image: url('/static/fon.jpg') !important;
+    background-image: url('/static/chat_bg.jpg') !important;
     background-size: cover !important;
     background-position: center !important;
+    background-repeat: no-repeat !important;
 }
 
 /* 2. Принудительно задаем размер кнопок в шапке */
@@ -88,9 +93,9 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 
 /* Сделаем сообщения на фоне кирпичной стены чуть прозрачнее, 
    чтобы фон был виден, но текст оставался читаемым */
+/* Делаем сообщения чуть прозрачными, чтобы фон был виден */
 .message-box {
-    background: rgba(255, 255, 255, 0.9) !important;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.95) !important;
 }
 .message.my .message-box { 
     background: #d8f3dc !important; /* Твои сообщения останутся зелеными */
