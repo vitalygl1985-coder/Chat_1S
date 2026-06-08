@@ -1,25 +1,16 @@
 /* --- СТИЛЬ 100LETNIK.MD --- */
+/* 1. Брендовый цвет */
 :root {
     --brand-green: #28a745 !important;
-    --bg-light: #f4f7f6;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
-* { font-family: 'Roboto', sans-serif !important; }
-
-/* Зеленая шапка и кнопки */
-.header, .pane-header, #pane-header-main, .btn-primary, #send-btn { 
+/* 2. Перекрашиваем только нужные кнопки, не трогая размеры */
+.btn-primary, #send-btn, .btn-send, .header, .pane-header { 
     background-color: var(--brand-green) !important; 
+    border-color: var(--brand-green) !important; 
 }
 
-/* Сообщения */
-.message.my .message-box { 
-    background: #d4edda !important; 
-    border: 1px solid #c8e6c9 !important; 
-}
-.msg-author { color: var(--brand-green) !important; }
-
-/* Кнопка (i) - идеальный вид без рамок */
+/* 3. Оставляем кнопку (i) без рамки */
 button.btn-info-user {
     all: unset !important;
     display: inline-flex !important;
@@ -29,21 +20,31 @@ button.btn-info-user {
     height: 24px !important;
     cursor: pointer !important;
     margin-left: 8px !important;
-    background: transparent !important;
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
     color: var(--brand-green) !important;
 }
-button.btn-info-user svg {
-    stroke: var(--brand-green) !important;
-    width: 24px !important;
-    height: 24px !important;
-    stroke-width: 2px !important;
-    fill: none !important;
-}
-button.btn-info-user:hover { opacity: 0.6 !important; }
+button.btn-info-user svg { stroke: var(--brand-green) !important; }
 
+/* 4. Исправляем бабблы сообщений (не ломая их ширину) */
+.message.my .message-box { background: #d8f3dc !important; }
+
+/* 5. Исправляем кнопки в модальных окнах, чтобы они не были зелеными, если это "Отмена" */
+.btn { background-color: var(--brand-green) !important; }
+#btn-cancel-room-creation, #btn-cancel-screenshot, .btn-remove-participant { 
+    background-color: #9ca3af !important; 
+}
+/* Ограничиваем логотип, чтобы он не ломал шапку */
+#chat-logo { 
+    max-height: 35px !important; 
+    width: auto !important; 
+    display: block !important; 
+}
+
+/* Принудительно выравниваем шапку */
+.chat-header { 
+    display: flex !important; 
+    align-items: center !important; 
+    flex-wrap: nowrap !important; 
+}
 /* Нижняя панель */
 .system-footer-links { background: #fff !important; border-top: 2px solid var(--brand-green) !important; }
 .system-footer-links a { color: var(--brand-green) !important; }
