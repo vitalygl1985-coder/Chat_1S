@@ -74,7 +74,17 @@ button:hover, .btn-small:hover { opacity: 0.9; }
 .btn-danger-xs { background-color: #ef4444; font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-left: auto; }
 
 /* Модальные окна */
-.modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal-overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;
+    z-index: 9999;
+}
+.modal-content {
+    background: white; padding: 20px; border-radius: 8px; width: 300px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.modal-row { margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+.modal-label { font-weight: bold; color: #555; display: block; font-size: 12px; }
 .modal-body { background:white; padding:16px; border-radius:12px; width:280px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 .modal-body h4 { font-size:13px; margin-bottom:10px; color:#111827; }
 .modal-body select, .modal-body input { width:100%; padding:6px; margin-bottom:12px; border:1px solid #d1d5db; border-radius:6px; font-size:12px; }

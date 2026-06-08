@@ -381,12 +381,26 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         try {
             const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
             const data = await res.json();
+            
             if (data.shop_name) {
-                alert(`Магазин: ${data.shop_name}\nАдрес: ${data.address}\nТел: ${data.phones}\nГрафик: ${data.schedule}\nПрим: ${data.note}`);
+                const body = document.getElementById('modalBody');
+                // Устанавливаем нужный порядок полей
+                body.innerHTML = `
+                    <div class="modal-row"><span class="modal-label">Организация</span>${data.shop_name}</div>
+                    <div class="modal-row"><span class="modal-label">Магазин (примечание)</span>${data.note}</div>
+                    <div class="modal-row"><span class="modal-label">Адрес</span>${data.address}</div>
+                    <div class="modal-row"><span class="modal-label">Телефон</span>${data.phones}</div>
+                    <div class="modal-row"><span class="modal-label">График</span>${data.schedule}</div>
+                `;
+                document.getElementById('userInfoModal').style.display = 'flex';
             } else {
                 alert("Информация о магазине не заполнена.");
             }
         } catch(e) { console.error(e); }
+    }
+
+    function closeUserInfoModal() {
+        document.getElementById('userInfoModal').style.display = 'none';
     }
 
     async function initApplication() {
@@ -830,5 +844,12 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
 
     window.onload = initApplication;
 </script>
+<div id="userInfoModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <h3 id="modalTitle" style="margin-top:0;">Информация о сотруднике</h3>
+        <div id="modalBody" style="line-height:1.6;"></div>
+        <button onclick="closeUserInfoModal()" style="margin-top:15px; width:100%;">Закрыть</button>
+    </div>
+</div>
 </body>
 </html>
