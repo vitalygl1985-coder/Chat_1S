@@ -259,7 +259,7 @@
                     style="cursor:pointer; height:45px; width:45px; object-fit:contain;" 
                     title="Архивация сообщений" alt="Архив">           
                 <img src="/static/del_btn.png" id="btn-delete-room" 
-                    style="cursor:pointer; height:50px; width:50px; object-fit:contain;" 
+                    style="cursor:pointer; height:45px; width:45px; object-fit:contain;" 
                     title="Удаление комнаты" alt="Удалить">
             </div>
         </div>
@@ -474,7 +474,17 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             renderCompanyUsers(globalUsersCache);
             renderCurrentRoomParticipants(roomParticipantsCache);
         });
-
+        socket.on('download_archive_file', (data) => {
+            // data.url будет выглядеть как "/download-archive/uuid-твоего-файла"
+            const link = document.createElement('a');
+            link.href = data.url;
+            link.setAttribute('download', 'chat_archive.json'); // Имя файла для скачивания
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert("Архивация завершена! Файл скачивается.");
+        });
         socket.on('message_read_update', (data) => {
             messageReadsMap[data.message_id] = data.users_list;
             const targetList = document.getElementById(`read-users-${data.message_id}`);
