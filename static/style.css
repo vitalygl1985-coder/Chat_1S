@@ -100,3 +100,28 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 .message.my .message-box { 
     background: #d8f3dc !important; /* Твои сообщения останутся зелеными */
 }
+
+/* Делаем основной текст в модальном окне светлее */
+.modal-row {
+    color: #2f783e !important; /* Мягкий серый цвет, хорошо читается на белом */
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+/* Выделяем заголовки (метки) более темным, но не черным цветом */
+.modal-label {
+    font-weight: 600 !important;
+    color: #389033 !important; /* Чуть темнее основного текста */
+    display: inline-block;
+    min-width: 100px;
+}
+#modalBody {
+    padding: 20px !important;
+    background: #ffffff;
+}
+
+/* Добавляем легкую обводку или разделитель для строк */
+.modal-row {
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 8px;
+}
