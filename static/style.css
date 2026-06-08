@@ -24,17 +24,17 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 #chat-logo { max-height: 30px !important; width: auto !important; }
 
 #btn-attach-file {
-    width: 38px !important; /* Делаем кнопку квадратной */
+    width: 38px !important;
     height: 38px !important;
     border-radius: 8px !important;
     padding: 0 !important;
     border: none !important;
-    background-color: var(--brand-green) !important;
+    background-color: transparent !important; /* Убираем зеленый фон */
     transition: opacity 0.2s;
 }
 
 #btn-attach-file:hover {
-    opacity: 0.8;
+    opacity: 0.6; /* Легкое затемнение при наведении */
 }
 
 /* Показываем плейсхолдер, когда div пуст */
@@ -48,4 +48,31 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 /* Убираем плейсхолдер, как только пользователь начинает писать */
 .input-msg-div:focus:before {
     display: none;
+}
+
+/* Устанавливаем фирменный фон для чата */
+.messages-container {
+    background-image: url('/static/fon.jpg') !important;
+    background-size: cover;
+    background-position: center;
+}
+
+/* Настройка кнопок-картинок */
+#btn-archive-room, #btn-delete-room {
+    transition: transform 0.2s, filter 0.2s;
+}
+
+#btn-archive-room:hover, #btn-delete-room:hover {
+    transform: scale(1.05); /* Легкое увеличение при наведении */
+    filter: brightness(1.1); /* Легкое свечение */
+}
+
+/* Сделаем сообщения на фоне кирпичной стены чуть прозрачнее, 
+   чтобы фон был виден, но текст оставался читаемым */
+.message-box {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.message.my .message-box { 
+    background: #d8f3dc !important; /* Твои сообщения останутся зелеными */
 }
