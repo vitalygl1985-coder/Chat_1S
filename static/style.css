@@ -1,0 +1,24 @@
+/* Переменные */
+:root { --brand-green: #28a745; }
+
+/* 1. Брендирование кнопок */
+.btn-primary, #send-btn, .header { background-color: var(--brand-green) !important; }
+
+/* 2. Брендирование сообщений */
+.message.my .message-box { background-color: #d8f3dc !important; }
+
+/* 3. Кнопка (i) - точечный фикс */
+button.btn-info-user {
+    all: unset !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    cursor: pointer !important;
+    color: var(--brand-green) !important;
+}
+button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; height: 22px; }
+
+/* 4. Исправление логотипа, чтобы не ломал верстку */
+#chat-logo { max-height: 30px !important; width: auto !important; }
