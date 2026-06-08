@@ -538,11 +538,19 @@ async def delete_room_request(sid, data):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
-        room = cur.fetchone()
-        if room and ((room['type'] == 'admin_group' and user_role == 'admin') or (room['type'] == 'group' and (room['created_by'] == user_id or user_role == 'admin'))):
-            cur.execute("DELETE FROM rooms WHERE id_room = %s", (room_id,))
-            conn.commit()
-            await sio.emit('refresh_rooms_trigger')
+        room = cur.fetchone()    
+        # ТРЕБОВАНИЕ: Удаление доступно только автору (создателю) комнаты
+        # Админ имеет право удалить комнату, только если он её создатель или тип admin_group
+        if room:
+            is_creator = str(room['created_by']) == str(user_id)
+            is_admin_of_group = (room['type'] == 'admin_group' and user_role == 'admin')
+            
+            if is_creator or is_admin_of_group:
+                cur.execute("DELETE FROM rooms WHERE id_room = %s", (room_id,))
+                conn.commit()
+                await sio.emit('refresh_rooms_trigger')
+            else:
+                await sio.emit('system_alert', {"message": "Удалять кабинеты может только их создатель!"}, to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
 
