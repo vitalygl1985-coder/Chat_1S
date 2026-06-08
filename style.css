@@ -97,29 +97,27 @@ button:hover, .btn-small:hover { opacity: 0.9; }
 }
 
 /* Компактная иконка (i) */
-.btn-info-user {
-    background: transparent !important;
-    border: none !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    margin-left: 8px !important;
-    /* Запрещаем сжатие */
-    flex-shrink: 0 !important; 
-    /* Жестко задаем размер */
-    min-width: 24px !important;
-    width: 24px !important;
-    height: 24px !important;
+/* Принудительная изоляция кнопки от любых других стилей */
+button.btn-info-user {
+    all: unset !important; /* Убирает вообще все стандартные стили кнопки */
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    margin-left: 8px !important;
     color: #ff6600 !important;
 }
 
-.btn-info-user svg {
-    /* Фиксируем размер иконки внутри кнопки */
+button.btn-info-user svg {
     width: 24px !important;
     height: 24px !important;
-    display: block !important;
+    stroke: #ff6600 !important;
+    stroke-width: 2px !important;
 }
 /* Компактная панель */
 .msg-read-panel {
