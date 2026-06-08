@@ -39,6 +39,7 @@ class OneCAuthRequest(BaseModel):
     id_org: str
     username: str
     role: str = "user"
+    shop_name: Optional[str] = None
 
 class OneCMessageRequest(BaseModel):
     room_id: int
@@ -72,13 +73,17 @@ def clean_uuid(org_id_str):
         return "00000000-0000-0000-0000-000000000001"
 
 
-def check_and_create_global_rooms(cur, id_org, user_id, user_role):
+def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=None):
+    """
+    Проверяет и создает системные комнаты ОБЩИЙ и АДМИН.
+    Дополнительно привязывает пользователя к комнате магазина (shop_name).
+    """
+    # 1. ОБЩИЙ
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
         (id_org,)
     )
     room_general = cur.fetchone()
-    
     if not room_general:
         cur.execute(
             "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'ОБЩИЙ', %s) RETURNING id_room", 
@@ -87,19 +92,15 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
         room_general = cur.fetchone()
     
     general_room_id = room_general['id_room'] if isinstance(room_general, dict) else room_general[0]
-    
-    cur.execute(
-        "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
-        (general_room_id, user_id)
-    )
+    cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
 
+    # 2. АДМИН
     if user_role == 'admin':
         cur.execute(
             "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", 
             (id_org,)
         )
         room_admin = cur.fetchone()
-        
         if not room_admin:
             cur.execute(
                 "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'admin_group', 'АДМИН', %s) RETURNING id_room", 
@@ -108,11 +109,24 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role):
             room_admin = cur.fetchone()
         
         admin_room_id = room_admin['id_room'] if isinstance(room_admin, dict) else room_admin[0]
-        
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
+
+    # 3. МАГАЗИН (Твое дополнение)
+    if shop_name and shop_name.strip() != "":
         cur.execute(
-            "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
-            (admin_room_id, user_id)
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
+            (id_org, shop_name)
         )
+        room_shop = cur.fetchone()
+        if not room_shop:
+            cur.execute(
+                "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'group', %s, %s) RETURNING id_room", 
+                (id_org, shop_name, user_id)
+            )
+            room_shop = cur.fetchone()
+        
+        shop_room_id = room_shop['id_room'] if isinstance(room_shop, dict) else room_shop[0]
+        cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (shop_room_id, user_id))
 
 
 def init_db():
@@ -198,6 +212,34 @@ async def get_style():
     return FileResponse("style.css", media_type="text/css")
 
 
+# 1. Сначала определи функцию ВНЕ эндпоинта
+def sync_user_shop_room(cur, id_org, user_id, shop_name):
+    if not shop_name or shop_name.strip() == "":
+        return
+    
+    # Ищем комнату магазина
+    cur.execute(
+        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
+        (id_org, shop_name)
+    )
+    room = cur.fetchone()
+    
+    # Если нет — создаем
+    if not room:
+        cur.execute(
+            "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'group', %s, %s) RETURNING id_room", 
+            (id_org, shop_name, user_id)
+        )
+        room = cur.fetchone()
+        
+    room_id = room['id_room'] if isinstance(room, dict) else room[0]
+    
+    # Привязываем сотрудника
+    cur.execute(
+        "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
+        (room_id, user_id)
+    )
+
 @app.post("/api/1c/auth")
 async def onec_auth(data: OneCAuthRequest):
     import traceback
@@ -225,6 +267,8 @@ async def onec_auth(data: OneCAuthRequest):
         """, (data.id_user, validated_org, data.username, data.role))
 
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
+       
+        sync_user_shop_room(cur, validated_org, data.id_user, getattr(data, 'shop_name', None))
 
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
@@ -233,6 +277,7 @@ async def onec_auth(data: OneCAuthRequest):
             (one_time_ticket, data.id_user, validated_org, data.username, data.role)
         )
 
+        
         conn.commit()
         return {"success": True, "token": one_time_ticket}
     except Exception as e:
