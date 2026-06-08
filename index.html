@@ -9,64 +9,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
-        :root {
-            --brand-green: #28a745;
-            --bg-main: #f4f7f6;
-            --bg-panel: #ffffff;
-            --border-color: #e5e7eb;
-            --text-main: #333;
-            --text-muted: #9ca3af;
-            --online-color: #10b981;
-            --offline-color: #9ca3af;
-        }
-
-        /* Шрифт как на сайте */
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif !important; }
-        body, html { height: 100vh; background: var(--bg-main); color: var(--text-main); overflow: hidden; display: flex; flex-direction: column; }
-
-        .app-container { display: grid; grid-template-columns: 260px 1fr 280px; flex: 1; max-height: calc(100vh - 25px); background: var(--bg-panel); overflow: hidden; }
-
-        /* Зеленые акценты везде */
-        .btn-primary, .btn-send, #send-btn, .header { background-color: var(--brand-green) !important; }
-        .room-item.active { background: #e8f5e9 !important; color: var(--brand-green) !important; font-weight: 600; }
-        
-        /* Бабблы сообщений */
-        .message.my .message-box { background: #d8f3dc !important; }
-        .msg-author { color: var(--brand-green) !important; }
-
-        /* Идеальная кнопка (i) */
-        button.btn-info-user {
-            all: unset !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            width: 24px !important;
-            height: 24px !important;
-            cursor: pointer !important;
-            margin-left: 8px !important;
-            background: transparent !important;
-            border: none !important;
-            outline: none !important;
-            box-shadow: none !important;
-            color: var(--brand-green) !important;
-        }
-        button.btn-info-user svg {
-            stroke: var(--brand-green) !important;
-            width: 24px !important;
-            height: 24px !important;
-            stroke-width: 2px !important;
-            fill: none !important;
-        }
-        button.btn-info-user:hover { opacity: 0.6 !important; }
-
-        /* Остальной дизайн (панели и модалки) */
-        .panel { display: flex; flex-direction: column; background: var(--bg-panel); border-right: 1px solid var(--border-color); height: 100%; }
-        .panel-header { padding: 12px; border-bottom: 1px solid var(--border-color); }
-        .search-box { border: 1px solid #ddd; border-radius: 6px; padding: 6px; }
-        
-        .system-footer-links { background: #fff !important; border-top: 1px solid #ddd; height: 25px; display: flex; align-items: center; padding: 0 15px; font-size: 11px; }
-        .system-footer-links a { color: var(--brand-green) !important; text-decoration: none; }
+       link rel="stylesheet" 
     </style>
 </head>
 <body>
