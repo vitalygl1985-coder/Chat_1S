@@ -386,11 +386,11 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                 const body = document.getElementById('modalBody');
                 // Устанавливаем нужный порядок полей
                 body.innerHTML = `
-                    <div class="modal-row"><span class="modal-label">Организация</span>${data.shop_name}</div>
-                    <div class="modal-row"><span class="modal-label">Магазин (примечание)</span>${data.note}</div>
-                    <div class="modal-row"><span class="modal-label">Адрес</span>${data.address}</div>
-                    <div class="modal-row"><span class="modal-label">Телефон</span>${data.phones}</div>
-                    <div class="modal-row"><span class="modal-label">График</span>${data.schedule}</div>
+                    <div class="modal-row"><span class="modal-label">Организация: </span>${data.shop_name}</div>
+                    <div class="modal-row"><span class="modal-label">Магазин: </span>${data.note}</div>
+                    <div class="modal-row"><span class="modal-label">Адрес: </span>${data.address}</div>
+                    <div class="modal-row"><span class="modal-label">Телефон: </span>${data.phones}</div>
+                    <div class="modal-row"><span class="modal-label">График: </span>${data.schedule}</div>
                 `;
                 document.getElementById('userInfoModal').style.display = 'flex';
             } else {
