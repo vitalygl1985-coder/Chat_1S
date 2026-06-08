@@ -298,8 +298,13 @@
 
             <div class="controls-row">
                 <input type="file" id="global-file-input" style="display:none">
-                <button class="btn btn-primary" id="btn-attach-file" style="background:#6b7280; padding: 10px 14px;" title="Отправить файл">📎</button>
-                <div class="input-msg-div" id="input-msg" contenteditable="true" placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора"></div>
+                <button class="btn btn-primary" id="btn-attach-file" style="background:#28a745 !important; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Прикрепить файл">
+                    <img src="/static/attach-icon.png" alt="Прикрепить" style="width: 24px; height: 24px; object-fit: contain;">
+                </button>
+                <div class="input-msg-div" 
+                    id="input-msg" contenteditable="true" 
+                    placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
+                </div>
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>

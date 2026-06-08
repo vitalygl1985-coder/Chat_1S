@@ -22,3 +22,30 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 
 /* 4. Исправление логотипа, чтобы не ломал верстку */
 #chat-logo { max-height: 30px !important; width: auto !important; }
+
+#btn-attach-file {
+    width: 38px !important; /* Делаем кнопку квадратной */
+    height: 38px !important;
+    border-radius: 8px !important;
+    padding: 0 !important;
+    border: none !important;
+    background-color: var(--brand-green) !important;
+    transition: opacity 0.2s;
+}
+
+#btn-attach-file:hover {
+    opacity: 0.8;
+}
+
+/* Показываем плейсхолдер, когда div пуст */
+.input-msg-div:empty:before {
+    content: attr(placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+    display: block; /* Чтобы текст не "прыгал" при вводе */
+}
+
+/* Убираем плейсхолдер, как только пользователь начинает писать */
+.input-msg-div:focus:before {
+    display: none;
+}
