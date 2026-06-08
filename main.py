@@ -234,7 +234,7 @@ async def get_style():
 
 
 # 1. Сначала определи функцию ВНЕ эндпоинта
-def sync_user_shop_room(cur, id_org, user_id, shop_name):
+def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
     if not shop_name or shop_name.strip() == "":
         return
     # 1. Обновляем или вставляем данные магазина в таблицу shops
@@ -297,7 +297,7 @@ async def onec_auth(data: OneCAuthRequest):
 
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
        
-        sync_user_shop_room(cur, validated_org, data.id_user, getattr(data, 'shop_name', None))
+        sync_user_shop_room(cur, validated_org, data.id_user, data.shop_name, data.shop_info)
 
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
