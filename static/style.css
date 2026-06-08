@@ -23,14 +23,6 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 /* 4. Исправление логотипа, чтобы не ломал верстку */
 #chat-logo { max-height: 30px !important; width: auto !important; }
 
-/* Полностью убираем любые фоны и рамки для иконки змеи */
-#btn-attach-file {
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-}
-
 /* Увеличение размера для всех кнопок-иконок */
 #btn-archive-room, #btn-delete-room {
     height: 45px !important; /* Увеличили высоту */
@@ -55,13 +47,27 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
     display: none;
 }
 
-/* Устанавливаем фирменный фон для чата */
+/* 1. Возвращаем фон чата */
 .messages-container {
     background-image: url('/static/fon.jpg') !important;
-    background-size: cover;
-    background-position: center;
+    background-size: cover !important;
+    background-position: center !important;
 }
 
+/* 2. Принудительно задаем размер кнопок в шапке */
+.chat-actions img {
+    height: 35px !important;
+    width: auto !important;
+    object-fit: contain;
+}
+
+/* 3. Фикс кнопки прикрепления (чтобы она не лезла в кнопки удаления) */
+#btn-attach-file {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin-right: 10px;
+}
 /* Настройка кнопок-картинок */
 #btn-archive-room, #btn-delete-room {
     transition: transform 0.2s, filter 0.2s;
