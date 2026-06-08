@@ -570,7 +570,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             </div>
             <div class="avatar-container">...</div>
             <div class="user-info-meta">...</div>
-            <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${u.id_user}')">i</button>
+            <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${msg.id_user_from}')">i</button>
         `;
         messagesStream.appendChild(div);
         const textBlock = document.getElementById(`text-container-${msgId}`);
