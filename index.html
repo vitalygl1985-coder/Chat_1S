@@ -4,19 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Корпоративный чат 1С</title>
-    <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
-    /* Только базовая сетка, ничего лишнего */
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
-    body, html { height: 100vh; overflow: hidden; }
-    .app-container { display: grid; grid-template-columns: 260px 1fr 280px; height: 100vh; }
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5000; }
-</style>
+        /* Брендовые переменные */
+        :root { --brand-green: #28a745; --bg-main: #f4f7f6; }
+        
+        /* Глобальная верстка */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body, html { height: 100vh; overflow: hidden; background: var(--bg-main); }
+        
+        /* Сетка - КЛЮЧЕВОЙ МОМЕНТ ДЛЯ ВОССТАНОВЛЕНИЯ */
+        .app-container { 
+            display: grid; 
+            grid-template-columns: 260px 1fr 280px; 
+            height: 100vh; 
+            overflow: hidden;
+        }
+
+        /* Брендирование (перекрашиваем синий в зеленый) */
+        .btn-primary, #send-btn, .header, .pane-header, #pane-header-main { background-color: var(--brand-green) !important; }
+        .room-item.active { background: #e8f5e9 !important; color: var(--brand-green) !important; }
+        .message.my .message-box { background: #d8f3dc !important; }
+
+        /* Фикс логотипа */
+        #chat-logo { max-height: 35px; width: auto; cursor: pointer; }
+
+        /* Вспомогательная верстка (чтобы не плыло) */
+        .panel { display: flex; flex-direction: column; height: 100%; border-right: 1px solid #ddd; }
+        .chat-panel { display: flex; flex-direction: column; height: 100%; background: #fff; }
+        .messages-container { flex: 1; overflow-y: auto; padding: 15px; }
+        .input-area { border-top: 1px solid #ddd; padding: 10px; }
+    </style>
 </head>
 <body>
+    <div class="app-container">
+        <div class="panel left-panel">...</div>
+        <div class="panel chat-panel">...</div>
+        <div class="panel right-panel">...</div>
+    </div>
+</body>
 
 <div class="modal-overlay" id="create-room-modal">
     <div class="modal-window" style="width: 420px;">
