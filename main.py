@@ -12,8 +12,15 @@ import socketio
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import secrets
+from fastapi.staticfiles import StaticFiles
+import os
 
 app = FastAPI()
+
+# Убедись, что папка static существует
+if not os.path.exists("static"):
+    os.makedirs("static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.exception_handler(422)
 async def validation_exception_handler(request: Request, exc):
