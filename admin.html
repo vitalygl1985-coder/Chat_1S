@@ -346,18 +346,32 @@
         }
 
         async function loadDbTables() {
-            const sqlQ = `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'`;
+            const sqlQ = `
+                SELECT 
+                    table_name, 
+                    string_agg(column_name || ' (' || data_type || ')', ', ') AS columns
+                FROM information_schema.columns 
+                WHERE table_schema='public' AND table_type='BASE TABLE'
+                GROUP BY table_name 
+                ORDER BY table_name;
+            `;
             const res = await fetch('/api/admin/sql', {
-                method:'POST', headers:{'Content-Type':'application/json'},
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ sql: sqlQ })
             });
             const d = await res.json();
             const box = document.getElementById('tables-list-box');
+            
             if (d.success && d.data) {
                 box.style.display = 'block';
-                box.innerHTML = d.data.map(t => `<b style="color:#10b981">${t.table_name}</b>`).join(', ');
+                box.innerHTML = d.data.map(t => `
+                    <div style="margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">
+                        <b style="color:#2563eb">${t.table_name}</b>: <span style="font-size:12px; color:#4b5563;">${t.columns}</span>
+                    </div>
+                `).join('');
             } else {
-                showToast("Ошибка загрузки таблиц", true);
+                showToast("Ошибка загрузки структуры", true);
             }
         }
 
@@ -382,8 +396,13 @@
             document.getElementById('sql-result').innerText = JSON.stringify(d.data || d.message, null, 2);
         }
 
-        function loadLogs() {
-            document.getElementById('logs-result').innerText = "Система работает штатно. Выполнен вход администратором.";
+        async function loadLogs() {
+            const res = await fetch('/api/admin/logs');
+            const logs = await res.json();
+            const resultDiv = document.getElementById('logs-result');
+            resultDiv.innerHTML = logs.map(l => `
+                <div>[${new Date(l.created_at).toLocaleString()}] <b>${l.admin_login}</b>: ${l.action}</div>
+            `).join('') || 'Логи отсутствуют.';
         }
 
         document.getElementById('primary-color').oninput = (e) => document.getElementById('primary-color-value').innerText = e.target.value;
