@@ -323,7 +323,7 @@
                 <button class="btn" id="btn-attach-file" 
                         style="background: transparent !important; padding: 4px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;" 
                         title="Прикрепить файл">
-                    <img src="/static/attach-icon.png" alt="Прикрепить" style="width: 24px; height: 24px; object-fit: contain;">
+                    <img src="/static/attach-icon.png" alt="Прикрепить" style="width: 36px; height: 36px; object-fit: contain;">
                 </button>
                 <div class="input-msg-div" 
                     id="input-msg" contenteditable="true" 
@@ -820,6 +820,12 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
         inputMsg.innerHTML = ""; isSecretMode = false; resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
     }
+
+    const messageSound = new Audio('/static/beep.mp3');
+    socket.on('new_message', (msg) => {
+        if (msg && msg.id_room == currentRoomId) displayMessage(msg, false);
+        messageSound.play().catch(err => console.log("Браузер заблокировал автовоспроизведение звука", err));
+    });
 
     function initScreenshotEditorLogic() {
         document.getElementById('btn-close-screenshot-modal').addEventListener('click', () => screenshotModal.classList.remove('open'));
