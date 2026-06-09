@@ -254,6 +254,11 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
+@app.get("/admin", response_class=HTMLResponse)
+async def get_admin_page():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(current_dir, "admin.html"), "r", encoding="utf-8") as f: 
+        return f.read()
 
 @app.get("/api/admin/users")
 async def admin_get_users():
