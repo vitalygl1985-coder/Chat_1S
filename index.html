@@ -411,16 +411,16 @@
     // ИСПРАВЛЕНО: Надежное переключение аккордеона
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         const content = document.getElementById('inactive-rooms-list');
-        const header = this;
         
+        // Переключает класс "open" (документ сам развернется или свернется)
         content.classList.toggle('open');
         
+        // Меняем стрелочку и грамматику
+        const countText = document.getElementById('inactive-count').innerText.match(/\d+/);
         if (content.classList.contains('open')) {
-            content.style.display = 'block';
-            header.querySelector('span:last-child').innerText = '(...) ▲';
+            this.querySelector('span:last-child').innerText = `(${countText}) ▲`;
         } else {
-            content.style.display = 'none';
-            header.querySelector('span:last-child').innerText = '(' + document.getElementById('inactive-count').innerText.match(/\d+/) + ') ▼';
+            this.querySelector('span:last-child').innerText = `(${countText}) ▼`;
         }
     });
 
