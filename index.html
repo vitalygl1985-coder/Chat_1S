@@ -175,7 +175,23 @@
         </div>
     </div>
 </div>
-    
+ 
+<div class="modal-overlay" id="edit-message-modal">
+    <div class="modal-window" style="width: 420px;">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">✏️ Редактирование сообщения</span>
+            <span id="btn-close-edit-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px; border-bottom: 1px solid var(--border-color);">
+            <textarea class="search-box" id="edit-msg-textarea" style="height: 80px; resize: none;" placeholder="Введите новый текст..."></textarea>
+        </div>
+        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
+            <button class="btn" id="btn-cancel-edit" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-primary" id="btn-confirm-edit">Сохранить</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="create-room-modal">
     <div class="modal-window" style="width: 420px;">
         <div class="modal-header">
@@ -770,13 +786,30 @@
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
+    let editingMsgId = null;
+
+    // Привязка закрытия модалки
+    document.getElementById('btn-close-edit-modal').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
+    document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
+
     window.requestEditMessage = async function(msgId, currentText) {
-        let newText = prompt("Редактирование сообщения:", currentText);
-        if (newText && newText.trim() !== "" && newText !== currentText) {
+        editingMsgId = msgId;
+        const textarea = document.getElementById('edit-msg-textarea');
+        textarea.value = currentText.replace(/\\'/g, "'").replace(/\\"/g, '"');
+        document.getElementById('edit-message-modal').classList.add('open');
+        textarea.focus();
+    };
+
+    document.getElementById('btn-confirm-edit').onclick = function() {
+        const textarea = document.getElementById('edit-msg-textarea');
+        let newText = textarea.value.trim();
+        
+        if (newText && editingMsgId) {
             if (isSecretMode && userSecretKey) {
-                newText = CryptoJS.AES.encrypt(newText.trim(), userSecretKey).toString();
+                newText = CryptoJS.AES.encrypt(newText, userSecretKey).toString();
             }
-            socket.emit('edit_message', { id_message: msgId, new_text: newText });
+            socket.emit('edit_message', { id_message: editingMsgId, new_text: newText });
+            document.getElementById('edit-message-modal').classList.remove('open');
         }
     };
 
