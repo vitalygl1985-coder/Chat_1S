@@ -559,7 +559,6 @@
             }
         });
 
-        // ИСПРАВЛЕНО: опечатка ocket -> socket
         socket.on('message_edited', (data) => {
             const textContainer = document.getElementById(`text-container-${data.id_message}`);
             if (textContainer) {
