@@ -41,7 +41,7 @@
 </head>
 <body>
     <div id="login-overlay" class="login-overlay">
-        <<div class="login-box">
+        <div class="login-box">
             <h2>🔐 Вход в админ-панель</h2>
             <input type="text" id="login-input" placeholder="Логин" value="Admin">
             <input type="password" id="password-input" placeholder="Пароль">
@@ -69,7 +69,7 @@
                 <div class="card">
                     <h3>🗄️ Управление кабинетами</h3>
                     <table>
-                        <thead><tr><th>ID</th><th>Имя</th><th>Тип</th><th>Создатель (ID)</th><th>Действия</th></tr></thead>
+                        <thead><tr><th>ID</th><th>Имя</th><th>Тип</th><th>Создатель</th><th>Действия</th></tr></thead>
                         <tbody id="rooms-tbody"></tbody>
                     </table>
                 </div>
@@ -97,6 +97,14 @@
                     <h3>🔊 Звуковое оповещение</h3>
                     <input type="file" id="sound-file-input" accept=".mp3">
                     <button onclick="uploadStaticFile('sound-file-input', 'beep.mp3')">Загрузить beep.mp3</button>
+                </div>
+                <div class="card">
+                    <h3>🔘 Замена картинок кнопок (интерфейса)</h3>
+                    <p style="font-size:12px; margin-bottom:8px;">Выберите файл и укажите точное имя целевого файла (например: del_btn.png, attach-icon.png).</p>
+                    <input type="file" id="static-img-input"><br>
+                    <label style="font-size:12px;">Имя файла в папке static:</label>
+                    <input type="text" id="target-static-name" placeholder="del_btn.png" style="width:100%; padding:8px; margin: 5px 0 10px 0; border: 1px solid #d1d5db; border-radius:6px;">
+                    <button onclick="uploadSpecificStatic()">Заменить иконку</button>
                 </div>
             </div>
             
@@ -135,7 +143,10 @@
                 </div>
                 <div class="card">
                     <h3>📂 Хранилище вложений (папка uploads)</h3>
-                    <div class="file-list-box" id="uploads-files-list">Загрузка...</div>
+                    <table>
+                        <thead><tr><th>Имя файла</th><th>Действия</th></tr></thead>
+                        <tbody id="uploads-tbody"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -145,6 +156,11 @@
                     <textarea id="sql-query" rows="5" placeholder="SELECT * FROM users LIMIT 10" style="width:100%;"></textarea>
                     <button onclick="executeSQL()" style="margin-top: 10px;">▶️ Выполнить</button>
                     <div id="sql-result" class="sql-result"></div>
+                </div>
+                <div class="card">
+                    <h3>📋 Список всех таблиц БД</h3>
+                    <button onclick="loadDbTables()" style="background:#4b5563; margin-bottom:10px;">Получить список таблиц</button>
+                    <div id="tables-list-box" class="file-list-box" style="display:none;"></div>
                 </div>
             </div>
 
@@ -162,6 +178,7 @@
     
     <script>
         let currentAdmin = null;
+        let systemUsers = [];
         
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
@@ -188,8 +205,8 @@
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('admin-container').style.display = 'flex';
                     showTab('rooms');
-                    loadRooms();
-                    loadUsers();
+                    await loadUsers();
+                    await loadRooms();
                     loadFilesList('static');
                     loadFilesList('uploads');
                 } else {
@@ -215,7 +232,12 @@
             const rooms = await res.json();
             const tbody = document.getElementById('rooms-tbody');
             tbody.innerHTML = '';
+            
             rooms.forEach(r => {
+                let userOptions = systemUsers.map(u => 
+                    `<option value="${u.id_user}" ${u.id_user === r.created_by ? 'selected' : ''}>${u.username} (${u.id_user})</option>`
+                ).join('');
+
                 tbody.innerHTML += `<tr>
                     <td>${r.id_room}</td>
                     <td><input type="text" id="rname-${r.id_room}" value="${r.name}"></td>
@@ -226,7 +248,7 @@
                             <option value="private" ${r.type==='private'?'selected':''}>private</option>
                         </select>
                     </td>
-                    <td><input type="text" id="rcreate-${r.id_room}" value="${r.created_by}"></td>
+                    <td><select id="rcreate-${r.id_room}">${userOptions}</select></td>
                     <td><button onclick="saveRoom(${r.id_room})">Обновить</button></td>
                 </tr>`;
             });
@@ -247,13 +269,17 @@
         }
 
         async function loadUsers() {
-            const res = await fetch('/api/admin/users');
-            const users = await res.json();
-            const tbody = document.querySelector('#users-tbody');
-            tbody.innerHTML = '';
-            users.forEach(u => {
-                tbody.innerHTML += `<tr><td>${u.id_user}</td><td>${u.username}</td><td>${u.role}</td></tr>`;
-            });
+            try {
+                const res = await fetch('/api/admin/users');
+                systemUsers = await res.json();
+                const tbody = document.querySelector('#users-tbody');
+                tbody.innerHTML = '';
+                systemUsers.forEach(u => {
+                    tbody.innerHTML += `<tr><td>${u.id_user}</td><td>${u.username}</td><td>${u.role}</td></tr>`;
+                });
+            } catch(e) {
+                showToast('Ошибка загрузки пользователей: ' + e.message, true);
+            }
         }
 
         async function updateRole() {
@@ -272,7 +298,29 @@
         async function loadFilesList(folder) {
             const res = await fetch(`/api/admin/files/${folder}`);
             const files = await res.json();
-            document.getElementById(`${folder}-files-list`).innerHTML = files.join(', ');
+            
+            if (folder === 'uploads') {
+                const tbody = document.getElementById('uploads-tbody');
+                tbody.innerHTML = '';
+                files.forEach(f => {
+                    tbody.innerHTML += `<tr>
+                        <td>${f}</td>
+                        <td>
+                            <a href="/uploads/${f}" target="_blank" style="text-decoration:none; color:#2563eb; margin-right:10px;">⬇️ Ссылка</a>
+                            <button onclick="deleteUpload('${f}')" style="background:#ef4444; padding:4px 8px; font-size:11px;">Удалить</button>
+                        </td>
+                    </tr>`;
+                });
+            } else if (folder === 'static') {
+                document.getElementById('static-files-list').innerHTML = files.join(', ');
+            }
+        }
+
+        async function deleteUpload(filename) {
+            const res = await fetch(`/api/admin/files/uploads/${filename}`, { method: 'DELETE' });
+            const d = await res.json();
+            if(d.success) { showToast("Файл успешно удален из хранилища"); loadFilesList('uploads'); }
+            else showToast("Ошибка: " + d.message, true);
         }
 
         async function uploadStaticFile(inputId, forceName) {
@@ -282,6 +330,35 @@
             formData.append("file", file, forceName || file.name);
             const res = await fetch('/api/admin/upload-file/static', { method: 'POST', body: formData });
             if((await res.json()).success) { showToast("Файл успешно заменен!"); loadFilesList('static'); }
+        }
+
+        async function uploadSpecificStatic() {
+            const file = document.getElementById('static-img-input').files[0];
+            const forceName = document.getElementById('target-static-name').value;
+            if(!file || !forceName) {
+                showToast("Выберите файл и укажите имя целевого файла", true);
+                return;
+            }
+            const formData = new FormData();
+            formData.append("file", file, forceName);
+            const res = await fetch('/api/admin/upload-file/static', { method: 'POST', body: formData });
+            if((await res.json()).success) { showToast("Иконка успешно заменена в каталоге static!"); }
+        }
+
+        async function loadDbTables() {
+            const sqlQ = `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'`;
+            const res = await fetch('/api/admin/sql', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ sql: sqlQ })
+            });
+            const d = await res.json();
+            const box = document.getElementById('tables-list-box');
+            if (d.success && d.data) {
+                box.style.display = 'block';
+                box.innerHTML = d.data.map(t => `<b style="color:#10b981">${t.table_name}</b>`).join(', ');
+            } else {
+                showToast("Ошибка загрузки таблиц", true);
+            }
         }
 
         async function saveSettings() {
@@ -306,7 +383,6 @@
         }
 
         function loadLogs() {
-            // Логирование может запрашиваться из базы данных или файла
             document.getElementById('logs-result').innerText = "Система работает штатно. Выполнен вход администратором.";
         }
 
