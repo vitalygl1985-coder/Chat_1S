@@ -273,7 +273,7 @@
             <div id="active-rooms-list"></div>
             <div class="accordion-section">
                 <div class="accordion-header" id="inactive-accordion-trigger">
-                    <span>Неактивные сообщения</span>
+                    <span>Неактивные кабинеты</span>
                     <span id="inactive-count">(0) ▼</span>
                 </div>
                 <div class="accordion-content" id="inactive-rooms-list"></div>
@@ -408,20 +408,17 @@
         signs: ['✅','❌','➕','➖','➗','✖️','❓','❔','❗','❕','⚠️','🚫','💯','🔔','🔕','🎵','🎶','🏁','🚩','🔥','🚀','👍','👎','✊','👊','✌️','👌','🤝','👏','🙌','🙏','👀','⭐']
     };
 
-    // ИСПРАВЛЕНО: Надежное переключение аккордеона
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         const content = document.getElementById('inactive-rooms-list');
         
-        // Переключает класс "open" (документ сам развернется или свернется)
         content.classList.toggle('open');
+        const isOpen = content.classList.contains('open');
         
-        // Меняем стрелочку и грамматику
+        // Принудительно управляем видимостью
+        content.style.display = isOpen ? 'block' : 'none';
+        
         const countText = document.getElementById('inactive-count').innerText.match(/\d+/);
-        if (content.classList.contains('open')) {
-            this.querySelector('span:last-child').innerText = `(${countText}) ▲`;
-        } else {
-            this.querySelector('span:last-child').innerText = `(${countText}) ▼`;
-        }
+        this.querySelector('span:last-child').innerText = `(${countText}) ${isOpen ? '▲' : '▼'}`;
     });
 
     document.getElementById('btn-toggle-right-view').addEventListener('click', function() {
@@ -709,8 +706,8 @@
 
         let rawText = msg.encrypted_text || msg.text || "";
         const author = msg.username || "Сотрудник";
-        const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
-
+        const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
+        
         let customStyleCSS = "";
         try {
             const styles = typeof msg.ui_styles === 'string' ? JSON.parse(msg.ui_styles || '{}') : msg.ui_styles;
