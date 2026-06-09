@@ -549,6 +549,19 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             }
         });
 
+        ocket.on('message_edited', (data) => {
+            const textContainer = document.getElementById(`text-container-${data.id_message}`);
+            if (textContainer) {
+                // Проверяем на шифрование, если нужно, или просто рендерим
+                renderProcessedText(textContainer, data.new_text);
+                
+                // Подсвечиваем измененное сообщение
+                textContainer.style.transition = "background 1s";
+                textContainer.style.background = "#fef3c7"; // Желтоватый оттенок
+                setTimeout(() => textContainer.style.background = "transparent", 2000);
+            }
+        });
+
         socket.on('user_statuses', (statuses) => {
             onlineUsersCache = statuses || {};
             renderCompanyUsers(globalUsersCache);
@@ -705,8 +718,10 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         } catch(e) {}
 
         let deleteBtnHtml = "";
+        let editBtnHtml = "";
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
+            editBtnHtml = `<span class="msg-edit-trigger" style="position: absolute; right: 42px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted);" onclick="requestEditMessage(${msgId}, '${escapedText}')" title="Изменить">✏️</span>`;
         }
 
         // Кнопка ответа (появляется при наведении)
@@ -768,6 +783,18 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         } else { renderProcessedText(textBlock, rawText); }
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
+
+    window.requestEditMessage = async function(msgId, currentText) {
+        // Используем вашу кастомную модалку или встроенный prompt
+        let newText = prompt("Редактирование сообщения:", currentText);
+        if (newText && newText.trim() !== "" && newText !== currentText) {
+            if (isSecretMode && userSecretKey) {
+                // Если включено шифрование, шифруем новый текст
+                newText = CryptoJS.AES.encrypt(newText.trim(), userSecretKey).toString();
+            }
+            socket.emit('edit_message', { id_message: msgId, new_text: newText });
+        }
+    };
 
     window.triggerReply = function(messageId, authorName, textContent) {
         currentReplyMessageId = messageId;

@@ -574,7 +574,32 @@ async def send_message(sid, data):
         await sio.emit('new_message', new_msg, room=f"room_{room_id}")
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
-
+@sio.event
+async def edit_message(sid, data):
+    msg_id = data.get('id_message')
+    new_text = data.get('new_text')
+    if not msg_id or not new_text: return
+    
+    conn = get_db_connection(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE messages 
+            SET encrypted_text = %s 
+            WHERE id_message = %s 
+            RETURNING id_room
+        """, (new_text, msg_id))
+        room = cur.fetchone()
+        conn.commit()
+        
+        if room:
+            await sio.emit('message_edited', {
+                'id_message': msg_id, 
+                'new_text': new_text
+            }, room=f"room_{room['id_room']}")
+    except Exception as e: 
+        print(e)
+    finally: 
+        cur.close(); conn.close()
 @sio.event
 async def message_read_click(sid, data):
     msg_id = data.get('message_id')
