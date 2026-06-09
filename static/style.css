@@ -104,6 +104,7 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 .message.my .message-box { 
     background: #d8f3dc !important; /* Твои сообщения останутся зелеными */
 }
+.message-box:hover .msg-reply-trigger { display: block !important; }
 
 /* Делаем основной текст в модальном окне светлее */
 .modal-row {

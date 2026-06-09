@@ -178,6 +178,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS messages (
                 id_message SERIAL PRIMARY KEY,
                 id_room INT REFERENCES rooms(id_room) ON DELETE CASCADE,
+                reply_to INT REFERENCES messages(id_message) ON DELETE SET NULL,
                 id_user_from VARCHAR(100),
                 encrypted_text TEXT NOT NULL,
                 is_user_encrypted BOOLEAN DEFAULT false,

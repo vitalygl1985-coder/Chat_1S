@@ -285,7 +285,10 @@
         
         <div class="input-area">
             <div class="mention-popup" id="mention-menu"></div>
-
+            <div class="reply-panel" id="reply-panel" style="display: none; background: #eff6ff; padding: 6px 12px; border-left: 3px solid #2563eb; font-size: 12px; justify-content: space-between; align-items: center; margin-bottom: 6px; border-radius: 4px;">
+                <div>📎 Ответ для <span id="reply-author" style="font-weight: bold;"></span>: <span id="reply-text" style="color: #4b5563;"></span></div>
+                <span style="cursor: pointer; font-weight: bold; color: #6b7280;" onclick="cancelReply()">✕</span>
+            </div>
             <div class="toolbar">
                 <select id="font-family-select">
                     <option value="Segoe UI">Стандартный</option>
@@ -366,7 +369,8 @@
     let isSecretMode = false, userSecretKey = "";
     let roomCreatorId = null, roomSystemType = "";
     let unreadRooms = {};
-
+    let currentReplyMessageId = null;
+    
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
 
@@ -704,12 +708,17 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
         }
+
+        // Кнопка ответа (появляется при наведении)
+        const escapedText = rawText.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
+        let replyBtnHtml = `<span class="msg-reply-trigger" style="position: absolute; right: 26px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted);" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
         
         const readsList = messageReadsMap[msgId] || [];
 
         div.innerHTML = `
             <div class="message-box">
                 ${deleteBtnHtml}
+                ${replyBtnHtml}
                 <div class="msg-meta"><span class="msg-author">${author}</span><span>${timeStr}</span></div>
                 <div class="msg-text" id="text-container-${msgId}" style="${customStyleCSS}"></div>
                 <div class="msg-read-panel">
@@ -732,7 +741,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             const decryptBtn = document.createElement('button'); decryptBtn.className = 'btn-decrypt-inline'; decryptBtn.innerText = '🔑 Ввести код';
             
             decryptBtn.onclick = async function() {
-                let inputKey = await showCustomPrompt(); // Используем кастомную модалку
+                let inputKey = await showCustomPrompt();
                 if (inputKey && inputKey.trim() !== "") {
                     try {
                         let decryptedText = CryptoJS.AES.decrypt(rawText, inputKey.trim()).toString(CryptoJS.enc.Utf8);
@@ -745,6 +754,19 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         } else { renderProcessedText(textBlock, rawText); }
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
+
+    window.triggerReply = function(messageId, authorName, textContent) {
+        currentReplyMessageId = messageId;
+        document.getElementById('reply-author').innerText = authorName;
+        document.getElementById('reply-text').innerText = textContent.length > 35 ? textContent.substring(0, 35) + '...' : textContent;
+        document.getElementById('reply-panel').style.display = 'flex';
+        inputMsg.focus();
+    };
+
+    window.cancelReply = function() {
+        currentReplyMessageId = null;
+        document.getElementById('reply-panel').style.display = 'none';
+    };
 
     function showCustomPrompt() {
         return new Promise((resolve) => {
@@ -901,8 +923,22 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
     function sendMessageStream() {
         let text = inputMsg.innerHTML.trim(); if (!text || !currentRoomId) return;
         if (isSecretMode && userSecretKey) { text = CryptoJS.AES.encrypt(inputMsg.innerText.trim(), userSecretKey).toString(); }
-        socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
-        inputMsg.innerHTML = ""; isSecretMode = false; resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
+        
+        socket.emit('send_message', { 
+            room_id: currentRoomId, 
+            text: text, 
+            is_secret: isSecretMode, 
+            ui_styles: JSON.stringify(currentTextStyles),
+            reply_to: currentReplyMessageId // Передаем ID цитируемого сообщения
+        });
+        
+        inputMsg.innerHTML = ""; 
+        isSecretMode = false; 
+        resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
+        
+        if (typeof cancelReply === 'function') {
+            cancelReply(); // Сбрасываем панель ответа после отправки
+        }
     }
 
     function initScreenshotEditorLogic() {
