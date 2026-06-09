@@ -410,15 +410,16 @@
 
     document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
         const content = document.getElementById('inactive-rooms-list');
-        
-        content.classList.toggle('open');
-        const isOpen = content.classList.contains('open');
-        
-        // Принудительно управляем видимостью
-        content.style.display = isOpen ? 'block' : 'none';
-        
-        const countText = document.getElementById('inactive-count').innerText.match(/\d+/);
-        this.querySelector('span:last-child').innerText = `(${countText}) ${isOpen ? '▲' : '▼'}`;
+        const countSpan = this.querySelector('span:last-child');
+        const countNum = document.getElementById('inactive-count').innerText.match(/\d+/);
+
+        if (content.style.display === 'block') {
+            content.style.display = 'none';
+            countSpan.innerText = `(${countNum}) ▼`;
+        } else {
+            content.style.display = 'block';
+            countSpan.innerText = `(${countNum}) ▲`;
+        }
     });
 
     document.getElementById('btn-toggle-right-view').addEventListener('click', function() {
@@ -664,11 +665,11 @@
         document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
     }
 
-    document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-        var content = document.getElementById('inactive-rooms-list');
-        content.classList.toggle('open');
-        this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
-    });
+    //*document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+    //*    var content = document.getElementById('inactive-rooms-list');
+    //*    content.classList.toggle('open');
+    //*    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
+    //*});
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId; 
