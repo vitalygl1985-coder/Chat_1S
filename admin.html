@@ -345,7 +345,7 @@
             if((await res.json()).success) { showToast("Иконка успешно заменена в каталоге static!"); }
         }
 
-        async function loadDbTables() {
+       async function loadDbTables() {
             const sqlQ = `
                 SELECT table_name, column_name, data_type 
                 FROM information_schema.columns 
@@ -363,7 +363,7 @@
             if (d.success && d.data) {
                 box.style.display = 'block';
                 
-        группируем таблицы
+                // Группируем таблицы
                 const tables = {};
                 d.data.forEach(row => {
                     if (!tables[row.table_name]) tables[row.table_name] = [];
