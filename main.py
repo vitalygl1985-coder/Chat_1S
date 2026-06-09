@@ -569,7 +569,7 @@ async def edit_message(sid, data):
             await sio.emit('message_edited', {
                 'id_message': msg_id, 
                 'new_text': new_text
-            }, room=f"room_{room['id_room']}")
+            }, room=f"room_{room[0]}") # ⬅️ Использован индекс 0 вместо строкового ключа
     except Exception as e: 
         print(e)
     finally: 
