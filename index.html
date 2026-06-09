@@ -565,8 +565,29 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             if (targetList) targetList.innerText = data.users_list.join(', ');
         });
 
-        socket.on('room_participants_list', (data) => { roomParticipantsCache = data.participants || []; renderCurrentRoomParticipants(roomParticipantsCache); });
-        socket.on('room_history', (data) => { if(data && data.messages) { data.messages.forEach(msg => { if (msg.reads) messageReadsMap[msg.id_message] = msg.reads; displayMessage(msg, true); }); } });
+        socket.on('room_participants_list', (data) => { 
+            roomParticipantsCache = data.participants || []; 
+            renderCurrentRoomParticipants(roomParticipantsCache); 
+        });        
+        socket.on('room_history', (data) => {
+            if (data && data.messages) {
+                data.messages.forEach(msg => {
+                    if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
+                    displayMessage(msg, true);
+                });
+
+                // Проверка: если последнее сообщение не прочитано текущим пользователем
+                if (data.messages.length > 0) {
+                    const lastMsg = data.messages[data.messages.length - 1];
+                    const isRead = lastMsg.reads && lastMsg.reads.includes(currentUser.username);
+                    
+                    if (lastMsg.id_user_from !== currentUser.id_user && !isRead) {
+                        unreadRooms[lastMsg.id_room] = true;
+                        if (typeof filterAndRenderRooms === 'function') filterAndRenderRooms();
+                    }
+                }
+            }
+        });
 
         socket.on('message_deleted', (data) => {
             const el = document.querySelector(`[data-msg-id="${data.id_message}"] .msg-text`);
@@ -654,7 +675,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         }
         delete unreadRooms[roomId];
         filterAndRenderRooms();
-        
+
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId }); 
         socket.emit('get_room_history', { room_id: roomId }); 
