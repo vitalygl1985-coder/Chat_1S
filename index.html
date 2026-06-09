@@ -487,13 +487,49 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         
-        // Сюда:
         socket.on('new_message', (msg) => { 
-            if (msg && msg.id_room == currentRoomId) {
-                displayMessage(msg, false);
-                // Пищим, если сообщение пришло от другого пользователя
+            if (msg) {
+                // Отображаем сообщение в чате, если мы находимся в этой комнате
+                if (msg.id_room == currentRoomId) {
+                    displayMessage(msg, false);
+                }
+
+                // Оповещения (звук и уведомление) срабатывают, если сообщение пришло от другого сотрудника
                 if (msg.id_user_from !== currentUser.id_user) {
+                    // 1. Звук
                     beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+
+                    // 2. Браузерное уведомление
+                    if (Notification.permission === "granted") {
+                        const room = latestRoomsListCache.find(r => r.id_room === msg.id_room);
+                        const roomTitle = room ? (room.name.includes(' ⇄ ') ? room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim() : room.name) : "Чат";
+
+                        const notification = new Notification(`Новое сообщение в кабинете: ${roomTitle}`, {
+                            body: `${msg.username || 'Коллега'}: ${msg.encrypted_text.startsWith('/download/') ? '[Вложение]' : msg.encrypted_text.substring(0, 40)}`,
+                            icon: '/static/logo.png'
+                        });
+
+                        // Клик по уведомлению
+                        notification.onclick = function() {
+                            window.focus();
+                            if (room) {
+                                selectRoomById(room.id_room, room.name, room.type, room.created_by);
+                            } else {
+                                selectRoomById(msg.id_room);
+                            }
+                            
+                            // Плавная прокрутка к сообщению
+                            setTimeout(() => {
+                                const targetMsg = document.querySelector(`[data-msg-id="${msg.id_message}"]`);
+                                if (targetMsg) {
+                                    targetMsg.scrollIntoView({ behavior: 'smooth' });
+                                    targetMsg.style.transition = "background 1s";
+                                    targetMsg.style.background = "#eff6ff";
+                                    setTimeout(() => targetMsg.style.background = "transparent", 2000);
+                                }
+                            }, 300);
+                        };
+                    }
                 }
             }
         });
