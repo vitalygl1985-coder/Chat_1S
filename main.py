@@ -79,7 +79,8 @@ class Base64ImageRequest(BaseModel):
     filename: str
 
 class AdminAuthRequest(BaseModel):
-    id_user: str
+    login: str
+    password: str
     id_org: str
 
 class UpdateUserRoleRequest(BaseModel):
@@ -259,6 +260,27 @@ async def get_admin_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(current_dir, "admin.html"), "r", encoding="utf-8") as f: 
         return f.read()
+    
+@app.post("/api/admin/auth")
+async def admin_auth(data: AdminAuthRequest):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) FROM admin_users")
+        if cur.fetchone()['count'] == 0:
+            raise HTTPException(status_code=403, detail="Админ-панель не инициализирована.")
+        
+        cur.execute("SELECT * FROM admin_users WHERE login = %s AND password = %s AND id_org = %s", 
+                    (data.login, data.password, data.id_org))
+        admin = cur.fetchone()
+        if not admin:
+            raise HTTPException(status_code=403, detail="Неверные данные.")
+        
+        return {"success": True, "admin": {"username": admin['login']}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close(); conn.close()
 
 @app.get("/api/admin/users")
 async def admin_get_users():
