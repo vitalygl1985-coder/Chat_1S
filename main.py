@@ -319,7 +319,7 @@ async def admin_upload_file(folder: str, file: UploadFile = File(...)):
         file_object.write(file.file.read())
     return {"success": True, "filename": file.filename}
 
-@post("/api/admin/settings")
+@app.post("/api/admin/settings")
 async def admin_save_settings(settings: dict):
     conn = get_db_connection(); cur = conn.cursor()
     try:
@@ -330,7 +330,7 @@ async def admin_save_settings(settings: dict):
     except Exception as e: conn.rollback(); return {"success": False, "message": str(e)}
     finally: cur.close(); conn.close()
 
-@get("/api/admin/settings")
+@app.get("/api/admin/settings")
 async def admin_get_settings():
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -338,7 +338,7 @@ async def admin_get_settings():
         return {r['key']: r['value'] for r in cur.fetchall()}
     finally: cur.close(); conn.close()
 
-@post("/api/admin/sql")
+@app.post("/api/admin/sql")
 async def admin_execute_sql(data: dict):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -349,7 +349,7 @@ async def admin_execute_sql(data: dict):
         return {"success": True, "message": "Запрос успешно выполнен"}
     except Exception as e: conn.rollback(); return {"success": False, "message": str(e)}
     finally: cur.close(); conn.close()
-    
+
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
