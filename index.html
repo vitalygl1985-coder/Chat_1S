@@ -477,6 +477,8 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         renderEmojiGrid(category);
     };
 
+    const beepingSound = new Audio('/static/beep.mp3');
+
     function connectSockets() {
         const socketUrl = window.location.protocol + '//' + window.location.host;
         socket = io(socketUrl, { path: '/socket.io', transports: ['polling', 'websocket'], query: { id_user: currentUser.id_user, id_org: currentUser.id_org, username: currentUser.username, role: currentUser.role } });
@@ -484,7 +486,17 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         socket.on('connect', () => { refreshRoomsAndLists(); socket.emit('get_users_list'); });
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
-        socket.on('new_message', (msg) => { if (msg && msg.id_room == currentRoomId) displayMessage(msg, false); });
+        
+        // Сюда:
+        socket.on('new_message', (msg) => { 
+            if (msg && msg.id_room == currentRoomId) {
+                displayMessage(msg, false);
+                // Пищим, если сообщение пришло от другого пользователя
+                if (msg.id_user_from !== currentUser.id_user) {
+                    beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+                }
+            }
+        });
 
         socket.on('user_statuses', (statuses) => {
             onlineUsersCache = statuses || {};
@@ -492,14 +504,12 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             renderCurrentRoomParticipants(roomParticipantsCache);
         });
         socket.on('download_archive_file', (data) => {
-            // data.url будет выглядеть как "/download-archive/uuid-твоего-файла"
             const link = document.createElement('a');
             link.href = data.url;
-            link.setAttribute('download', 'chat_archive.json'); // Имя файла для скачивания
+            link.setAttribute('download', 'chat_archive.json');
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
             alert("Архивация завершена! Файл скачивается.");
         });
         socket.on('message_read_update', (data) => {
@@ -522,8 +532,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         });
 
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
-        
-        // ФИКС: Перерисовываем левое меню при получении триггера обновления структуры от сокетов
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
     }
 
@@ -820,12 +828,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: isSecretMode, ui_styles: JSON.stringify(currentTextStyles) });
         inputMsg.innerHTML = ""; isSecretMode = false; resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
     }
-
-    const messageSound = new Audio('/static/beep.mp3');
-    socket.on('new_message', (msg) => {
-        if (msg && msg.id_room == currentRoomId) displayMessage(msg, false);
-        messageSound.play().catch(err => console.log("Браузер заблокировал автовоспроизведение звука", err));
-    });
 
     function initScreenshotEditorLogic() {
         document.getElementById('btn-close-screenshot-modal').addEventListener('click', () => screenshotModal.classList.remove('open'));
