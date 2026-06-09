@@ -560,13 +560,15 @@
         });
 
         socket.on('message_edited', (data) => {
+            console.log("Пришло изменение для id:", data.id_message, "Текст:", data.new_text);
             const textContainer = document.getElementById(`text-container-${data.id_message}`);
             if (textContainer) {
                 renderProcessedText(textContainer, data.new_text);
-                
                 textContainer.style.transition = "background 1s";
                 textContainer.style.background = "#fef3c7";
                 setTimeout(() => textContainer.style.background = "transparent", 2000);
+            } else {
+                console.log("Не найден контейнер для", `text-container-${data.id_message}`);
             }
         });
 
