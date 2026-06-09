@@ -713,6 +713,19 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         const escapedText = rawText.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
         let replyBtnHtml = `<span class="msg-reply-trigger" style="position: absolute; right: 26px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted);" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
         
+        // Блок цитаты, если это ответ
+        let replyQuoteHtml = "";
+        if (msg.reply_to && msg.reply_text) {
+            let preview = msg.reply_text.startsWith('/download/') ? '[Вложение]' : msg.reply_text;
+            if (preview.length > 45) preview = preview.substring(0, 45) + '...';
+            replyQuoteHtml = `
+                <div style="border-left: 2px solid #2563eb; background: rgba(37, 99, 235, 0.05); padding: 4px 8px; margin-bottom: 6px; font-size: 11px; border-radius: 2px;">
+                    <div style="font-weight: bold; color: #2563eb;">↪️ ${msg.reply_author || 'Сотрудник'}</div>
+                    <div style="color: #4b5563;">${preview}</div>
+                </div>
+            `;
+        }
+
         const readsList = messageReadsMap[msgId] || [];
 
         div.innerHTML = `
@@ -720,10 +733,11 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                 ${deleteBtnHtml}
                 ${replyBtnHtml}
                 <div class="msg-meta"><span class="msg-author">${author}</span><span>${timeStr}</span></div>
+                ${replyQuoteHtml}
                 <div class="msg-text" id="text-container-${msgId}" style="${customStyleCSS}"></div>
                 <div class="msg-read-panel">
                 <span class="btn-read-trigger" onclick="markMessageAsRead(${msgId})">👁️ Прочитано</span>
-                <span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>     
+                <span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>    
                 <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${msg.id_user_from}')">
                     <svg viewBox="0 0 24 24" width="24" height="24">
                         <circle cx="12" cy="12" r="10" fill="none" stroke="#ff6600" stroke-width="2"/>

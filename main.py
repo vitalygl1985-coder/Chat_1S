@@ -532,7 +532,17 @@ async def get_room_history(sid, data):
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at FROM messages m LEFT JOIN users u ON m.id_user_from = u.id_user WHERE m.id_room = %s ORDER BY m.created_at ASC LIMIT 100", (room_id,))
+        cur.execute("""
+            SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
+                   m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, m.reply_to,
+                   rm.encrypted_text as reply_text, COALESCE(u2.username, rm.id_user_from) as reply_author
+            FROM messages m 
+            LEFT JOIN users u ON m.id_user_from = u.id_user 
+            LEFT JOIN messages rm ON m.reply_to = rm.id_message
+            LEFT JOIN users u2 ON rm.id_user_from = u2.id_user
+            WHERE m.id_room = %s 
+            ORDER BY m.created_at ASC LIMIT 100
+        """, (room_id,))
         messages = cur.fetchall()
         for m in messages:
             msg_id = m['id_message']
@@ -545,14 +555,21 @@ async def get_room_history(sid, data):
 @sio.event
 async def send_message(sid, data):
     room_id, text, is_secret, ui_styles = data.get('room_id'), data.get('text'), data.get('is_secret', False), data.get('ui_styles', '{}')
+    reply_to = data.get('reply_to')
     if not room_id or not text: return
     session = await sio.get_session(sid)
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted, ui_styles) VALUES (%s, %s, %s, %s, %s) RETURNING id_message, id_room, id_user_from, encrypted_text, is_user_encrypted, ui_styles, created_at", (room_id, session['id_user'], text, is_secret, ui_styles))
+        cur.execute("INSERT INTO messages (id_room, id_user_from, encrypted_text, is_user_encrypted, ui_styles, reply_to) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id_message, id_room, id_user_from, encrypted_text, is_user_encrypted, ui_styles, created_at, reply_to", (room_id, session['id_user'], text, is_secret, ui_styles, reply_to))
         new_msg = cur.fetchone(); conn.commit()
         new_msg['username'] = session['username']
         new_msg['reads'] = []
+        
+        if new_msg.get('reply_to'):
+            cur.execute("SELECT m.encrypted_text, COALESCE(u.username, m.id_user_from) as username FROM messages m LEFT JOIN users u ON m.id_user_from = u.id_user WHERE m.id_message = %s", (new_msg['reply_to'],))
+            r_info = cur.fetchone()
+            if r_info: new_msg['reply_text'] = r_info['encrypted_text']; new_msg['reply_author'] = r_info['username']
+
         if new_msg['created_at']: new_msg['created_at'] = new_msg['created_at'].isoformat()
         await sio.emit('new_message', new_msg, room=f"room_{room_id}")
     except Exception as e: print(e)
