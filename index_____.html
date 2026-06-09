@@ -1,665 +1,1133 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta charset="UTF-8">
-    <title>1C Chat Client</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Корпоративный чат 1С</title>
+    <link rel="stylesheet" href="/static/style.css?v=1">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <link rel="stylesheet" href="/style.css">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-main: #f3f4f6;
+            --bg-panel: #ffffff;
+            --border-color: #e5e7eb;
+            --text-main: #1f2937;
+            --text-muted: #9ca3af;
+            --online-color: #10b981;
+            --offline-color: #9ca3af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body, html { height: 100vh; max-height: 100vh; background: var(--bg-main); color: var(--text-main); overflow: hidden; display: flex; flex-direction: column; }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 260px 1fr 280px;
+            flex: 1;
+            max-height: calc(100vh - 25px);
+            background: var(--bg-panel);
+            overflow: hidden;
+        }
+
+        .system-footer-links {
+            height: 25px; background: #e5e7eb; border-top: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center; padding: 0 15px; font-size: 11px; font-weight: 500; flex-shrink: 0;
+        }
+        .system-footer-links a { color: var(--primary-color); text-decoration: none; }
+        .system-footer-links a:hover { text-decoration: underline; }
+
+        .panel { display: flex; flex-direction: column; background: var(--bg-panel); border-right: 1px solid var(--border-color); height: 100%; overflow: hidden; }
+        .panel-header { padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .search-box { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; outline: none; font-size: 13px; }
+        .search-box:focus { border-color: var(--primary-color); }
+        .panel-scroll-area { flex: 1; overflow-y: auto; padding: 8px; }
+
+        .room-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; transition: all 0.2s ease; }
+        .room-item:hover { background: var(--bg-main); }
+        .room-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }
+        
+        .accordion-section { margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
+        .accordion-header { font-weight: bold; color: var(--text-muted); cursor: pointer; padding: 5px; font-size: 11px; text-transform: uppercase; display: flex; justify-content: space-between; }
+        .accordion-content { display: none; margin-top: 5px; }
+        .accordion-content.open { display: block; }
+
+        .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; }
+        .chat-header { height: 55px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; }
+        
+        .chat-title-area { display: flex; flex-direction: column; }
+        .chat-title { font-weight: 600; font-size: 15px; }
+        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; }
+        .chat-actions { display: flex; gap: 6px; }
+        
+        .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: white; }
+        .btn-primary { background: var(--primary-color); }
+        .btn-warn { background: #eab308; }
+        .btn-danger { background: #ef4444; }
+        .btn-success { background: #10b981; }
+
+        .messages-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 75%; display: flex; flex-direction: column; margin-bottom: 2px; align-self: flex-start; }
+        .message.my { align-self: flex-end; }
+        .message-box { padding: 8px 12px; border-radius: 12px; background: var(--bg-panel); box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; }
+        .message.my .message-box { background: #dbeafe; }
+        .msg-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; gap: 15px;}
+        .msg-author { font-weight: 600; }
+        .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
+        
+        .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
+        .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
+        
+        .msg-read-panel { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; border-top: 1px dashed #e5e7eb; padding-top: 4px; }
+        .btn-read-trigger { cursor: pointer; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; user-select: none; border: 1px solid #e5e7eb; }
+        .btn-read-trigger:hover { background: #e5e7eb; }
+        .read-users-list { font-style: italic; color: #6b7280; font-size: 10px; }
+
+        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+        .msg-edit-trigger { position: absolute; right: 24px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+        .msg-reply-trigger { position: absolute; right: 44px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+        
+        .message-box:hover .msg-delete-trigger,
+        .message-box:hover .msg-edit-trigger,
+        .message-box:hover .msg-reply-trigger { display: block !important; }
+
+        .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
+        .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; }
+        .toolbar-item { cursor: pointer; font-size: 13px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
+        .toolbar-item:hover { background: var(--bg-main); }
+        .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
+        
+        .emoji-picker-popover {
+            position: absolute; bottom: 35px; left: 120px; background: white; border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 8px; padding: 0; display: none;
+            flex-direction: column; z-index: 2000; width: 240px; height: 210px;
+        }
+        .emoji-tabs { display: flex; background: #f3f4f6; border-bottom: 1px solid var(--border-color); border-top-left-radius: 8px; border-top-right-radius: 8px; }
+        .emoji-tab-btn { flex: 1; padding: 4px; text-align: center; cursor: pointer; font-size: 12px; user-select: none; }
+        .emoji-tab-btn.active { background: white; font-weight: bold; border-bottom: 2px solid var(--primary-color); }
+        .emoji-grid-viewport { flex: 1; overflow-y: auto; padding: 8px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; font-size: 18px; }
+        .emoji-picker-item { cursor: pointer; text-align: center; border-radius: 4px; transition: background 0.1s; }
+        .emoji-picker-item:hover { background: #e5e7eb; }
+
+        .controls-row { display: flex; gap: 8px; align-items: center; }
+        .input-msg-div { flex: 1; min-height: 36px; max-height: 80px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; outline: none; background: #fff; font-size: 13px; }
+
+        .mention-popup { position: absolute; bottom: 100%; left: 15px; width: 220px; background: #fff; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); display: none; max-height: 120px; overflow-y: auto; z-index: 1000; }
+        .mention-item { padding: 6px 10px; cursor: pointer; font-size: 12px; }
+        .mention-item:hover { background: var(--bg-main); }
+
+        /* ПРАВАЯ ПАНЕЛЬ */
+        .right-panel { border-right: none; }
+        .section-title { font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
+        .user-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .user-row:hover { background: var(--bg-main); }
+        
+        .avatar-container { position: relative; width: 28px; height: 28px; }
+        .avatar { width: 28px; height: 28px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: #4b5563; }
+        .status-badge { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; }
+        .status-badge.online { background: var(--online-color); }
+        .status-badge.offline { background: var(--offline-color); }
+        .user-info-meta { flex: 1; display: flex; flex-direction: column; }
+        .user-role { font-size: 10px; color: var(--text-muted); }
+
+        .view-pane { display: none; }
+        .view-pane.active { display: block; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000; }
+        .modal-overlay.open { display: flex; }
+        .modal-window { width: 380px; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
+        .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
+        .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 13px; }
+        .modal-user-item:hover { background: var(--bg-main); }
+        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
+        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; }
+        
+        .btn-remove-participant { border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+        .btn-remove-participant:hover { background: #ffeeeb; }
+
+        .screenshot-modal-window { width: 85vw; height: 85vh; max-width: 1000px; background: white; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; }
+        .editor-container { flex: 1; display: flex; background: #333; overflow: hidden; justify-content: center; align-items: center; position: relative; }
+        .canvas-wrapper { position: relative; max-width: 100%; max-height: 100%; overflow: auto; padding: 10px; }
+        canvas { background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: block; cursor: crosshair; }
+        .editor-toolbar { padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
+        .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
+    </style>
 </head>
-<body oncontextmenu="if (window.event) { window.event.returnValue = false; } return false;">
+<body>
 
-<div class="header">
-    <h1>Корпоративный чат 1С</h1>
-    <div class="header-controls">
-        <div id="custom-links-container" class="header-links"></div>
-        <span id="user-info" class="user-info">Авторизация...</span>
+<div class="modal-overlay" id="secret-prompt-modal">
+    <div class="modal-window" style="width: 380px;">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">🔑 Задайте секретный код</span>
+            <span id="btn-close-prompt" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px;">
+            <label style="font-size:12px; font-weight:600; color:var(--text-main)">Секретный код:</label>
+            <input type="text" class="search-box" id="prompt-input" placeholder="Введите код...">
+        </div>
+        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
+            <button class="btn" id="btn-cancel-prompt" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-primary" id="btn-confirm-prompt">ОК</button>
+        </div>
+    </div>
+</div>
+ 
+<div class="modal-overlay" id="edit-message-modal">
+    <div class="modal-window" style="width: 420px;">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">✏️ Редактирование сообщения</span>
+            <span id="btn-close-edit-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px; border-bottom: 1px solid var(--border-color);">
+            <textarea class="search-box" id="edit-msg-textarea" style="height: 80px; resize: none;" placeholder="Введите новый текст..."></textarea>
+        </div>
+        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
+            <button class="btn" id="btn-cancel-edit" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-primary" id="btn-confirm-edit">Сохранить</button>
+        </div>
     </div>
 </div>
 
-<div class="main-container">
-    <div class="sidebar">
-        <div class="sidebar-section">
-            <h3>Кабинеты <button id="btn-create-group" class="btn-small">+ Кабинет</button></h3>
-            <div id="rooms-list">Загрузка...</div>
+<div class="modal-overlay" id="create-room-modal">
+    <div class="modal-window" style="width: 420px;">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">🛠️ Создание нового кабинета</span>
+            <span id="btn-close-room-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px; border-bottom: 1px solid var(--border-color);">
+            <label style="font-size:12px; font-weight:600; color:var(--text-main)">Название кабинета:</label>
+            <input type="text" class="search-box" id="new-room-name" placeholder="Введите имя комнаты...">
+        </div>
+        <div style="padding: 10px 15px 5px 15px; font-size:11px; font-weight:bold; color:var(--text-muted); text-transform:uppercase;">
+            Выберите участников (минимум 1 сотрудник):
+        </div>
+        <div class="modal-body" id="create-room-users-container" style="max-height: 250px;"></div>
+        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
+            <button class="btn" id="btn-cancel-room-creation" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-primary" id="btn-confirm-room-creation">Создать комнату</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="add-user-modal">
+    <div class="modal-window">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">Выберите сотрудника</span>
+            <span id="btn-close-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 10px; border-bottom: 1px solid var(--border-color);">
+            <input type="text" class="search-box" id="search-modal-users" placeholder="Поиск по имени...">
+        </div>
+        <div class="modal-body" id="modal-users-container"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="screenshot-modal">
+    <div class="screenshot-modal-window">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">🎨 Графический редактор скриншотов</span>
+            <span id="btn-close-screenshot-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div class="editor-toolbar">
+            <button class="editor-tool-btn active" id="tool-draw">✏️ Кисть</button>
+            <button class="editor-tool-btn" id="tool-text">🔤 Текст (Клик на холст)</button>
+            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
+                <span>Цвет:</span>
+                <input type="color" id="editor-color" value="#ef4444" style="width:24px; height:24px; border:none; cursor:pointer;">
+            </div>
+            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
+                <span>Размер:</span>
+                <select id="editor-size" style="padding:2px; font-size:12px;">
+                    <option value="3">3 px</option>
+                    <option value="5" selected>5 px</option>
+                    <option value="10">10 px</option>
+                    <option value="15">15 px</option>
+                </select>
+            </div>
+            <button class="editor-tool-btn" id="btn-editor-clear" style="margin-left:auto; background:#fca5a5; color:#7f1d1d;">🗑️ Очистить правки</button>
+        </div>
+        <div class="editor-container">
+            <div class="canvas-wrapper">
+                <canvas id="editor-canvas"></canvas>
+            </div>
+        </div>
+        <div class="modal-header" style="border-top: 1px solid var(--border-color); border-bottom:none; justify-content:flex-end; gap:10px;">
+            <button class="btn" id="btn-cancel-screenshot" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-success" id="btn-submit-screenshot" style="padding:7px 20px;">💾 Отправить в чат</button>
+        </div>
+    </div>
+</div>
+
+<div class="app-container">
+    <div class="panel left-panel">
+        <div class="panel-header">
+            <h3 style="font-size: 14px;">Кабинеты</h3>
+            <input type="text" class="search-box" id="search-rooms" placeholder="Поиск кабинета...">
+            <button class="btn btn-primary" id="btn-open-create-modal">+ Создать Кабинет</button>
+        </div>
+        <div class="panel-scroll-area" id="rooms-list-container">
+            <div id="active-rooms-list"></div>
+            <div class="accordion-section">
+                <div class="accordion-header" id="inactive-accordion-trigger">
+                    <span>Неактивные кабинеты</span>
+                    <span id="inactive-count">(0) ▼</span>
+                </div>
+                <div class="accordion-content" id="inactive-rooms-list"></div>
+            </div>
         </div>
     </div>
 
-    <div class="chat-window" id="chat-window">
+    <div class="panel chat-panel">
         <div class="chat-header">
-            <span id="current-chat-title">Выберите кабинет или сотрудника</span>
-            <div class="chat-actions" id="chat-management-actions" style="display: none;">
-                <button onclick="triggerArchive(); return false;" class="btn-small" style="background:#eab308;">📦 В архив</button>
-                <button onclick="triggerDeleteRoom(); return false;" class="btn-small" style="background:#ef4444;">❌ Удалить</button>
+            <a href="https://100letnik.md" target="_blank">
+                <img id="chat-logo" src="/static/logo.png" alt="100ЛЕТНИК" 
+                style="height: 50px; width: 50px; margin-right: 15px; cursor: pointer;">
+            </a>
+            <div class="chat-title-area">
+                <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
+                <div class="chat-user-identity" id="header-user-identity">Загрузка сессии...</div>
+            </div>
+            <div class="chat-actions" id="chat-management-controls" 
+                style="display: none; align-items: center; gap: 10px;">
+                <img src="/static/archive_btn.png" id="btn-archive-room" 
+                    style="cursor:pointer; height:45px; width:45px; object-fit:contain;" 
+                    title="Архивация сообщений" alt="Архив">            
+                <img src="/static/del_btn.png" id="btn-delete-room" 
+                    style="cursor:pointer; height:65px; width:65px; object-fit:contain;" 
+                    title="Удаление комнаты" alt="Удалить">
             </div>
         </div>
-
-        <div id="messages-container" class="messages-container">
-            <div class="message"><div class="message-content"><span class="msg-author">Система</span><div class="msg-text">Выберите чат для начала общения.</div></div></div>
-        </div>
+             
+        <div class="messages-container" id="messages-stream"></div>
         
-        <div class="input-panel">
-            <div class="secret-row">
-                <button id="btn-secret" class="btn-secret">🔒 Обычный режим</button>
-                <button id="btn-paste-screen" class="btn-small" style="background:#6b7280; margin-left:6px;">📋 Вставить скриншот</button>
+        <div class="input-area">
+            <div class="mention-popup" id="mention-menu"></div>
+            <div class="reply-panel" id="reply-panel" style="display: none; background: #eff6ff; padding: 6px 12px; border-left: 3px solid #2563eb; font-size: 12px; justify-content: space-between; align-items: center; margin-bottom: 6px; border-radius: 4px;">
+                <div>📎 Ответ для <span id="reply-author" style="font-weight: bold;"></span>: <span id="reply-text" style="color: #4b5563;"></span></div>
+                <span style="cursor: pointer; font-weight: bold; color: #6b7280;" onclick="cancelReply()">✕</span>
             </div>
+            <div class="toolbar">
+                <select id="font-family-select">
+                    <option value="Segoe UI">Стандартный</option>
+                    <option value="Courier New">Широкий (Код)</option>
+                    <option value="Georgia">Строгий</option>
+                    <option value="Impact">Жирный акцент</option>
+                </select>
+                <select id="font-size-select">
+                    <option value="13px">13px</option>
+                    <option value="12px">12px</option>
+                    <option value="15px">15px</option>
+                </select>
+                <div class="toolbar-item" id="style-bold" style="font-weight:bold;">B</div>
+                <div class="toolbar-item" id="style-italic" style="font-style:italic;">I</div>
+                
+                <div class="toolbar-item" id="btn-emoji-trigger" title="Эмодзи">😀</div>
+                
+                <div class="emoji-picker-popover" id="emoji-popover">
+                    <div class="emoji-tabs">
+                        <div class="emoji-tab-btn active" onclick="switchEmojiTab(event, 'smile')">😀 Смайлы</div>
+                        <div class="emoji-tab-btn" onclick="switchEmojiTab(event, 'work')">💼 Деловые</div>
+                        <div class="emoji-tab-btn" onclick="switchEmojiTab(event, 'signs')">✅ Знаки</div>
+                    </div>
+                    <div class="emoji-grid-viewport" id="emoji-grid"></div>
+                </div>
+
+                <input type="color" id="text-color-picker" title="Цвет текста" style="width:16px; height:16px; border:none; cursor:pointer;" value="#1f2937">
+                <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
+                <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
+                <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
+            </div>
+
             <div class="controls-row">
-                <input type="file" id="file-input" style="display:none">
-                <button id="btn-file" class="btn-file">📎</button>
-                <div id="input-msg" class="input-msg-div" contenteditable="true"></div>
-                <button id="btn-send" class="btn-send">Отправить</button>
+                <input type="file" id="global-file-input" style="display:none">
+                <button class="btn" id="btn-attach-file" 
+                        style="background: transparent !important; padding: 4px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;" 
+                        title="Прикрепить файл">
+                    <img src="/static/attach-icon.png" alt="Прикрепить" style="width: 36px; height: 36px; object-fit: contain;">
+                </button>
+                <div class="input-msg-div" 
+                    id="input-msg" contenteditable="true" 
+                    placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
+                </div>
+                <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
     </div>
 
-    <div class="participants-panel">
-        <h3>В кабинете <button id="btn-add-participant" class="btn-small" style="display:none;">+</button></h3>
-        <div id="participants-list">Не выбран чат</div>
-        
-        <h3>Сотрудники компании</h3>
-        <div id="users-list-right">Загрузка...</div>
-    </div>
-</div>
-
-<div id="custom-context-menu" style="display:none; position:fixed; z-index:10000; background:#ffffff; border:1px solid #d1d5db; border-radius:6px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); padding:4px 0; width:160px; font-family:Arial, sans-serif;">
-    <div id="ctx-delete-msg" style="padding:8px 12px; font-size:12px; color:#ef4444; cursor:pointer;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">❌ Удалить сообщение</div>
-</div>
-
-<div class="modal-overlay" id="user-select-modal">
-    <div class="modal-body">
-        <h4 id="modal-action-title">Выберите сотрудника</h4>
-        <select id="modal-user-dropdown"></select>
-        <div class="modal-buttons">
-            <button onclick="closeUserModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="modal-submit-btn" class="btn-small">Выбрать</button>
+    <div class="panel right-panel">
+        <div class="panel-header">
+            <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
+        </div>
+        <div class="panel-scroll-area">
+            <div id="pane-participants" class="view-pane active">
+                <div class="section-title">В этом кабинете <button id="btn-add-user-modal" style="border:none; background:none; color:var(--primary-color); cursor:pointer; font-weight:bold; font-size:13px; float:right;">+</button></div>
+                <div id="current-room-participants"></div>
+            </div>
+            <div id="pane-company" class="view-pane">
+                <input type="text" class="search-box" id="search-contacts" placeholder="Быстрый поиск коллеги..." style="margin-bottom: 10px;">
+                <div class="section-title">Все сотрудники компании</div>
+                <div id="company-users-list"></div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="modal-overlay" id="secret-input-modal">
-    <div class="modal-body">
-        <h4 id="secret-modal-title">Ключ шифрования</h4>
-        <input type="password" id="modal-secret-field" placeholder="Ключ..." />
-        <div class="modal-buttons">
-            <button onclick="closeSecretModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="secret-modal-submit-btn" class="btn-small" style="background:#eab308;">Применить</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="text-input-modal">
-    <div class="modal-body">
-        <h4 id="text-modal-title">Имя нового кабинета</h4>
-        <input type="text" id="modal-text-field" placeholder="Название..." />
-        <div class="modal-buttons">
-            <button onclick="closeTextModal()" class="btn-small" style="background:#9ca3af;">Отмена</button>
-            <button id="text-modal-submit-btn" class="btn-small">Создать</button>
-        </div>
-    </div>
+<div class="system-footer-links">
+    <div id="footer-admin-block"><a href="/admin" target="_blank">⚙️ Панель администратора чата</a></div>
+    <div id="footer-onec-block"><a href="https://onec.company.local/trade" target="_blank">🌐 Запуск веб-клиента 1С:Предприятие</a></div>
 </div>
 
 <script>
-window.onerror = function() { return true; };
+    window.onerror = function() { return true; };
 
-var socket = null;
-var currentRoomId = null;
-var currentRoomType = "";
-var currentRoomCreator = "";
-var isSecretMode = false;
-var userSecretKey = "";
-var currentUserId = "";
-var currentUserRole = "";
-var globalUsersCache = [];
-var activeOnlineIds = []; 
-var selectedMessageIdForCtx = null;
-
-var inputMsg = document.getElementById('input-msg');
-
-function selectRoomById(roomId) {
-    currentRoomId = roomId;
-    if (!socket) return;
-    socket.emit('join_room_pool', { room_id: roomId });
-    socket.emit('get_room_history', { room_id: roomId });
-    socket.emit('get_room_participants', { room_id: roomId });
-    socket.emit('get_rooms_again');
-}
-
-function apply1CAuth(id_user, id_org, username, user_role) {
-    currentUserId = id_user;
-    currentUserRole = user_role || 'user';
+    let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
+    let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
+    let onlineUsersCache = {}, messageReadsMap = {}; 
+    let isSecretMode = false, userSecretKey = "";
+    let roomCreatorId = null, roomSystemType = "";
+    let unreadRooms = {};
+    let currentReplyMessageId = null;
     
-    document.getElementById('user-info').innerText = username + (currentUserRole === 'admin' ? ' 👑' : '');
-    
-    if (socket) {
-        try { socket.disconnect(); } catch(e) {}
-    }
-    
-    var socketUrl = window.location.protocol + '//' + window.location.host;
-    socket = io(socketUrl, {
-        path: '/socket.io',
-        transports: ['polling', 'websocket'],
-        query: { id_user: id_user, id_org: id_org, username: username, role: currentUserRole }
-    });
+    let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
+    let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
 
-    socket.on('connect', function() {
-        socket.emit('get_users_list');
-        socket.emit('get_rooms_again');
-    });
+    const inputMsg = document.getElementById('input-msg');
+    const messagesStream = document.getElementById('messages-stream');
+    const createRoomModal = document.getElementById('create-room-modal');
+    const screenshotModal = document.getElementById('screenshot-modal');
+    const canvas = document.getElementById('editor-canvas');
+    const ctx = canvas.getContext('2d');
 
-    socket.on('rooms_list', function(rooms) { renderRoomsList(rooms); });
-    socket.on('users_list', function(users) { globalUsersCache = users; renderUsersRightPanel(users); });
-    
-    socket.on('online_status_update', function(onlineIds) {
-        activeOnlineIds = onlineIds || [];
-        renderUsersRightPanel(globalUsersCache);
-    });
+    const emojiCategories = {
+        smile: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓'],
+        work: ['💼','📁','📂','📅','📆','📊','📈','📉','📜','📋','📌','📍','📎','📎','📏','📐','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🛠️','🔧','⚙️','💻','🖥️','🖨️','🖱️','🖲️','📱','☎️','📞'],
+        signs: ['✅','❌','➕','➖','➗','✖️','❓','❔','❗','❕','⚠️','🚫','💯','🔔','🔕','🎵','🎶','🏁','🚩','🔥','🚀','👍','👎','✊','👊','✌️','👌','🤝','👏','🙌','🙏','👀','⭐']
+    };
 
-    socket.on('private_chat_created', function(data) {
-        if (data && data.id_room) selectRoomById(data.id_room);
-    });
-    
-    socket.on('room_history', function(data) {
-        var container = document.getElementById('messages-container');
-        if (!container) return;
-        container.innerHTML = "";
-        if (data && data.messages) {
-            for (var i = 0; i < data.messages.length; i++) { displayMessage(data.messages[i], true); }
-        }
-        container.scrollTop = container.scrollHeight;
-    });
+    document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+        const content = document.getElementById('inactive-rooms-list');
+        const countSpan = this.querySelector('span:last-child');
+        const countNum = document.getElementById('inactive-count').innerText.match(/\d+/);
 
-    socket.on('room_participants_list', function(data) { 
-        renderParticipantsList(data.participants); 
-    });
-
-    socket.on('new_message', function(msg) { 
-        if (msg && msg.id_room == currentRoomId) displayMessage(msg, false); 
-    });
-    
-    socket.on('system_alert', function(data) { alert(data.message); });
-    
-    socket.on('refresh_rooms_trigger', function(data) { 
-        socket.emit('get_rooms_again'); 
-        if (data && data.deleted_room_id && currentRoomId == data.deleted_room_id) {
-            currentRoomId = null;
-            document.getElementById('current-chat-title').innerText = "Выберите кабинет или сотрудника";
-            document.getElementById('chat-management-actions').style.display = "none";
-            document.getElementById('messages-container').innerHTML = '<div class="message"><div class="message-content"><span class="msg-author">Система</span><div class="msg-text">Кабинет был удален. Выберите другой чат слева.</div></div></div>';
-            document.getElementById('participants-list').innerHTML = "Не выбран чат";
+        if (content.style.display === 'block') {
+            content.style.display = 'none';
+            countSpan.innerText = `(${countNum}) ▼`;
+        } else {
+            content.style.display = 'block';
+            countSpan.innerText = `(${countNum}) ▲`;
         }
     });
 
-    socket.on('message_deleted', function(data) {
-        if (!data || !data.id_message) return;
-        var el = document.querySelector('[data-msg-id="' + data.id_message + '"]');
-        if (el) {
-            el.innerHTML = '<div class="message-content" style="color:#9ca3af; font-style:italic;">Сообщение удалено автором или администратором</div>';
+    document.getElementById('btn-toggle-right-view').addEventListener('click', function() {
+        const panePart = document.getElementById('pane-participants');
+        const paneComp = document.getElementById('pane-company');
+        if (panePart.classList.contains('active')) {
+            panePart.classList.remove('active'); paneComp.classList.add('active');
+            this.innerText = "🚪 Вернуться к кабинету"; this.style.background = "#6b7280";
+        } else {
+            paneComp.classList.remove('active'); panePart.classList.add('active');
+            this.innerText = "👥 Все сотрудники"; this.style.background = "#4b5563";
         }
     });
 
-    // ИСПРАВЛЕНО: Безопасное сохранение пути в атрибут без деструктивного parentWindow и v8-ссылок
-    socket.on('download_archive_file', function(data) {
-        if (!data || !data.url) return;
+    async function showUserInfo(userId) {
         try {
-            var container = document.getElementById('messages-container');
-            if (!container) return;
+            const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
+            const data = await res.json();
             
-            container.innerHTML = '<div style="background:#fef08a; border:1px solid #eab308; padding:12px; margin:10px; border-radius:6px; text-align:center;">' +
-                                    '<b style="color:#854d0e; display:block; margin-bottom:6px;">📦 Архив переписки успешно сформирован на сервере!</b>' +
-                                    '<button id="btn-save-1c-archive" style="background:#eab308; color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📥 СКАЧАТЬ И СОХРАНИТЬ АРХИВ</button>' +
-                                  '</div>';
-            
-            var btn = document.getElementById('btn-save-1c-archive');
-            if (btn) {
-                // Прячем путь скачивания в стандартный data-атрибут тега кнопки
-                btn.setAttribute('data-url', data.url);
-                
-                btn.onclick = function(e) {
-                    if (e && e.preventDefault) e.preventDefault();
-                    if (window.event) window.event.returnValue = false;
-                    
-                    // Меняем текст. Этот флаг 1С считает по таймеру и выполнит выгрузку
-                    this.innerText = "ПЕРЕДАЧА В 1С...";
-                    this.style.background = "#9ca3af";
-                    
-                    return false;
-                };
+            if (data.shop_name) {
+                const body = document.getElementById('modalBody');
+                body.innerHTML = `
+                    <div class="modal-row"><span class="modal-label">Организация: </span>${data.shop_name}</div>
+                    <div class="modal-row"><span class="modal-label">Магазин: </span>${data.note}</div>
+                    <div class="modal-row"><span class="modal-label">Адрес: </span>${data.address}</div>
+                    <div class="modal-row"><span class="modal-label">Телефон: </span>${data.phones}</div>
+                    <div class="modal-row"><span class="modal-label">График: </span>${data.schedule}</div>
+                `;
+                document.getElementById('userInfoModal').style.display = 'flex';
+            } else {
+                alert("Информация о магазине не заполнена.");
             }
-        } catch(err) {}
-    });
-}
+        } catch(e) { console.error(e); }
+    }
 
-function renderRoomsList(rooms) {
-    var container = document.getElementById('rooms-list');
-    if (!container) return;
-    container.innerHTML = "";
-    
-    var myCleanId = currentUserId ? String(currentUserId).trim().toUpperCase() : "";
+    function closeUserInfoModal() {
+        document.getElementById('userInfoModal').style.display = 'none';
+    }
 
-    for (var i = 0; i < rooms.length; i++) {
-        var room = rooms[i];
-        
+    function updateLogo() {
+        const logo = document.getElementById('chat-logo');
+        logo.src = "/static/logo.png?v=" + new Date().getTime();
+    }
+
+    async function initApplication() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ticket = urlParams.get('ticket');
+        if (!ticket) { alert("Ошибка безопасности: Отсутствует токен авторизации 1С."); return; }
+
         try {
-            if (room.type === 'private' && room.created_by && myCleanId) {
-                var creatorCleanId = String(room.created_by).trim().toUpperCase();
-                if (creatorCleanId === myCleanId && room.name && room.name.indexOf("⇄") === -1) {
-                    continue; 
+            const response = await fetch('/api/web/exchange-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: ticket }) });
+            const data = await response.json();
+            if (data.success) {
+                sessionToken = data.token; currentUser = data.user;
+                document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
+                renderEmojiGrid('smile'); connectSockets(); initUIEventListeners(); initMentionLogic(); initScreenshotEditorLogic();
+            }
+        } catch (err) { alert("Не удалось связаться с сервером."); }
+    }
+
+    function renderEmojiGrid(category) {
+        const grid = document.getElementById('emoji-grid'); grid.innerHTML = "";
+        const emojis = emojiCategories[category] || [];
+        emojis.forEach(em => {
+            const span = document.createElement('span'); span.className = 'emoji-picker-item'; span.innerText = em;
+            span.onclick = () => { inputMsg.innerText += em; inputMsg.focus(); };
+            grid.appendChild(span);
+        });
+    }
+
+    window.switchEmojiTab = function(event, category) {
+        event.stopPropagation();
+        document.querySelectorAll('.emoji-tab-btn').forEach(btn => btn.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        renderEmojiGrid(category);
+    };
+
+    const beepingSound = new Audio('/static/beep.mp3');
+
+    function connectSockets() {
+        const socketUrl = window.location.protocol + '//' + window.location.host;
+        socket = io(socketUrl, { path: '/socket.io', transports: ['polling', 'websocket'], query: { id_user: currentUser.id_user, id_org: currentUser.id_org, username: currentUser.username, role: currentUser.role } });
+
+        socket.on('connect', () => { refreshRoomsAndLists(); socket.emit('get_users_list'); });
+        socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
+        socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
+        
+        socket.on('new_message', (msg) => { 
+            if (msg) {
+                if (msg.id_room == currentRoomId) {
+                    displayMessage(msg, false);
+                } else {
+                    if (msg.id_user_from !== currentUser.id_user) {
+                        unreadRooms[String(msg.id_room)] = true;
+                        if (typeof filterAndRenderRooms === 'function') {
+                            filterAndRenderRooms();
+                        }
+                    }
                 }
+
+                if (msg.id_user_from !== currentUser.id_user) {
+                    if (typeof beepingSound !== 'undefined') {
+                        beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+                    }
+
+                    if (Notification.permission === "granted") {
+                        const room = latestRoomsListCache.find(r => r.id_room === msg.id_room);
+                        const roomTitle = room ? (room.name.includes(' ⇄ ') ? room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim() : room.name) : "Чат";
+
+                        const notification = new Notification(`Новое сообщение в кабинете: ${roomTitle}`, {
+                            body: `${msg.username || 'Коллега'}: ${msg.encrypted_text.startsWith('/download/') ? '[Вложение]' : msg.encrypted_text.substring(0, 40)}`,
+                            icon: '/static/logo.png'
+                        });
+
+                        notification.onclick = function() {
+                            window.focus();
+                            if (room) {
+                                selectRoomById(room.id_room, room.name, room.type, room.created_by);
+                            } else {
+                                selectRoomById(msg.id_room);
+                            }
+                            
+                            setTimeout(() => {
+                                const targetMsg = document.querySelector(`[data-msg-id="${msg.id_message}"]`);
+                                if (targetMsg) {
+                                    targetMsg.scrollIntoView({ behavior: 'smooth' });
+                                    targetMsg.style.transition = "background 1s";
+                                    targetMsg.style.background = "#eff6ff";
+                                    setTimeout(() => targetMsg.style.background = "transparent", 2000);
+                                }
+                            }, 300);
+                        };
+                    }
+                }
+            }
+        });
+
+        socket.on('message_edited', (data) => {
+            console.log("Пришло изменение для id:", data.id_message, "Текст:", data.new_text);
+            const textContainer = document.getElementById(`text-container-${data.id_message}`);
+            if (textContainer) {
+                renderProcessedText(textContainer, data.new_text);
+                textContainer.style.transition = "background 1s";
+                textContainer.style.background = "#fef3c7";
+                setTimeout(() => textContainer.style.background = "transparent", 2000);
+            } else {
+                console.log("Не найден контейнер для", `text-container-${data.id_message}`);
+            }
+        });
+
+        socket.on('user_statuses', (statuses) => {
+            onlineUsersCache = statuses || {};
+            renderCompanyUsers(globalUsersCache);
+            renderCurrentRoomParticipants(roomParticipantsCache);
+        });
+        socket.on('download_archive_file', (data) => {
+            const link = document.createElement('a');
+            link.href = data.url;
+            link.setAttribute('download', 'chat_archive.json');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            alert("Архивация завершена! Файл скачивается.");
+        });
+        socket.on('message_read_update', (data) => {
+            messageReadsMap[data.message_id] = data.users_list;
+            const targetList = document.getElementById(`read-users-${data.message_id}`);
+            if (targetList) targetList.innerText = data.users_list.join(', ');
+        });
+
+        socket.on('room_participants_list', (data) => { 
+            roomParticipantsCache = data.participants || []; 
+            renderCurrentRoomParticipants(roomParticipantsCache); 
+        });        
+        socket.on('room_history', (data) => {
+            if (data && data.messages) {
+                data.messages.forEach(msg => {
+                    if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
+                    displayMessage(msg, true);
+                });
+
+                if (data.messages.length > 0) {
+                    const lastMsg = data.messages[data.messages.length - 1];
+                    const isRead = lastMsg.reads && lastMsg.reads.includes(currentUser.username);
+                    
+                    if (lastMsg.id_user_from !== currentUser.id_user && !isRead) {
+                        unreadRooms[lastMsg.id_room] = true;
+                        if (typeof filterAndRenderRooms === 'function') filterAndRenderRooms();
+                    }
+                }
+            }
+        });
+
+        socket.on('message_deleted', (data) => {
+            const el = document.querySelector(`[data-msg-id="${data.id_message}"] .msg-text`);
+            if (el) {
+                el.innerText = "";
+                const innerSpan = document.createElement('span');
+                innerSpan.style.color = "#9ca3af"; innerSpan.style.fontStyle = "italic"; innerSpan.innerText = "Сообщение удалено автором";
+                el.appendChild(innerSpan);
+            }
+        });
+
+        socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
+        socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
+    }
+
+    function refreshRoomsAndLists() { if (socket) socket.emit('get_rooms_again'); }
+    
+    function filterAndRenderRooms() {
+        const query = document.getElementById('search-rooms').value.toLowerCase().trim();
+        processRoomsDivision(latestRoomsListCache.filter(r => r.name.toLowerCase().includes(query)));
+    }
+
+    function processRoomsDivision(allRooms) {
+        const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
+        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
+        
+        allRooms.forEach(room => {
+            const div = document.createElement('div'); 
+            div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
+            let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
+            
+            let displayName = room.name;
+            if (room.type === 'private' && room.name.includes(' ⇄ ')) {
+                displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
+            }
+
+            if (unreadRooms[String(room.id_room)]) {
+                div.style.background = "#fee2e2";
+                div.style.borderLeft = "4px solid #ef4444";
+            }
+
+            const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
+            div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
+            
+            if (room.participants_count < 2) { 
+                inactiveContainer.appendChild(div); inactiveCount++; 
+            } else { 
+                activeContainer.appendChild(div); 
+            }
+        });
+        document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
+    }
+
+    //*document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+    //*    var content = document.getElementById('inactive-rooms-list');
+    //*    content.classList.toggle('open');
+    //*    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
+    //*});
+
+    function selectRoomById(roomId, name, type, createdBy) {
+        currentRoomId = roomId; 
+        roomCreatorId = createdBy; 
+        roomSystemType = type;
+        
+        let headerName = name;
+        if (type === 'private' && name.includes(' ⇄ ')) {
+            headerName = name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
+        }
+        document.getElementById('current-chat-title').innerText = headerName || "Кабинет";
+        
+        const managementRow = document.getElementById('chat-management-controls');
+        const isOwner = (String(roomCreatorId) === String(currentUser.id_user));
+        const isAdmin = (currentUser.role === 'admin');
+
+        if ((roomSystemType === 'admin_group' && isAdmin) || (roomSystemType === 'group' && isOwner)) {
+            managementRow.style.display = 'flex';
+        } else {
+            managementRow.style.display = 'none';
+        }
+        delete unreadRooms[String(roomId)];
+        filterAndRenderRooms();
+
+        messagesStream.innerHTML = "";
+        socket.emit('join_room_pool', { room_id: roomId }); 
+        socket.emit('get_room_history', { room_id: roomId }); 
+        socket.emit('get_room_participants', { room_id: roomId });
+    }
+
+    function displayMessage(msg, isBulkLoad) {
+        const isMyMessage = (msg.id_user_from == currentUser.id_user);
+        const div = document.createElement('div'); div.className = `message ${isMyMessage ? 'my' : ''}`;
+        const msgId = msg.id_message || msg.id; div.setAttribute('data-msg-id', msgId);
+
+        let rawText = msg.encrypted_text || msg.text || "";
+        const author = msg.username || "Сотрудник";
+        const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
+        
+        let customStyleCSS = "";
+        try {
+            const styles = typeof msg.ui_styles === 'string' ? JSON.parse(msg.ui_styles || '{}') : msg.ui_styles;
+            if (styles && styles.fontFamily) {
+                customStyleCSS = `font-family:${styles.fontFamily}; font-size:${styles.fontSize}; color:${styles.color}; background-color:${styles.background};`;
+                if (styles.isBold) customStyleCSS += "font-weight:bold;"; if (styles.isItalic) customStyleCSS += "font-style:italic;";
             }
         } catch(e) {}
-        
-        var div = document.createElement('div');
-        div.className = 'room-item' + (room.id_room == currentRoomId ? ' active' : '');
-        div.innerText = (room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ')) + room.name;
-        
-        if (room.id_room == currentRoomId) {
-            currentRoomType = room.type;
-            currentRoomCreator = room.created_by;
-            document.getElementById('current-chat-title').innerText = room.name;
-            document.getElementById('chat-management-actions').style.display = (currentUserRole === 'admin' || room.created_by == currentUserId) && room.type !== 'private' ? 'flex' : 'none';
-            document.getElementById('btn-add-participant').style.display = room.type === 'private' ? 'none' : 'inline-block';
+
+        const escapedText = rawText.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
+
+        let deleteBtnHtml = "";
+        let editBtnHtml = "";
+        if (String(msg.id_user_from) === String(currentUser.id_user)) {
+            deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
+            editBtnHtml = `<span class="msg-edit-trigger" style="display: none;" onclick="requestEditMessage(${msgId}, '${escapedText}')" title="Изменить">✏️</span>`;
         }
-        
-        (function(r) { 
-            div.onclick = function() { selectRoomById(r.id_room); }; 
-        })(room);
-        
-        container.appendChild(div);
-    }
-}
 
-function renderUsersRightPanel(users) {
-    var container = document.getElementById('users-list-right');
-    if (!container) return;
-    container.innerHTML = "";
-    for (var i = 0; i < users.length; i++) {
-        var u = users[i];
-        if (u.id_user == currentUserId) continue;
+        let replyBtnHtml = `<span class="msg-reply-trigger" style="display: none;" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
         
-        var div = document.createElement('div');
-        div.className = 'user-row';
-        var firstLetter = u.username ? u.username.charAt(0).toUpperCase() : '?';
-        var isOnline = (u.id_user === 'Admin' || u.role === 'admin'); 
-        if (isOnline) div.className += ' online';
-
-        div.innerHTML = '<div class="avatar-container"><div class="avatar">' + firstLetter + '</div><div class="status-online"></div></div>' +
-                        '<div class="user-name-text">' + u.username + '</div>';
-        
-        (function(target) {
-            div.onclick = function() {
-                socket.emit('create_private_chat', { target_user_id: target.id_user, target_username: target.username });
-            };
-        })(u);
-        container.appendChild(div);
-    }
-}
-
-function renderParticipantsList(list) {
-    var container = document.getElementById('participants-list');
-    if (!container) return;
-    container.innerHTML = "";
-
-    if (currentRoomType === 'private' && list && list.length < 2) {
-        document.getElementById('chat-window').style.opacity = "0.3";
-        container.innerHTML = "<div style='font-size:11px;color:#ef4444;padding:6px;'>Собеседник покинул чат.</div>";
-        document.getElementById('current-chat-title').innerText = "Диалог невозможен (собеседник удален)";
-        socket.emit('get_rooms_again');
-        return;
-    } else {
-        document.getElementById('chat-window').style.opacity = "1";
-    }
-
-    for (var i = 0; i < list.length; i++) {
-        var p = list[i];
-        var div = document.createElement('div');
-        div.className = 'user-row';
-        var firstLetter = p.username ? p.username.charAt(0).toUpperCase() : '?';
-        div.innerHTML = '<div class="avatar-container"><div class="avatar" style="background:#10b981">' + firstLetter + '</div></div>' +
-                        '<div class="user-name-text">' + p.username + '</div>';
-        
-        if (currentRoomType !== 'private' && p.id_user != currentUserId && (currentUserRole === 'admin' || currentRoomCreator == currentUserId)) {
-            var btnKick = document.createElement('button');
-            btnKick.className = 'btn-danger-xs';
-            btnKick.innerText = 'Удалить';
-            (function(tid) {
-                btnKick.onclick = function(e) {
-                    if (e.stopPropagation) e.stopPropagation(); else window.event.cancelBubble = true;
-                    if (confirm("Исключить сотрудника из кабинета?")) socket.emit('remove_user_from_room', { room_id: currentRoomId, target_user_id: tid });
-                };
-            })(p.id_user);
-            div.appendChild(btnKick);
+        let replyQuoteHtml = "";
+        if (msg.reply_to && msg.reply_text) {
+            let preview = msg.reply_text.startsWith('/download/') ? '[Вложение]' : msg.reply_text;
+            if (preview.length > 45) preview = preview.substring(0, 45) + '...';
+            replyQuoteHtml = `
+                <div style="border-left: 2px solid #2563eb; background: rgba(37, 99, 235, 0.05); padding: 4px 8px; margin-bottom: 6px; font-size: 11px; border-radius: 2px;">
+                    <div style="font-weight: bold; color: #2563eb;">↪️ ${msg.reply_author || 'Сотрудник'}</div>
+                    <div style="color: #4b5563;">${preview}</div>
+                </div>
+            `;
         }
-        container.appendChild(div);
-    }
-}
 
-function displayMessage(msg, isBulkLoad) {
-    try {
-        var container = document.getElementById('messages-container');
-        if (!container) return;
-        var isMyMessage = (msg.id_user_from == currentUserId);
-        
-        var div = document.createElement('div');
-        div.className = 'message' + (isMyMessage ? ' my' : '');
-        div.setAttribute('data-msg-id', msg.id_message || msg.id);
-        div.setAttribute('data-author-id', msg.id_user_from);
+        const readsList = messageReadsMap[msgId] || [];
 
-        var text = String(msg.encrypted_text || msg.text || "");
-        var author = String(msg.username || "Сотрудник");
+        div.innerHTML = `
+            <div class="message-box">
+                ${deleteBtnHtml}
+                ${editBtnHtml}
+                ${replyBtnHtml}
+                <div class="msg-meta"><span class="msg-author">${author}</span><span>${timeStr}</span></div>
+                ${replyQuoteHtml}
+                <div class="msg-text" id="text-container-${msgId}" style="${customStyleCSS}"></div>
+                <div class="msg-read-panel">
+                <span class="btn-read-trigger" onclick="markMessageAsRead(${msgId})">👁️ Прочитано</span>
+                <span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>    
+                <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${msg.id_user_from}')">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="#ff6600" stroke-width="2"/>
+                        <path d="M12 16v-4M12 8h.01" stroke="#ff6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            </div>
+        `;
+        messagesStream.appendChild(div);
+        const textBlock = document.getElementById(`text-container-${msgId}`);
 
-        var timeStr = "";
-        if (msg.created_at) {
-            var dateObj = new Date(msg.created_at);
-            var hh = dateObj.getHours();
-            var mm = dateObj.getMinutes();
-            if (isNaN(hh) || isNaN(mm)) {
-                var parts = msg.created_at.split('T');
-                if (parts.length > 1) { timeStr = parts[1].substring(0, 5); }
-            } else {
-                timeStr = (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
-            }
-        }
-        var timeHtml = timeStr ? '<span style="font-size:10px; color:#9ca3af; margin-left:8px; font-weight:normal; font-style:normal;">' + timeStr + '</span>' : '';
-
-        if (msg.is_user_encrypted || text.indexOf("SECRET:") === 0) {
-            var cipher = text.replace("SECRET:", "").replace(/<\/?[^>]+(>|$)/g, "").trim();
-            var uid = 'c_' + Math.random().toString(36).substr(2, 6);
-            text = '<div style="color:#ef4444; font-weight:bold;">🔒 Шифрованное сообщение</div><div id="'+uid+'" data-cipher="'+cipher+'">[Текст скрыт]</div>' +
-                   '<button class="btn-small" style="background:#eab308; margin-top:4px;" onclick="decryptMsg(\''+uid+'\')">Расшифровать</button>';
-        }
-        
-        div.innerHTML = '<div class="message-content"><span class="msg-author">' + author + timeHtml + '</span><div class="msg-text">' + text + '</div></div>';
-        container.appendChild(div);
-        if (!isBulkLoad) container.scrollTop = container.scrollHeight;
-    } catch(e) {}
-}
-
-window.decryptMsg = function(elementId) {
-    var el = document.getElementById(elementId);
-    if (!el) return;
-    openSecretModal("Введите секретный ключ", function(key) {
-        try {
-            var dec = CryptoJS.AES.decrypt(el.getAttribute("data-cipher"), key).toString(CryptoJS.enc.Utf8);
-            if (dec) { el.innerHTML = dec; el.style.cssText = "color:#111827; font-weight:normal;"; } else { alert("Неверный ключ!"); }
-        } catch(e) { alert("Ошибка расшифровки!"); }
-    });
-};
-
-function sendMessage() {
-    var text = (inputMsg.innerText || inputMsg.textContent || "").trim();
-    if (!text || !currentRoomId) return;
-    var sendAsSecret = isSecretMode;
-    if (isSecretMode) { text = "SECRET:" + CryptoJS.AES.encrypt(text, userSecretKey).toString(); }
-    socket.emit('send_message', { room_id: currentRoomId, text: text, is_secret: sendAsSecret });
-    inputMsg.innerHTML = "";
-}
-
-function uploadFile(file) {
-    var fd = new FormData(); fd.append('file', file);
-    var xhr = new XMLHttpRequest(); xhr.open('POST', '/upload', true);
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            var data = JSON.parse(xhr.responseText);
-            if (data && data.url) {
-                var isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
-                var absUrl = window.location.protocol + '//' + window.location.host + data.url;
-                var content = isImg ? '<img src="' + absUrl + '" class="chat-image" onclick="window.open(\'' + absUrl + '"\)" />' : 
-                                      '<a href="javascript:void(0);" class="file-attachment" onclick="return downloadFile(\'' + data.url + '\', \'' + file.name.replace(/'/g, "\\'") + '\');">📄 Файл: ' + file.name + '</a>';
-                socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
-            }
-        }
-    };
-    xhr.send(fd);
-}
-
-function downloadFile(url, filename) {
-    var fullUrl = window.location.protocol + '//' + window.location.host + url;
-    try {
-        window.open(fullUrl, '_blank', 'width=1,height=1,left=9999,top=9999,resizable=no,scrollbars=no,status=no');
-    } catch(e) {
-        var downloadAnchor = document.createElement('a');
-        downloadAnchor.href = fullUrl;
-        downloadAnchor.download = filename;
-        downloadAnchor.target = '_blank';
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        document.body.removeChild(downloadAnchor);
-    }
-    return false;
-}
-
-function uploadBase64Image(rawInputString) {
-    if (!currentRoomId || !socket || !rawInputString) return;
-    
-    var cleanBase64 = rawInputString.trim();
-    if (cleanBase64.indexOf(",") !== -1) {
-        cleanBase64 = cleanBase64.split(",")[1];
-    }
-    cleanBase64 = cleanBase64.replace(/<\/?[^>]+(>|$)/g, "").replace(/\s/g, "");
-
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/1c/upload-base64', true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            var response = JSON.parse(xhr.responseText);
-            if (response.success && response.url) {
-                var absoluteUrl = window.location.protocol + '//' + window.location.host + response.url;
-                var content = '<img src="' + absoluteUrl + '" class="chat-image" onclick="window.open(\'' + absoluteUrl + '\')" />';
-                socket.emit('send_message', { room_id: currentRoomId, text: content, is_secret: false });
-            }
-        }
-    };
-    xhr.send(JSON.stringify({
-        room_id: parseInt(currentRoomId),
-        base64_data: cleanBase64,
-        filename: "screenshot_" + Date.now() + ".png"
-    }));
-}
-
-function handlePasteEvent(e) {
-    if (!currentRoomId) return true;
-    setTimeout(function() {
-        try {
-            var imgs = inputMsg.getElementsByTagName('img');
-            if (imgs && imgs.length > 0) {
-                var base64Src = imgs[0].src;
-                if (base64Src && base64Src.indexOf("data:image") === 0) {
-                    uploadBase64Image(base64Src); 
-                }
-                inputMsg.innerHTML = ""; 
-            }
-        } catch(err) {}
-    }, 20);
-    return true;
-}
-
-if (inputMsg) { inputMsg.onpaste = handlePasteEvent; }
-window.onpaste = handlePasteEvent;
-
-function triggerDeleteRoom() {
-    if (!currentRoomId) return;
-    if (confirm("Вы уверены, что хотите полностью удалить этот кабинет? Действие необратимо.")) {
-        socket.emit('delete_room_request', { 
-            room_id: parseInt(currentRoomId),
-            user_id: currentUserId,
-            role: currentUserRole
-        });
-    }
-}
-
-function triggerArchive() {
-    if (!currentRoomId) return;
-    if (confirm("Перенести переписку кабинета в архивный файл и очистить текущий чат на сервере?")) {
-        socket.emit('archive_room_messages', { 
-            room_id: parseInt(currentRoomId),
-            user_id: currentUserId,
-            role: currentUserRole
-        });
-    }
-}
-
-document.oncontextmenu = function(e) {
-    e = e || window.event;
-    
-    // 1. СРАЗУ глушим стандартное меню 1С для всей страницы
-    if (e.preventDefault) e.preventDefault();
-    e.returnValue = false;
-    e.cancelBubble = true;
-    if (e.stopPropagation) e.stopPropagation();
-    
-    var target = e.target || e.srcElement;
-    var msgDiv = target;
-    
-    // Ищем контейнер сообщения вверх по дереву DOM
-    while (msgDiv && msgDiv !== document.body) {
-        if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
-            break;
-        }
-        msgDiv = msgDiv.parentNode;
-    }
-    
-    // 2. Если кликнули мимо сообщения — просто ничего не делаем (меню 1С не откроется)
-    if (!msgDiv || msgDiv === document.body) return false; 
-    
-    selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
-    var authorId = msgDiv.getAttribute('data-author-id');
-    
-    if (selectedMessageIdForCtx) {
-        var cleanAuthor = String(authorId).toUpperCase().trim();
-        var cleanCurrent = String(currentUserId).toUpperCase().trim();
-        
-        // 3. Если это админ или автор сообщения — показываем наше меню
-        if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
-            var menu = document.getElementById('custom-context-menu');
-            if (menu) {
-                menu.style.left = e.clientX + 'px';
-                menu.style.top = e.clientY + 'px';
-                menu.style.display = 'block';
-            }
-        }
-    }
-    
-    return false;
-};
-
-// Перехватываем правый клик на этапе мыши, до вызова меню платформы
-document.onmousedown = function(e) {
-    e = e || window.event;
-    if (!e) return true;
-    
-    // 2 — это код правой кнопки мыши в старых стандартах IE
-    if (e.button === 2 || e.which === 3) {
-        var target = e.target || e.srcElement;
-        
-        var msgDiv = target;
-        while (msgDiv && msgDiv !== document.body) {
-            if (msgDiv.getAttribute && msgDiv.getAttribute('data-msg-id')) {
-                break;
-            }
-            msgDiv = msgDiv.parentNode;
-        }
-        
-        if (!msgDiv || msgDiv === document.body) return true; 
-        
-        selectedMessageIdForCtx = msgDiv.getAttribute('data-msg-id');
-        var authorId = msgDiv.getAttribute('data-author-id');
-        
-        if (selectedMessageIdForCtx) {
-            var cleanAuthor = String(authorId).toUpperCase().trim();
-            var cleanCurrent = String(currentUserId).toUpperCase().trim();
+       if (msg.is_user_encrypted) {
+            textBlock.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:12px;">🔒 Зашифрованное сообщение</span>`;
+            const decryptBtn = document.createElement('button'); decryptBtn.className = 'btn-decrypt-inline'; decryptBtn.innerText = '🔑 Ввести код';
             
-            if (currentUserRole === 'admin' || cleanAuthor === cleanCurrent) {
-                if (e.stopPropagation) e.stopPropagation();
-                if (e.preventDefault) e.preventDefault();
-                e.cancelBubble = true;
-                e.returnValue = false;
-                
-                var menu = document.getElementById('custom-context-menu');
-                menu.style.left = e.clientX + 'px';
-                menu.style.top = e.clientY + 'px';
-                menu.style.display = 'block';
-                
-                return false;
+            decryptBtn.onclick = async function() {
+                let inputKey = await showCustomPrompt();
+                if (inputKey && inputKey.trim() !== "") {
+                    try {
+                        let decryptedText = CryptoJS.AES.decrypt(rawText, inputKey.trim()).toString(CryptoJS.enc.Utf8);
+                        if (decryptedText) { renderProcessedText(textBlock, decryptedText); decryptBtn.remove(); }
+                        else { alert("Неверный код!"); }
+                    } catch(err) { alert("Ошибка расшифровки."); }
+                }
+            };
+            textBlock.appendChild(decryptBtn);
+        } else { renderProcessedText(textBlock, rawText); }
+        messagesStream.scrollTop = messagesStream.scrollHeight;
+    }
+
+    let editingMsgId = null;
+
+    // Привязка закрытия модалки
+    document.getElementById('btn-close-edit-modal').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
+    document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
+
+    window.requestEditMessage = async function(msgId, currentText) {
+        editingMsgId = msgId;
+        const textarea = document.getElementById('edit-msg-textarea');
+        textarea.value = currentText.replace(/\\'/g, "'").replace(/\\"/g, '"');
+        document.getElementById('edit-message-modal').classList.add('open');
+        textarea.focus();
+    };
+
+    document.getElementById('btn-confirm-edit').onclick = function() {
+        const textarea = document.getElementById('edit-msg-textarea');
+        let newText = textarea.value.trim();
+        
+        if (newText && editingMsgId) {
+            if (isSecretMode && userSecretKey) {
+                newText = CryptoJS.AES.encrypt(newText, userSecretKey).toString();
             }
+            socket.emit('edit_message', { id_message: editingMsgId, new_text: newText });
+            document.getElementById('edit-message-modal').classList.remove('open');
+        }
+    };
+
+    window.triggerReply = function(messageId, authorName, textContent) {
+        currentReplyMessageId = messageId;
+        document.getElementById('reply-author').innerText = authorName;
+        document.getElementById('reply-text').innerText = textContent.length > 35 ? textContent.substring(0, 35) + '...' : textContent;
+        document.getElementById('reply-panel').style.display = 'flex';
+        inputMsg.focus();
+    };
+
+    window.cancelReply = function() {
+        currentReplyMessageId = null;
+        document.getElementById('reply-panel').style.display = 'none';
+    };
+
+    function showCustomPrompt() {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('secret-prompt-modal');
+            const input = document.getElementById('prompt-input');
+            
+            modal.classList.add('open');
+            input.value = '';
+            input.focus();
+
+            const handleConfirm = () => {
+                const val = input.value;
+                closeModal();
+                resolve(val);
+            };
+
+            const closeModal = () => {
+                modal.classList.remove('open');
+                cleanup();
+            };
+
+            const cleanup = () => {
+                document.getElementById('btn-confirm-prompt').removeEventListener('click', handleConfirm);
+                document.getElementById('btn-cancel-prompt').removeEventListener('click', handleCancel);
+                document.getElementById('btn-close-prompt').removeEventListener('click', closeModal);
+            };
+
+            const handleCancel = () => {
+                closeModal();
+                resolve(null);
+            };
+
+            document.getElementById('btn-confirm-prompt').addEventListener('click', handleConfirm);
+            document.getElementById('btn-cancel-prompt').addEventListener('click', handleCancel);
+            document.getElementById('btn-close-prompt').addEventListener('click', closeModal);
+        });
+    }
+
+    function renderProcessedText(targetElement, contentText) {
+        if (contentText.startsWith("/download/")) {
+            const lower = contentText.toLowerCase();
+            if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".gif") || lower.includes(".webp")) {
+                targetElement.innerHTML = `
+                    <img src="${contentText}" alt="Скриншот" onclick="window.open('${contentText}', '_blank')">
+                    <a class="img-download-link" href="${contentText}" target="_blank">📁 Скачать файл</a>
+                `;
+            } else {
+                const parts = contentText.split('|');
+                targetElement.innerHTML = `📁 <a href="${parts[0]}" target="_blank" style="color:var(--primary-color); font-weight:600;">${parts[1] || "Скачать файл"}</a>`;
+            }
+        } else { targetElement.innerHTML = contentText; }
+    }
+
+    window.requestDeleteMessage = function(msgId) { 
+        if (confirm("Удалить это сообщение?")) socket.emit('delete_message_request', { message_id: parseInt(msgId), room_id: parseInt(currentRoomId), user_id: currentUser.id_user, role: currentUser.role }); 
+    };
+    window.markMessageAsRead = function(messageId) {
+        if (!currentUser) return;
+        socket.emit('message_read_click', { message_id: messageId, username: currentUser.username });
+    };
+    function initUIEventListeners() {
+        document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
+
+        document.getElementById('btn-open-create-modal').addEventListener('click', () => {
+            createRoomModal.classList.add('open'); renderCreateRoomUsers(globalUsersCache);
+        });
+        document.getElementById('btn-close-room-modal').addEventListener('click', () => createRoomModal.classList.remove('open'));
+        document.getElementById('btn-cancel-room-creation').addEventListener('click', () => createRoomModal.classList.remove('open'));
+        
+        document.getElementById('btn-confirm-room-creation').addEventListener('click', () => {
+            const rName = document.getElementById('new-room-name').value.trim();
+            const checkedBoxes = document.querySelectorAll('.participant-checkbox:checked');
+            if(!rName) { alert("Укажите название создаваемой комнаты!"); return; }
+            if(checkedBoxes.length === 0) { alert("Необходимо выбрать хотя бы одного участника для создания комнаты!"); return; }
+            const participantsArray = []; checkedBoxes.forEach(cb => participantsArray.push(cb.value));
+            socket.emit('create_advanced_room', { name: rName, participants: participantsArray });
+            document.getElementById('new-room-name').value = ""; createRoomModal.classList.remove('open');
+        });
+
+        const modal = document.getElementById('add-user-modal');
+        document.getElementById('btn-add-user-modal').addEventListener('click', () => { if (!currentRoomId) return; modal.classList.add('open'); renderModalUsers(globalUsersCache); });
+        document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
+        document.getElementById('search-modal-users').addEventListener('input', function() { renderModalUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim()))); });
+
+        document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
+        inputMsg.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessageStream(); } });
+
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.startsWith('image/')) { openEditorWithBlob(item.getAsFile()); }
+            }
+        });
+
+        const fileInput = document.getElementById('global-file-input');
+        document.getElementById('btn-attach-file').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', async function() {
+            if (this.files.length === 0) return;
+            const formData = new FormData(); formData.append('file', this.files[0]);
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData }); const meta = await res.json();
+                if (meta.url) {
+                    let ext = meta.filename.split('.').pop().toLowerCase();
+                    let payload = ['png','jpg','jpeg','gif','webp'].includes(ext) ? meta.url : `${meta.url}|${meta.filename}`;
+                    socket.emit('send_message', { room_id: currentRoomId, text: payload, is_secret: false, ui_styles: "{}" });
+                }
+            } catch(e) {}
+            this.value = "";
+        });
+
+        document.getElementById('btn-secret-toggle').addEventListener('click', async function() {
+            isSecretMode = !isSecretMode;
+            if (isSecretMode) {
+                let key = await showCustomPrompt(); 
+                if (key && key.trim() !== "") {
+                    userSecretKey = key.trim(); 
+                    this.innerHTML = "🔒 Зашифровано"; 
+                    this.style.background = "#fef08a"; 
+                } else { 
+                    isSecretMode = false; 
+                    resetSecretToggleUI(this); 
+                }
+            } else { 
+                resetSecretToggleUI(this); 
+            }
+        });
+
+        const emojiPopover = document.getElementById('emoji-popover');
+        document.getElementById('btn-emoji-trigger').addEventListener('click', (e) => { e.stopPropagation(); emojiPopover.style.display = emojiPopover.style.display === 'flex' ? 'none' : 'flex'; });
+        document.addEventListener('click', () => emojiPopover.style.display = 'none');
+        emojiPopover.addEventListener('click', (e) => e.stopPropagation());
+
+        document.getElementById('font-family-select').addEventListener('change', function() { currentTextStyles.fontFamily = this.value; inputMsg.style.fontFamily = this.value; });
+        document.getElementById('font-size-select').addEventListener('change', function() { currentTextStyles.fontSize = this.value; inputMsg.style.fontSize = this.value; });
+        document.getElementById('style-bold').addEventListener('click', function() { currentTextStyles.isBold = !currentTextStyles.isBold; this.style.background = currentTextStyles.isBold ? '#e5e7eb' : 'transparent'; inputMsg.style.fontWeight = currentTextStyles.isBold ? 'bold' : 'normal'; });
+        document.getElementById('style-italic').addEventListener('click', function() { currentTextStyles.isItalic = !currentTextStyles.isItalic; this.style.background = currentTextStyles.isItalic ? '#e5e7eb' : 'transparent'; inputMsg.style.fontStyle = currentTextStyles.isItalic ? 'italic' : 'normal'; });
+        document.getElementById('text-color-picker').addEventListener('input', function() { currentTextStyles.color = this.value; inputMsg.style.color = this.value; });
+        document.getElementById('text-bg-picker').addEventListener('input', function() { currentTextStyles.background = this.value; inputMsg.style.backgroundColor = this.value; });
+
+        document.getElementById('search-contacts').addEventListener('input', function() {
+            renderCompanyUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim())));
+        });
+
+        document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId }); });
+        document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
+    }
+
+    function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; userSecretKey = ""; }
+    
+    function sendMessageStream() {
+        let text = inputMsg.innerHTML.trim(); if (!text || !currentRoomId) return;
+        if (isSecretMode && userSecretKey) { text = CryptoJS.AES.encrypt(inputMsg.innerText.trim(), userSecretKey).toString(); }
+        
+        socket.emit('send_message', { 
+            room_id: currentRoomId, 
+            text: text, 
+            is_secret: isSecretMode, 
+            ui_styles: JSON.stringify(currentTextStyles),
+            reply_to: currentReplyMessageId
+        });
+        
+        inputMsg.innerHTML = ""; 
+        isSecretMode = false; 
+        resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
+        
+        if (typeof cancelReply === 'function') {
+            cancelReply();
         }
     }
-    return true;
-};
 
-document.onclick = function() {
-    document.getElementById('custom-context-menu').style.display = 'none';
-};
+    function initScreenshotEditorLogic() {
+        document.getElementById('btn-close-screenshot-modal').addEventListener('click', () => screenshotModal.classList.remove('open'));
+        document.getElementById('btn-cancel-screenshot').addEventListener('click', () => screenshotModal.classList.remove('open'));
+        const toolDraw = document.getElementById('tool-draw'), toolText = document.getElementById('tool-text');
+        toolDraw.addEventListener('click', () => { currentEditorTool = 'draw'; toolDraw.classList.add('active'); toolText.classList.remove('active'); });
+        toolText.addEventListener('click', () => { currentEditorTool = 'text'; toolText.classList.add('active'); toolDraw.classList.remove('active'); });
+        document.getElementById('btn-editor-clear').addEventListener('click', () => { if(baseImageObj) redrawCanvasBase(); });
 
-document.getElementById('ctx-delete-msg').onclick = function() {
-    if (selectedMessageIdForCtx && currentRoomId) {
-        if (confirm("Удалить это сообщение для всех участников?")) {
-            socket.emit('delete_message_request', { 
-                message_id: parseInt(selectedMessageIdForCtx), 
-                room_id: parseInt(currentRoomId),
-                user_id: currentUserId,
-                role: currentUserRole
+        canvas.addEventListener('mousedown', (e) => {
+            if (currentEditorTool === 'draw') { isDrawing = true; [lastX, lastY] = [e.offsetX, e.offsetY]; }
+            else {
+                let userText = prompt("Введите текст подписи:");
+                if (userText) { ctx.font = `bold ${document.getElementById('editor-size').value * 3}px Arial`; ctx.fillStyle = document.getElementById('editor-color').value; ctx.fillText(userText.trim(), e.offsetX, e.offsetY); }
+            }
+        });
+        canvas.addEventListener('mousemove', (e) => { if (!isDrawing || currentEditorTool !== 'draw') return; ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(e.offsetX, e.offsetY); ctx.strokeStyle = document.getElementById('editor-color').value; ctx.lineWidth = document.getElementById('editor-size').value; ctx.lineCap = 'round'; ctx.stroke(); [lastX, lastY] = [e.offsetX, e.offsetY]; });
+        canvas.addEventListener('mouseup', () => isDrawing = false);
+
+        document.getElementById('btn-submit-screenshot').addEventListener('click', () => {
+            canvas.toBlob(async (blob) => {
+                const file = new File([blob], `screenshot_${Date.now()}.png`, { type: "image/png" });
+                const formData = new FormData(); formData.append('file', file);
+                try {
+                    const res = await fetch('/upload', { method: 'POST', body: formData }); const meta = await res.json();
+                    if (meta.url) {
+                        socket.emit('send_message', { room_id: currentRoomId, text: meta.url, is_secret: false, ui_styles: "{}" });
+                        screenshotModal.classList.remove('open');
+                        inputMsg.innerHTML = ""; 
+                    }
+                } catch(err) {}
+            }, 'image/png');
+        });
+    }
+
+    function openEditorWithBlob(blob) { if(!currentRoomId) { alert("Выберите чат!"); return; } const url = URL.createObjectURL(blob); baseImageObj = new Image(); baseImageObj.onload = function() { canvas.width = baseImageObj.width; canvas.height = baseImageObj.height; redrawCanvasBase(); screenshotModal.classList.add('open'); URL.revokeObjectURL(url); }; baseImageObj.src = url; }
+    function redrawCanvasBase() { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(baseImageObj, 0, 0); }
+
+    function renderCreateRoomUsers(users) {
+        const container = document.getElementById('create-room-users-container'); container.innerHTML = "";
+        users.forEach(u => {
+            if (u.id_user === currentUser.id_user) return;
+            const div = document.createElement('div'); div.className = 'modal-user-item';
+            div.innerHTML = `<span><b>${u.username}</b> (${u.role})</span><input type="checkbox" class="participant-checkbox" value="${u.id_user}">`;
+            container.appendChild(div);
+        });
+    }
+
+    function renderModalUsers(users) {
+        const container = document.getElementById('modal-users-container'); container.innerHTML = "";
+        users.forEach(u => {
+            if (roomParticipantsCache.some(p => p.id_user === u.id_user)) return;
+            const div = document.createElement('div'); div.className = 'modal-user-item';
+            div.innerHTML = `<span><b>${u.username}</b></span><button class="btn btn-primary" style="padding: 3px 8px; font-size: 11px;">Добавить</button>`;
+            div.querySelector('button').addEventListener('click', () => {
+                socket.emit('add_user_to_room', { room_id: parseInt(currentRoomId), user_id: u.id_user });
+                document.getElementById('add-user-modal').classList.remove('open');
             });
-        }
+            container.appendChild(div);
+        });
     }
-};
 
-function openUserModal(t, cb) {
-    document.getElementById('modal-action-title').innerText = t;
-    var d = document.getElementById('modal-user-dropdown'); d.innerHTML = "";
-    for (var i=0; i<globalUsersCache.length; i++) { d.innerHTML += '<option value="'+globalUsersCache[i].id_user+'">'+globalUsersCache[i].username+'</option>'; }
-    document.getElementById('user-select-modal').style.display = 'flex';
-    document.getElementById('modal-submit-btn').onclick = function() { cb(d.value); closeUserModal(); };
-}
-function closeUserModal() { document.getElementById('user-select-modal').style.display = 'none'; }
-function openSecretModal(t, cb) { document.getElementById('secret-input-modal').style.display = 'flex'; document.getElementById('secret-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-secret-field').value); closeSecretModal(); }; }
-function closeSecretModal() { document.getElementById('secret-input-modal').style.display = 'none'; }
-function openTextModal(t, cb) { document.getElementById('text-input-modal').style.display = 'flex'; document.getElementById('text-modal-submit-btn').onclick = function() { cb(document.getElementById('modal-text-field').value); closeTextModal(); }; }
-function closeTextModal() { document.getElementById('text-input-modal').style.display = 'none'; }
-
-document.getElementById('btn-paste-screen').onclick = function() {
-    if (!currentRoomId) { alert("Выберите кабинет перед отправкой скриншота!"); return; }
-    inputMsg.focus();
-    try {
-        if (document.execCommand) { document.execCommand('paste'); }
-    } catch(err) {}
-};
-
-document.getElementById('btn-add-participant').onclick = function() { openUserModal("Добавить сотрудника", function(uid) { socket.emit('add_user_to_room', { room_id: currentRoomId, user_id: uid }); }); };
-document.getElementById('btn-create-group').onclick = function() { openTextModal("Создать кабинет", function(name) { socket.emit('create_group_chat', { group_name: name }); }); };
-document.getElementById('btn-secret').onclick = function() {
-    if (!isSecretMode) { openSecretModal("Секретный ключ", function(k) { userSecretKey = k; isSecretMode = true; document.getElementById('btn-secret').className = 'btn-secret active'; document.getElementById('btn-secret').innerText = '🔒 Шифрование ВКЛ'; }); }
-    else { isSecretMode = false; this.className = 'btn-secret'; this.innerText = '🔒 Обычный режим'; }
-};
-document.getElementById('btn-send').onclick = sendMessage;
-document.getElementById('btn-file').onclick = function() { document.getElementById('file-input').click(); };
-document.getElementById('file-input').onchange = function(e) { if (e.target.files[0]) uploadFile(e.target.files[0]); };
-if (inputMsg) { inputMsg.onkeydown = function(e) { if ((e || window.event).key === 'Enter' && !(e || window.event).shiftKey) { e.preventDefault(); sendMessage(); } }; }
-
-function parseHashAndAuthorize() {
-    try {
-        var hash = window.location.hash;
-        if (hash && hash.length > 1) {
-            var cleanHash = decodeURIComponent(hash.substring(1));
-            var p = cleanHash.split("---");
-            if (p && p.length >= 3) {
-                if (currentUserId && currentUserId !== p[0]) {
-                    window.location.reload(true);
-                    return;
-                }
-                var roleParam = p[3] || 'user';
-                if (roleParam !== 'user' && roleParam !== 'admin') {
-                    roleParam = 'user';
-                }
-                apply1CAuth(p[0], p[1], p[2], roleParam);
+    function renderCurrentRoomParticipants(list) {
+        const container = document.getElementById('current-room-participants'); container.innerHTML = "";
+        list.forEach(p => {
+            const div = document.createElement('div'); div.className = 'user-row'; div.style.cursor = 'default';
+            const isOnline = !!onlineUsersCache[p.id_user];
+            let removeActionHtml = "";
+            if ((currentUser.role === 'admin' || roomCreatorId == currentUser.id_user) && p.id_user !== currentUser.id_user) {
+                removeActionHtml = `<button class="btn-remove-participant" onclick="event.stopPropagation(); requestRemoveUser('${p.id_user}')">❌</button>`;
             }
-        }
-    } catch(e) {}
-}
+            div.innerHTML = `<div class="avatar-container"><div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${p.username}</span><span class="user-role">${p.role}</span></div>${removeActionHtml}`;
+            container.appendChild(div);
+        });
+    }
 
-window.onload = parseHashAndAuthorize;
-window.onhashchange = parseHashAndAuthorize;
+    window.requestRemoveUser = function(targetUserId) {
+        if (confirm("Исключить данного сотрудника из этого рабочего кабинета?")) {
+            socket.emit('remove_user_from_room', { room_id: parseInt(currentRoomId), target_user_id: targetUserId });
+        }
+    };
+
+    function renderCompanyUsers(users) {
+        const container = document.getElementById('company-users-list'); container.innerHTML = "";
+        users.forEach(u => {
+            if (u.id_user === currentUser.id_user) return;
+            const div = document.createElement('div'); div.className = "user-row";
+            const isOnline = !!onlineUsersCache[u.id_user];
+            div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role}</span></div>`;
+            div.addEventListener('click', () => { socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username }); });
+            container.appendChild(div);
+        });
+    }
+
+    function initMentionLogic() {
+        const mentionMenu = document.getElementById('mention-menu');
+        inputMsg.addEventListener('input', function(e) {
+            if (roomParticipantsCache.length <= 2) { mentionMenu.style.display = 'none'; return; }
+            const text = inputMsg.innerText, selection = window.getSelection(); if (!selection.rangeCount) return;
+            const caretPos = selection.getRangeAt(0).startOffset, textBeforeCaret = text.substring(0, caretPos), lastAtIndex = textBeforeCaret.lastIndexOf('@');
+            if (lastAtIndex !== -1 && (lastAtIndex === 0 || textBeforeCaret[lastAtIndex - 1] === ' ')) {
+                const query = textBeforeCaret.substring(lastAtIndex + 1).toLowerCase();
+                const filtered = roomParticipantsCache.filter(p => p.id_user !== currentUser.id_user && p.username.toLowerCase().includes(query));
+                if (filtered.length > 0) { renderMentionMenu(filtered, lastAtIndex, caretPos); } else { mentionMenu.style.display = 'none'; }
+            } else { mentionMenu.style.display = 'none'; }
+        });
+    }
+
+    function renderMentionMenu(users, addIndex, caretPos) {
+        const mentionMenu = document.getElementById('mention-menu'); mentionMenu.innerHTML = ""; mentionMenu.style.display = 'block';
+        users.forEach(u => {
+            const div = document.createElement('div'); div.className = 'mention-item'; div.innerText = `@${u.username}`;
+            div.addEventListener('click', function() { insertMentionIntoInput(u.username, u.id_user, addIndex, caretPos); });
+            mentionMenu.appendChild(div);
+        });
+    }
+
+    function insertMentionIntoInput(username, userId, addIndex, caretPos) {
+        const text = inputMsg.innerText, beforeAt = text.substring(0, addIndex), afterCaret = text.substring(caretPos);
+        inputMsg.innerHTML = beforeAt + `<span class="mention" data-user-id="${userId}" style="color:var(--primary-color); font-weight:bold; background:#eff6ff; padding:2px 4px; border-radius:4px;">@${username}</span>&nbsp;` + afterCaret;
+        document.getElementById('mention-menu').style.display = 'none'; inputMsg.focus();
+        const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
+    }
+
+    if (Notification.permission === "default") Notification.requestPermission();
+
+    window.onload = initApplication;
 </script>
+<div id="userInfoModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <h3 id="modalTitle" style="margin-top:0;">Информация о сотруднике</h3>
+        <div id="modalBody" style="line-height:1.6;"></div>
+        <button onclick="closeUserInfoModal()" style="margin-top:15px; width:100%;">Закрыть</button>
+    </div>
+</div>
 </body>
 </html>

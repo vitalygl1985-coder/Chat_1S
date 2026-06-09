@@ -21,6 +21,10 @@ if not os.path.exists("static"):
     os.makedirs("static")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
 @app.exception_handler(422)
 async def validation_exception_handler(request: Request, exc):
     print(f"Ошибка валидации JSON: {exc.errors()}") 
@@ -45,6 +49,7 @@ if not os.path.exists(UPLOAD_DIR):
 online_users = {}       
 message_reads = {}      
 
+# Pydantic модели
 class ShopInfo(BaseModel):
     address: Optional[str] = ""
     phones: Optional[str] = ""
@@ -76,6 +81,16 @@ class Base64ImageRequest(BaseModel):
 class AdminAuthRequest(BaseModel):
     id_user: str
     id_org: str
+
+class UpdateUserRoleRequest(BaseModel):
+    id_user: str
+    role: str
+
+class UpdateRoomRequest(BaseModel):
+    id_room: int
+    name: str
+    type: str
+    created_by: str   
 
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
@@ -209,7 +224,15 @@ def init_db():
                 phones TEXT,
                 schedule TEXT,
                 note TEXT
-            );                    
+            ); 
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id_user VARCHAR(100) PRIMARY KEY,
+                id_org UUID NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS admin_settings (
+                key VARCHAR(255) PRIMARY KEY,
+                value TEXT
+            );                           
         """)
         conn.commit()
     except Exception as e:
@@ -231,6 +254,102 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
+
+@app.get("/api/admin/users")
+async def admin_get_users():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT id_user, username, role FROM users ORDER BY username ASC")
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+@app.post("/api/admin/update-role")
+async def admin_update_role(data: UpdateUserRoleRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE users SET role = %s WHERE id_user = %s", (data.role, data.id_user))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "message": str(e)}
+    finally:
+        cur.close(); conn.close()
+
+@app.get("/api/admin/rooms")
+async def admin_get_rooms():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT id_room, name, type, created_by FROM rooms")
+        return cur.fetchall()
+    finally:
+        cur.close(); conn.close()
+
+@app.post("/api/admin/update-room")
+async def admin_update_room(data: UpdateRoomRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE rooms SET name = %s, type = %s, created_by = %s WHERE id_room = %s", 
+                    (data.name, data.type, data.created_by, data.id_room))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "message": str(e)}
+    finally:
+        cur.close(); conn.close()
+
+@app.get("/api/admin/files/{folder}")
+async def admin_get_files(folder: str):
+    target = "static" if folder == "static" else UPLOAD_DIR
+    if os.path.exists(target):
+        return os.listdir(target)
+    return []
+
+@app.post("/api/admin/upload-file/{folder}")
+async def admin_upload_file(folder: str, file: UploadFile = File(...)):
+    target_dir = "static" if folder == "static" else UPLOAD_DIR
+    file_location = os.path.join(target_dir, file.filename)
+    with open(file_location, "wb+") as file_object:
+        file_object.write(file.file.read())
+    return {"success": True, "filename": file.filename}
+
+@post("/api/admin/settings")
+async def admin_save_settings(settings: dict):
+    conn = get_db_connection(); cur = conn.cursor()
+    try:
+        for k, v in settings.items():
+            cur.execute("INSERT INTO admin_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (k, v))
+        conn.commit()
+        return {"success": True}
+    except Exception as e: conn.rollback(); return {"success": False, "message": str(e)}
+    finally: cur.close(); conn.close()
+
+@get("/api/admin/settings")
+async def admin_get_settings():
+    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT key, value FROM admin_settings")
+        return {r['key']: r['value'] for r in cur.fetchall()}
+    finally: cur.close(); conn.close()
+
+@post("/api/admin/sql")
+async def admin_execute_sql(data: dict):
+    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(data.get("sql", ""))
+        if data.get("sql", "").strip().lower().startswith("select"):
+            return {"success": True, "data": cur.fetchall()}
+        conn.commit()
+        return {"success": True, "message": "Запрос успешно выполнен"}
+    except Exception as e: conn.rollback(); return {"success": False, "message": str(e)}
+    finally: cur.close(); conn.close()
+    
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
