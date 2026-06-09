@@ -434,20 +434,6 @@
         }
     });
 
-    // Применяем цвет при загрузке страницы
-    fetch('/api/admin/settings')
-        .then(response => response.json())
-        .then(settings => {
-            const primaryColor = settings.theme_primary_color;
-            if (primaryColor) {
-                // Находим все кнопки и шапку (замените селекторы на ваши классы/теги)
-                document.querySelectorAll('button, header, .btn').forEach(el => {
-                    el.style.backgroundColor = primaryColor;
-                });
-            }
-        })
-        .catch(err => console.error("Ошибка применения темы:", err));
-
     async function showUserInfo(userId) {
         try {
             const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
@@ -1135,6 +1121,23 @@
     if (Notification.permission === "default") Notification.requestPermission();
 
     window.onload = initApplication;
+    
+    fetch('/api/admin/settings')
+    .then(res => res.json())
+    .then(settings => {
+        const color = settings.theme_primary_color;
+        if (color) {
+            // Применяем цвет для кнопок, шапок и активных элементов
+            const styleSheet = document.createElement("style");
+            styleSheet.type = "text/css";
+            styleSheet.innerText = `
+                button, .btn, .sidebar, header, .active {
+                    background-color: ${color} !important;
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+    }).catch(console.error);
 </script>
 <div id="userInfoModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">

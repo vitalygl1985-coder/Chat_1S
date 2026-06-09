@@ -824,13 +824,20 @@ async def add_user_to_room(sid, data):
     if not room_id or not user_id: return
     session = await sio.get_session(sid); conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT type FROM rooms WHERE id_room = %s", (room_id,))
+        cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
         room = cur.fetchone()
-        if room and room['type'] == 'admin_group' and session['role'] != 'admin':
-            await sio.emit('system_alert', {"message": "Добавлять в этот официальный кабинет может только Администратор!"}, to=sid); return
+        
+        if room:
+            # Админ-группы могут модерироваться только админами
+            if room['type'] == 'admin_group' and session['role'] != 'admin':
+                await sio.emit('system_alert', {"message": "Добавлять в этот официальный кабинет может только Администратор!"}, to=sid); return
+            
+            # Обычные группы/кабинеты - только их создателем
+            if room['type'] == 'group' and str(room['created_by']) != str(session['id_user']) and session['role'] != 'admin':
+                await sio.emit('system_alert', {"message": "Добавлять участников может только создатель кабинета!"}, to=sid); return
+
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_id, user_id))
         conn.commit()
-        log_admin_action(session.get('username', 'Admin'), f"Добавлен участник {user_id} в комнату {room_id}")
         cur.execute("SELECT rp.id_user, u.username, u.role FROM room_participants rp INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s", (room_id,))
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, room=f"room_{room_id}")
         await sio.emit('refresh_rooms_trigger')

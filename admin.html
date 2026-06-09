@@ -347,13 +347,10 @@
 
         async function loadDbTables() {
             const sqlQ = `
-                SELECT 
-                    table_name, 
-                    string_agg(column_name || ' (' || data_type || ')', ', ') AS columns
+                SELECT table_name, column_name, data_type 
                 FROM information_schema.columns 
-                WHERE table_schema='public' AND table_type='BASE TABLE'
-                GROUP BY table_name 
-                ORDER BY table_name;
+                WHERE table_schema = 'public' 
+                ORDER BY table_name, ordinal_position;
             `;
             const res = await fetch('/api/admin/sql', {
                 method: 'POST', 
@@ -365,9 +362,18 @@
             
             if (d.success && d.data) {
                 box.style.display = 'block';
-                box.innerHTML = d.data.map(t => `
+                
+        группируем таблицы
+                const tables = {};
+                d.data.forEach(row => {
+                    if (!tables[row.table_name]) tables[row.table_name] = [];
+                    tables[row.table_name].push(`${row.column_name} (${row.data_type})`);
+                });
+
+                box.innerHTML = Object.keys(tables).map(tableName => `
                     <div style="margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">
-                        <b style="color:#2563eb">${t.table_name}</b>: <span style="font-size:12px; color:#4b5563;">${t.columns}</span>
+                        <b style="color:#2563eb">${tableName}</b>: 
+                        <span style="font-size:12px; color:#4b5563;">${tables[tableName].join(', ')}</span>
                     </div>
                 `).join('');
             } else {
