@@ -154,6 +154,23 @@
 </head>
 <body>
 
+<div class="modal-overlay" id="secret-prompt-modal">
+    <div class="modal-window" style="width: 380px;">
+        <div class="modal-header">
+            <span style="font-weight: 600; font-size: 14px;">🔑 Задайте секретный код</span>
+            <span id="btn-close-prompt" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
+        </div>
+        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px;">
+            <label style="font-size:12px; font-weight:600; color:var(--text-main)">Секретный код:</label>
+            <input type="text" class="search-box" id="prompt-input" placeholder="Введите код...">
+        </div>
+        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
+            <button class="btn" id="btn-cancel-prompt" style="background:#9ca3af;">Отмена</button>
+            <button class="btn btn-primary" id="btn-confirm-prompt">ОК</button>
+        </div>
+    </div>
+</div>
+    
 <div class="modal-overlay" id="create-room-modal">
     <div class="modal-window" style="width: 420px;">
         <div class="modal-header">
@@ -626,11 +643,12 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         messagesStream.appendChild(div);
         const textBlock = document.getElementById(`text-container-${msgId}`);
 
-        if (msg.is_user_encrypted) {
+       if (msg.is_user_encrypted) {
             textBlock.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:12px;">🔒 Зашифрованное сообщение</span>`;
             const decryptBtn = document.createElement('button'); decryptBtn.className = 'btn-decrypt-inline'; decryptBtn.innerText = '🔑 Ввести код';
-            decryptBtn.onclick = function() {
-                let inputKey = prompt("Введите код:");
+            
+            decryptBtn.onclick = async function() {
+                let inputKey = await showCustomPrompt(); // Используем кастомную модалку
                 if (inputKey && inputKey.trim() !== "") {
                     try {
                         let decryptedText = CryptoJS.AES.decrypt(rawText, inputKey.trim()).toString(CryptoJS.enc.Utf8);
@@ -642,6 +660,45 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             textBlock.appendChild(decryptBtn);
         } else { renderProcessedText(textBlock, rawText); }
         messagesStream.scrollTop = messagesStream.scrollHeight;
+    }
+
+    function showCustomPrompt() {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('secret-prompt-modal');
+            const input = document.getElementById('prompt-input');
+            
+            // Открываем окно
+            modal.classList.add('open');
+            input.value = '';
+            input.focus();
+
+            // Обработка кнопок
+            const handleConfirm = () => {
+                const val = input.value;
+                closeModal();
+                resolve(val);
+            };
+
+            const closeModal = () => {
+                modal.classList.remove('open');
+                cleanup();
+            };
+
+            const cleanup = () => {
+                document.getElementById('btn-confirm-prompt').removeEventListener('click', handleConfirm);
+                document.getElementById('btn-cancel-prompt').removeEventListener('click', handleCancel);
+                document.getElementById('btn-close-prompt').removeEventListener('click', closeModal);
+            };
+
+            const handleCancel = () => {
+                closeModal();
+                resolve(null);
+            };
+
+            document.getElementById('btn-confirm-prompt').addEventListener('click', handleConfirm);
+            document.getElementById('btn-cancel-prompt').addEventListener('click', handleCancel);
+            document.getElementById('btn-close-prompt').addEventListener('click', closeModal);
+        });
     }
 
     function renderProcessedText(targetElement, contentText) {
@@ -712,13 +769,22 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             this.value = "";
         });
 
-        document.getElementById('btn-secret-toggle').addEventListener('click', function() {
+        document.getElementById('btn-secret-toggle').addEventListener('click', async function() {
             isSecretMode = !isSecretMode;
             if (isSecretMode) {
-                let key = prompt("Задайте секретный код:");
-                if (key && key.trim() !== "") { userSecretKey = key.trim(); this.innerHTML = "🔒 Зашифровано"; this.style.background = "#fef08a"; }
-                else { isSecretMode = false; resetSecretToggleUI(this); }
-            } else { resetSecretToggleUI(this); }
+                // Вызываем нашу кастомную модалку
+                let key = await showCustomPrompt(); 
+                if (key && key.trim() !== "") {
+                    userSecretKey = key.trim(); 
+                    this.innerHTML = "🔒 Зашифровано"; 
+                    this.style.background = "#fef08a"; 
+                } else { 
+                    isSecretMode = false; 
+                    resetSecretToggleUI(this); 
+                }
+            } else { 
+                resetSecretToggleUI(this); 
+            }
         });
 
         const emojiPopover = document.getElementById('emoji-popover');

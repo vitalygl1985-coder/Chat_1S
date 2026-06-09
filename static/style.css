@@ -29,8 +29,8 @@ button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; h
 
 /* Увеличиваем кнопки управления в шапке */
 #btn-archive-room, #btn-delete-room {
-    height: 64px !important; /* Увеличенный размер */
-    width: 64px !important;
+    height: 55px !important; /* Увеличенный размер */
+    width: 55px !important;
     cursor: pointer !important;
     transition: transform 0.2s;
 }
