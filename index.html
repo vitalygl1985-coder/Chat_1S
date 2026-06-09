@@ -365,6 +365,7 @@
     let onlineUsersCache = {}, messageReadsMap = {}; 
     let isSecretMode = false, userSecretKey = "";
     let roomCreatorId = null, roomSystemType = "";
+    let unreadRooms = {};
 
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
@@ -492,12 +493,22 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                 // Отображаем сообщение в чате, если мы находимся в этой комнате
                 if (msg.id_room == currentRoomId) {
                     displayMessage(msg, false);
+                } else {
+                    // Если сообщение пришло в фоновую комнату от другого сотрудника, помечаем её как непрочитанную
+                    if (msg.id_user_from !== currentUser.id_user) {
+                        unreadRooms[msg.id_room] = true;
+                        if (typeof filterAndRenderRooms === 'function') {
+                            filterAndRenderRooms(); // Перерисовываем левую панель для подсветки
+                        }
+                    }
                 }
 
                 // Оповещения (звук и уведомление) срабатывают, если сообщение пришло от другого сотрудника
                 if (msg.id_user_from !== currentUser.id_user) {
                     // 1. Звук
-                    beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+                    if (typeof beepingSound !== 'undefined') {
+                        beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+                    }
 
                     // 2. Браузерное уведомление
                     if (Notification.permission === "granted") {
@@ -583,12 +594,18 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
         
         allRooms.forEach(room => {
-            const div = document.createElement('div'); div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
+            const div = document.createElement('div'); 
+            div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
             let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
             
             let displayName = room.name;
             if (room.type === 'private' && room.name.includes(' ⇄ ')) {
                 displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
+            }
+
+            if (unreadRooms[room.id_room]) {
+                div.style.background = "#fee2e2"; // Нежно-красный фон
+                div.style.borderLeft = "4px solid #ef4444";
             }
 
             const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
@@ -635,7 +652,9 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         } else {
             managementRow.style.display = 'none';
         }
-
+        delete unreadRooms[roomId];
+        filterAndRenderRooms();
+        
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId }); 
         socket.emit('get_room_history', { room_id: roomId }); 
