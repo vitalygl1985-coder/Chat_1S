@@ -496,7 +496,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                 } else {
                     // Если сообщение пришло в фоновую комнату от другого сотрудника, помечаем её как непрочитанную
                     if (msg.id_user_from !== currentUser.id_user) {
-                        unreadRooms[msg.id_room] = true;
+                        unreadRooms[String(msg.id_room)] = true;
                         if (typeof filterAndRenderRooms === 'function') {
                             filterAndRenderRooms(); // Перерисовываем левую панель для подсветки
                         }
@@ -624,8 +624,8 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                 displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
             }
 
-            if (unreadRooms[room.id_room]) {
-                div.style.background = "#fee2e2"; // Нежно-красный фон
+            if (unreadRooms[String(room.id_room)]) {
+                div.style.background = "#fee2e2";
                 div.style.borderLeft = "4px solid #ef4444";
             }
 
@@ -673,7 +673,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         } else {
             managementRow.style.display = 'none';
         }
-        delete unreadRooms[roomId];
+        delete unreadRooms[String(roomId)];
         filterAndRenderRooms();
 
         messagesStream.innerHTML = "";
