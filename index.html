@@ -716,8 +716,13 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         } else { targetElement.innerHTML = contentText; }
     }
 
-    window.requestDeleteMessage = function(msgId) { if (confirm("Удалить это сообщение?")) socket.emit('delete_message_request', { message_id: parseInt(msgId), room_id: parseInt(currentRoomId), user_id: currentUser.id_user, role: currentUser.role }); };
-
+    window.requestDeleteMessage = function(msgId) { 
+        if (confirm("Удалить это сообщение?")) socket.emit('delete_message_request', { message_id: parseInt(msgId), room_id: parseInt(currentRoomId), user_id: currentUser.id_user, role: currentUser.role }); 
+    };
+    window.markMessageAsRead = function(messageId) {
+        if (!currentUser) return;
+        socket.emit('message_read_click', { message_id: messageId, username: currentUser.username });
+    };
     function initUIEventListeners() {
         document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
 
