@@ -86,7 +86,12 @@
         .read-users-list { font-style: italic; color: #6b7280; font-size: 10px; }
 
         .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
-        .message-box:hover .msg-delete-trigger { display: block; }
+        .msg-edit-trigger { position: absolute; right: 24px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+        .msg-reply-trigger { position: absolute; right: 44px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+        
+        .message-box:hover .msg-delete-trigger,
+        .message-box:hover .msg-edit-trigger,
+        .message-box:hover .msg-reply-trigger { display: block !important; }
 
         .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
         .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; }
@@ -274,7 +279,7 @@
                 style="display: none; align-items: center; gap: 10px;">
                 <img src="/static/archive_btn.png" id="btn-archive-room" 
                     style="cursor:pointer; height:45px; width:45px; object-fit:contain;" 
-                    title="Архивация сообщений" alt="Архив">           
+                    title="Архивация сообщений" alt="Архив">            
                 <img src="/static/del_btn.png" id="btn-delete-room" 
                     style="cursor:pointer; height:65px; width:65px; object-fit:contain;" 
                     title="Удаление комнаты" alt="Удалить">
@@ -388,21 +393,19 @@
     };
 
     // ИСПРАВЛЕНО: Надежное переключение аккордеона
-document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-    const content = document.getElementById('inactive-rooms-list');
-    const header = this;
-    
-    // Переключаем класс
-    content.classList.toggle('open');
-    
-    // Меняем состояние видимости принудительно, если CSS не сработал
-    if (content.classList.contains('open')) {
-        content.style.display = 'block';
-        header.querySelector('span:last-child').innerText = '(...) ▲';
-    } else {
-        content.style.display = 'none';
-        header.querySelector('span:last-child').innerText = '(' + document.getElementById('inactive-count').innerText.match(/\d+/) + ') ▼';
-    }
+    document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+        const content = document.getElementById('inactive-rooms-list');
+        const header = this;
+        
+        content.classList.toggle('open');
+        
+        if (content.classList.contains('open')) {
+            content.style.display = 'block';
+            header.querySelector('span:last-child').innerText = '(...) ▲';
+        } else {
+            content.style.display = 'none';
+            header.querySelector('span:last-child').innerText = '(' + document.getElementById('inactive-count').innerText.match(/\d+/) + ') ▼';
+        }
     });
 
     document.getElementById('btn-toggle-right-view').addEventListener('click', function() {
@@ -424,7 +427,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             
             if (data.shop_name) {
                 const body = document.getElementById('modalBody');
-                // Устанавливаем нужный порядок полей
                 body.innerHTML = `
                     <div class="modal-row"><span class="modal-label">Организация: </span>${data.shop_name}</div>
                     <div class="modal-row"><span class="modal-label">Магазин: </span>${data.note}</div>
@@ -445,7 +447,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
 
     function updateLogo() {
         const logo = document.getElementById('chat-logo');
-        // Добавляем timestamp, чтобы браузер не брал старую картинку из кэша
         logo.src = "/static/logo.png?v=" + new Date().getTime();
     }
 
@@ -494,27 +495,22 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         
         socket.on('new_message', (msg) => { 
             if (msg) {
-                // Отображаем сообщение в чате, если мы находимся в этой комнате
                 if (msg.id_room == currentRoomId) {
                     displayMessage(msg, false);
                 } else {
-                    // Если сообщение пришло в фоновую комнату от другого сотрудника, помечаем её как непрочитанную
                     if (msg.id_user_from !== currentUser.id_user) {
                         unreadRooms[String(msg.id_room)] = true;
                         if (typeof filterAndRenderRooms === 'function') {
-                            filterAndRenderRooms(); // Перерисовываем левую панель для подсветки
+                            filterAndRenderRooms();
                         }
                     }
                 }
 
-                // Оповещения (звук и уведомление) срабатывают, если сообщение пришло от другого сотрудника
                 if (msg.id_user_from !== currentUser.id_user) {
-                    // 1. Звук
                     if (typeof beepingSound !== 'undefined') {
                         beepingSound.play().catch(e => console.log("Ошибка звука:", e));
                     }
 
-                    // 2. Браузерное уведомление
                     if (Notification.permission === "granted") {
                         const room = latestRoomsListCache.find(r => r.id_room === msg.id_room);
                         const roomTitle = room ? (room.name.includes(' ⇄ ') ? room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim() : room.name) : "Чат";
@@ -524,7 +520,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                             icon: '/static/logo.png'
                         });
 
-                        // Клик по уведомлению
                         notification.onclick = function() {
                             window.focus();
                             if (room) {
@@ -533,7 +528,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                                 selectRoomById(msg.id_room);
                             }
                             
-                            // Плавная прокрутка к сообщению
                             setTimeout(() => {
                                 const targetMsg = document.querySelector(`[data-msg-id="${msg.id_message}"]`);
                                 if (targetMsg) {
@@ -549,15 +543,14 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             }
         });
 
-        ocket.on('message_edited', (data) => {
+        // ИСПРАВЛЕНО: опечатка ocket -> socket
+        socket.on('message_edited', (data) => {
             const textContainer = document.getElementById(`text-container-${data.id_message}`);
             if (textContainer) {
-                // Проверяем на шифрование, если нужно, или просто рендерим
                 renderProcessedText(textContainer, data.new_text);
                 
-                // Подсвечиваем измененное сообщение
                 textContainer.style.transition = "background 1s";
-                textContainer.style.background = "#fef3c7"; // Желтоватый оттенок
+                textContainer.style.background = "#fef3c7";
                 setTimeout(() => textContainer.style.background = "transparent", 2000);
             }
         });
@@ -593,7 +586,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
                     displayMessage(msg, true);
                 });
 
-                // Проверка: если последнее сообщение не прочитано текущим пользователем
                 if (data.messages.length > 0) {
                     const lastMsg = data.messages[data.messages.length - 1];
                     const isRead = lastMsg.reads && lastMsg.reads.includes(currentUser.username);
@@ -649,7 +641,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
             div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
             
-            // ТРЕБОВАНИЕ: Если участников меньше двух, комната улетает в блок неактивных
             if (room.participants_count < 2) { 
                 inactiveContainer.appendChild(div); inactiveCount++; 
             } else { 
@@ -658,29 +649,24 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         });
         document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
     }
-    // ИСПРАВЛЕНО: Логика отображения кнопки управления комнатой и доступа к ней
-    // 1. Исправленный обработчик аккордеона
-document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-    var content = document.getElementById('inactive-rooms-list');
-    // Исправлено: .toggle -> .classList.toggle
-    content.classList.toggle('open');
-    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
-});
 
-    // 2. Исправленная функция выбора комнаты
+    document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+        var content = document.getElementById('inactive-rooms-list');
+        content.classList.toggle('open');
+        this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
+    });
+
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId; 
         roomCreatorId = createdBy; 
         roomSystemType = type;
         
-        // Безопасное отображение заголовка для приватов
         let headerName = name;
         if (type === 'private' && name.includes(' ⇄ ')) {
             headerName = name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
         }
         document.getElementById('current-chat-title').innerText = headerName || "Кабинет";
         
-        // Управление кнопками: приводим к строкам для безопасного сравнения
         const managementRow = document.getElementById('chat-management-controls');
         const isOwner = (String(roomCreatorId) === String(currentUser.id_user));
         const isAdmin = (currentUser.role === 'admin');
@@ -717,18 +703,17 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             }
         } catch(e) {}
 
+        const escapedText = rawText.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
+
         let deleteBtnHtml = "";
         let editBtnHtml = "";
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
-            editBtnHtml = `<span class="msg-edit-trigger" style="position: absolute; right: 42px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted);" onclick="requestEditMessage(${msgId}, '${escapedText}')" title="Изменить">✏️</span>`;
+            editBtnHtml = `<span class="msg-edit-trigger" style="display: none;" onclick="requestEditMessage(${msgId}, '${escapedText}')" title="Изменить">✏️</span>`;
         }
 
-        // Кнопка ответа (появляется при наведении)
-        const escapedText = rawText.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
-        let replyBtnHtml = `<span class="msg-reply-trigger" style="position: absolute; right: 26px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted);" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
+        let replyBtnHtml = `<span class="msg-reply-trigger" style="display: none;" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
         
-        // Блок цитаты, если это ответ
         let replyQuoteHtml = "";
         if (msg.reply_to && msg.reply_text) {
             let preview = msg.reply_text.startsWith('/download/') ? '[Вложение]' : msg.reply_text;
@@ -746,6 +731,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         div.innerHTML = `
             <div class="message-box">
                 ${deleteBtnHtml}
+                ${editBtnHtml}
                 ${replyBtnHtml}
                 <div class="msg-meta"><span class="msg-author">${author}</span><span>${timeStr}</span></div>
                 ${replyQuoteHtml}
@@ -785,11 +771,9 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
     }
 
     window.requestEditMessage = async function(msgId, currentText) {
-        // Используем вашу кастомную модалку или встроенный prompt
         let newText = prompt("Редактирование сообщения:", currentText);
         if (newText && newText.trim() !== "" && newText !== currentText) {
             if (isSecretMode && userSecretKey) {
-                // Если включено шифрование, шифруем новый текст
                 newText = CryptoJS.AES.encrypt(newText.trim(), userSecretKey).toString();
             }
             socket.emit('edit_message', { id_message: msgId, new_text: newText });
@@ -814,12 +798,10 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             const modal = document.getElementById('secret-prompt-modal');
             const input = document.getElementById('prompt-input');
             
-            // Открываем окно
             modal.classList.add('open');
             input.value = '';
             input.focus();
 
-            // Обработка кнопок
             const handleConfirm = () => {
                 const val = input.value;
                 closeModal();
@@ -924,7 +906,6 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         document.getElementById('btn-secret-toggle').addEventListener('click', async function() {
             isSecretMode = !isSecretMode;
             if (isSecretMode) {
-                // Вызываем нашу кастомную модалку
                 let key = await showCustomPrompt(); 
                 if (key && key.trim() !== "") {
                     userSecretKey = key.trim(); 
@@ -970,7 +951,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
             text: text, 
             is_secret: isSecretMode, 
             ui_styles: JSON.stringify(currentTextStyles),
-            reply_to: currentReplyMessageId // Передаем ID цитируемого сообщения
+            reply_to: currentReplyMessageId
         });
         
         inputMsg.innerHTML = ""; 
@@ -978,7 +959,7 @@ document.getElementById('inactive-accordion-trigger').addEventListener('click', 
         resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
         
         if (typeof cancelReply === 'function') {
-            cancelReply(); // Сбрасываем панель ответа после отправки
+            cancelReply();
         }
     }
 

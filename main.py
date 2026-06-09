@@ -13,7 +13,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import secrets
 from fastapi.staticfiles import StaticFiles
-import os
 
 app = FastAPI()
 
@@ -24,7 +23,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.exception_handler(422)
 async def validation_exception_handler(request: Request, exc):
-    # Выводим в лог детальную ошибку, чтобы понять, какое поле JSON не нравится Pydantic
     print(f"Ошибка валидации JSON: {exc.errors()}") 
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
@@ -43,7 +41,7 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-# ─── СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ ───
+# СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ
 online_users = {}       
 message_reads = {}      
 
@@ -59,7 +57,7 @@ class OneCAuthRequest(BaseModel):
     username: Optional[str] = ""
     role: Optional[str] = "user"
     shop_name: Optional[str] = None
-    shop_info: Optional[ShopInfo] = None # Pydantic теперь будет ждать объект
+    shop_info: Optional[ShopInfo] = None
 
 class OneCMessageRequest(BaseModel):
     room_id: int
@@ -79,8 +77,6 @@ class AdminAuthRequest(BaseModel):
     id_user: str
     id_org: str
 
-
-
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
     if url and url.startswith("postgres://"):
@@ -93,12 +89,7 @@ def clean_uuid(org_id_str):
     except ValueError:
         return "00000000-0000-0000-0000-000000000001"
 
-
 def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=None):
-    """
-    Проверяет и создает системные комнаты ОБЩИЙ и АДМИН.
-    Дополнительно привязывает пользователя к комнате магазина (shop_name).
-    """
     # 1. ОБЩИЙ
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
@@ -132,7 +123,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
         admin_room_id = room_admin['id_room'] if isinstance(room_admin, dict) else room_admin[0]
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
 
-    # 3. МАГАЗИН (Твое дополнение)
+    # 3. МАГАЗИН
     if shop_name and shop_name.strip() != "":
         cur.execute(
             "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
@@ -149,12 +140,15 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
         shop_room_id = room_shop['id_room'] if isinstance(room_shop, dict) else room_shop[0]
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (shop_room_id, user_id))
 
-
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS organizations (
+                id_org UUID PRIMARY KEY,
+                name VARCHAR(255)
+            );
             CREATE TABLE IF NOT EXISTS users (
                 id_user VARCHAR(100) PRIMARY KEY,
                 id_org UUID NOT NULL,
@@ -237,7 +231,6 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
-
 @app.get("/", response_class=HTMLResponse)
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -248,12 +241,9 @@ async def get_chat_page():
 async def get_style():
     return FileResponse("style.css", media_type="text/css")
 
-
-# 1. Сначала определи функцию ВНЕ эндпоинта
 def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
     if not shop_name or shop_name.strip() == "":
         return
-    # 1. Обновляем или вставляем данные магазина в таблицу shops
     if shop_info:
         cur.execute("""
             INSERT INTO user_shop_info (id_user, shop_name, address, phones, schedule, note)
@@ -263,14 +253,12 @@ def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
             phones = EXCLUDED.phones, schedule = EXCLUDED.schedule, note = EXCLUDED.note
         """, (user_id, shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note)
         )  
-    # Ищем комнату магазина
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
         (id_org, shop_name)
     )
     room = cur.fetchone()
     
-    # Если нет — создаем
     if not room:
         cur.execute(
             "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'group', %s, %s) RETURNING id_room", 
@@ -279,8 +267,6 @@ def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
         room = cur.fetchone()
         
     room_id = room['id_room'] if isinstance(room, dict) else room[0]
-    
-    # Привязываем сотрудника
     cur.execute(
         "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
         (room_id, user_id)
@@ -296,15 +282,10 @@ async def onec_auth(data: OneCAuthRequest):
         print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
         print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
 
-        try:
-            cur.execute(
-                "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
-                (validated_org, f"Организация {validated_org[:8]}")
-            )
-        except psycopg2.Error:
-            conn.rollback()
-            conn = get_db_connection()
-            cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
+            (validated_org, f"Организация {validated_org[:8]}")
+        )
 
         cur.execute("""
             INSERT INTO users (id_user, id_org, username, role, is_active)
@@ -313,7 +294,6 @@ async def onec_auth(data: OneCAuthRequest):
         """, (data.id_user, validated_org, data.username, data.role))
 
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
-       
         sync_user_shop_room(cur, validated_org, data.id_user, data.shop_name, data.shop_info)
 
         one_time_ticket = secrets.token_hex(32)
@@ -322,7 +302,6 @@ async def onec_auth(data: OneCAuthRequest):
             "INSERT INTO auth_tickets (ticket, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
             (one_time_ticket, data.id_user, validated_org, data.username, data.role)
         )
-
         
         conn.commit()
         return {"success": True, "token": one_time_ticket}
@@ -342,7 +321,6 @@ async def get_user_info(user_id: str, x_token: Optional[str] = Header(None)):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Берем данные конкретного сотрудника из новой таблицы
         cur.execute("SELECT * FROM user_shop_info WHERE id_user = %s", (user_id,))
         return cur.fetchone() or {"error": "Информация не найдена"}
     finally: cur.close(); conn.close()
@@ -382,7 +360,6 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     finally: 
         cur.close(); conn.close()
 
-
 @app.get("/api/web/rooms")
 async def web_get_rooms(x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
@@ -405,7 +382,6 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
         }
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
     finally: cur.close(); conn.close()
-
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -430,7 +406,6 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/admin/upload-logo")
 async def upload_logo(file: UploadFile = File(...)):
-    # Сохраняем файл в папку static/
     file_location = f"static/logo.png"
     with open(file_location, "wb+") as file_object:
         file_object.write(file.file.read())
@@ -453,7 +428,6 @@ async def download_file(file_uuid_with_ext: str):
         return FileResponse(file_path, media_type='application/force-download', headers={'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\' {encoded_name}'})
     return HTMLResponse("Файл не найден", status_code=404)
 
-
 @app.get("/download-archive/{file_uuid}")
 async def download_archive_endpoint(file_uuid: str):
     mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
@@ -463,8 +437,7 @@ async def download_archive_endpoint(file_uuid: str):
         if file_uuid in filename and filename.endswith(".json"): target_filename = filename; break
     return FileResponse(path=os.path.join(UPLOAD_DIR, target_filename), media_type="application/json", headers={'Content-Disposition': f'attachment; filename="{urllib.parse.quote(file_map[file_uuid])}"'})
 
-
-# ─── СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO ───
+# СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -574,6 +547,7 @@ async def send_message(sid, data):
         await sio.emit('new_message', new_msg, room=f"room_{room_id}")
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
+
 @sio.event
 async def edit_message(sid, data):
     msg_id = data.get('id_message')
@@ -600,6 +574,7 @@ async def edit_message(sid, data):
         print(e)
     finally: 
         cur.close(); conn.close()
+
 @sio.event
 async def message_read_click(sid, data):
     msg_id = data.get('message_id')
@@ -654,12 +629,9 @@ async def add_user_to_room(sid, data):
         conn.commit()
         cur.execute("SELECT rp.id_user, u.username, u.role FROM room_participants rp INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s", (room_id,))
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, room=f"room_{room_id}")
-        
-        # КРИТИЧЕСКИЙ ФИКС: Оповещаем абсолютно всех клиентов о необходимости перерисовать левую панель комнат
         await sio.emit('refresh_rooms_trigger')
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
-
 
 @sio.event
 async def remove_user_from_room(sid, data):
@@ -675,13 +647,9 @@ async def remove_user_from_room(sid, data):
         conn.commit()
         cur.execute("SELECT rp.id_user, u.username, u.role FROM room_participants rp INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s", (room_id,))
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, room=f"room_{room_id}")
-        
-        # КРИТИЧЕСКИЙ ФИКС: Принудительно заставляем ВСЕХ пользователей мессенджера обновить свои списки комнат в реальном времени.
-        # Теперь комната с 1 участником мгновенно улетит в неактивные у всех клиентов!
         await sio.emit('refresh_rooms_trigger')
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
-
 
 @sio.event
 async def delete_room_request(sid, data):
@@ -691,8 +659,6 @@ async def delete_room_request(sid, data):
     try:
         cur.execute("SELECT type, created_by FROM rooms WHERE id_room = %s", (room_id,))
         room = cur.fetchone()    
-        # ТРЕБОВАНИЕ: Удаление доступно только автору (создателю) комнаты
-        # Админ имеет право удалить комнату, только если он её создатель или тип admin_group
         if room:
             is_creator = str(room['created_by']) == str(user_id)
             is_admin_of_group = (room['type'] == 'admin_group' and user_role == 'admin')
