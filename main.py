@@ -584,21 +584,14 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session['role'] == 'admin':
-            # Админ видит ВСЕ admin_group организации + свои личные/магазинные группы
             query = """
-                SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-                FROM rooms r
-                LEFT JOIN room_participants rp ON r.id_room = rp.id_room
-                WHERE r.id_org = %s::uuid 
-                  AND (
-                      TRIM(r.type) = 'admin_group' 
-                      OR rp.id_user = %s
-                  )
-                ORDER BY CASE WHEN TRIM(r.type)='admin_group' THEN 1 ELSE 2 END, r.name ASC
+                SELECT id_room, name, type FROM rooms WHERE id_org = %s::uuid
             """
-            print(session['id_org'])
-            cur.execute(query, (str(session['id_org']), session['id_user']))
+            cur.execute(query, (str(session['id_org']),))
+            all_data = cur.fetchall()
+            print(f"DEBUG: АДМИН ВИДИТ ВСЕГО КОМНАТ: {len(all_data)}")
+            for row in all_data:
+                print(f"DEBUG: Комната '{row['name']}' имеет тип '{row['type']}'")
 
         else:
             # Обычный юзер видит только то, где он участник
