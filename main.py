@@ -586,11 +586,11 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
         if session['role'] == 'admin':
             query = """
                 SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
                 FROM rooms r
                 LEFT JOIN room_participants rp ON r.id_room = rp.id_room
                 WHERE r.id_org = %s::uuid 
-                  AND (TRIM(r.type) = 'admin_group' OR rp.id_user = %s)
+                AND (TRIM(r.type) = 'admin_group' OR rp.id_user = %s)
                 ORDER BY r.name ASC
             """
             cur.execute(query, (str(session['id_org']), session['id_user']))
