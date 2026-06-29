@@ -692,6 +692,8 @@ async def download_archive_endpoint(file_uuid: str):
     return FileResponse(path=os.path.join(UPLOAD_DIR, target_filename), media_type="application/json", headers={'Content-Disposition': f'attachment; filename="{urllib.parse.quote(file_map[file_uuid])}"'})
 
 # СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO
+# Глобальный словарь для поиска: {id_user: sid}
+user_sid_map = {}
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -700,7 +702,8 @@ async def connect(sid, environ, auth=None):
     id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
     username = urllib.parse.unquote(params.get('username', ''))
     user_role = urllib.parse.unquote(params.get('role', 'user'))
-    
+    user_sid_map[id_user] = sid # Запоминаем связь
+
     if not id_user: return False
 
     conn = get_db_connection(); cur = conn.cursor()
@@ -712,10 +715,18 @@ async def connect(sid, environ, auth=None):
         conn.rollback()
     finally: 
         cur.close(); conn.close()
+    
         
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
     online_users[id_user] = username
     await sio.emit('user_statuses', online_users)
+
+@sio.event
+async def call_request(sid, data):
+    target_user_id = data.get('target_user_id')
+    target_sid = user_sid_map.get(target_user_id)
+    if target_sid:
+        await sio.emit('incoming_call', {'from_sid': sid}, to=target_sid)
 
 @sio.event
 async def join_room_pool(sid, data):
@@ -1043,10 +1054,16 @@ async def create_private_chat(sid, data):
     finally: cur.close(); conn.close()
 
 @sio.event
+async def get_sid_by_user(sid, data):
+    target_user_id = data.get('user_id')
+    return user_sid_map.get(target_user_id)
+
+@sio.event
 async def disconnect(sid):
     session = await sio.get_session(sid)
     if session and 'id_user' in session:
         online_users.pop(session['id_user'], None)
+        user_sid_map.pop(session['id_user'], None)
         await sio.emit('user_statuses', online_users)
 
 @sio.event
