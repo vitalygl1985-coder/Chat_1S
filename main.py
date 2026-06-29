@@ -593,16 +593,24 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session['role'] == 'admin':
-            # Админ видит ВСЕ admin_group организации + свои личные/магазинные группы
-            # Временно используйте этот упрощенный запрос для админа:
             query = """
-                SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
-                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                SELECT id_room, name, type, created_by, 
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
+                FROM rooms
+                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
+                
+                UNION
+                
+                SELECT r.id_room, r.name, r.type, r.created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
                 FROM rooms r
-                WHERE r.id_org = %s::uuid 
-                -- Убрали лишние JOIN и фильтры, чтобы увидеть, придет ли КЕЙСЕР
+                INNER JOIN room_participants rp ON r.id_room = rp.id_room
+                WHERE r.id_org = %s::uuid AND rp.id_user = %s
+                
+                ORDER BY name ASC
             """
-            cur.execute(query, (str(session['id_org']),))
+            # Передаем: id_org для admin_group, id_org для обычных групп, id_user для обычных групп
+            cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
 
         else:
             # Обычный юзер видит только то, где он участник
