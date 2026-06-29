@@ -442,9 +442,11 @@ async def get_chat_page():
 async def get_style():
     return FileResponse("style.css", media_type="text/css")
 
-def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
+def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=None):
     if not shop_name or shop_name.strip() == "":
         return
+
+    # Сохраняем информацию о магазине
     if shop_info:
         cur.execute("""
             INSERT INTO user_shop_info (id_user, shop_name, address, phones, schedule, note)
@@ -452,22 +454,32 @@ def sync_user_shop_room(cur, id_org, user_id, shop_name, shop_info=None):
             ON CONFLICT (id_user) DO UPDATE SET 
             shop_name = EXCLUDED.shop_name, address = EXCLUDED.address, 
             phones = EXCLUDED.phones, schedule = EXCLUDED.schedule, note = EXCLUDED.note
-        """, (user_id, shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note)
-        )  
+        """, (user_id, shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note))
+
+    # 1. Пытаемся найти существующий кабинет по имени
     cur.execute(
-        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
+        "SELECT id_room, type FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
         (id_org, shop_name)
     )
     room = cur.fetchone()
-    
-    if not room:
+
+    # 2. Логика создания или использования кабинета
+    if room:
+        room_id = room['id_room']
+        # Если админ зашел в комнату, которая была создана как 'group', 
+        # он может принудительно обновить её тип на 'admin_group'
+        if user_role == 'admin' and room['type'] != 'admin_group':
+            cur.execute("UPDATE rooms SET type = 'admin_group' WHERE id_room = %s", (room_id,))
+    else:
+        # Кабинета нет — создаем с нужным типом
+        new_type = 'admin_group' if user_role == 'admin' else 'group'
         cur.execute(
-            "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'group', %s, %s) RETURNING id_room", 
-            (id_org, shop_name, user_id)
+            "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, %s, %s, %s) RETURNING id_room", 
+            (id_org, new_type, shop_name, user_id)
         )
-        room = cur.fetchone()
-        
-    room_id = room['id_room'] if isinstance(room, dict) else room[0]
+        room_id = cur.fetchone()[0]
+
+    # 3. Добавляем пользователя, если его нет в участниках
     cur.execute(
         "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
         (room_id, user_id)
@@ -495,7 +507,7 @@ async def onec_auth(data: OneCAuthRequest):
         """, (data.id_user, validated_org, data.username, data.role))
 
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
-        sync_user_shop_room(cur, validated_org, data.id_user, data.shop_name, data.shop_info)
+        sync_user_shop_room(cur, validated_org, data.id_user, data.role, data.shop_name, data.shop_info)
 
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
