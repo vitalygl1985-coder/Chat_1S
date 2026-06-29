@@ -354,7 +354,7 @@
                     placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
                 </div>
 
-                <button id="record-btn" onmousedown="startRecording()" onmouseup="stopRecording()" class="btn btn-secondary" style="padding: 10px 15px; margin-right: 5px; font-size: 16px;">🎤</button>
+                <button id="record-btn" class="btn" style="background: #6b7280; padding: 10px 15px; margin-right: 5px; font-size: 16px;" title="Удерживайте для записи">🎤</button>
 
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
@@ -396,6 +396,7 @@
     let currentReplyMessageId = null;
     let mediaRecorder;
     let audioChunks = [];
+    let isRecording = false;
     
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
@@ -439,52 +440,80 @@
         }
     });
 
-    async function startRecording() {
-        try {
-            // Запрашиваем доступ к микрофону
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            
-            mediaRecorder.ondataavailable = event => {
-                if (event.data.size > 0) audioChunks.push(event.data);
-            };
-            
-            mediaRecorder.onstop = async () => {
-                // Собираем кусочки аудио в один файл
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                audioChunks = [];
-                
-                // Отправляем файл на ваш сервер
-                const formData = new FormData();
-                formData.append('file', audioBlob, 'voice.webm');
-                
-                const response = await fetch('/upload', { method: 'POST', body: formData });
-                const result = await response.json();
-                
-                // Отправляем сообщение в чат
-                if (result.url) {
-                    const audioMessage = `<audio controls src="${result.url}" style="height: 40px;"></audio>`;
-                    socket.emit('send_message', { 
-                        room_id: currentRoomId, 
-                        text: audioMessage 
-                    });
-                }
-            };
-            
-            mediaRecorder.start();
-            document.getElementById('record-btn').style.background = 'red'; // Индикация записи
-        } catch (err) {
-            console.error("Нет доступа к микрофону:", err);
-        }
-    }
+    function initMicrophone() {
+        const recordBtn = document.getElementById('record-btn');
+        if (!recordBtn) return;
 
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-            mediaRecorder.stop();
-            document.getElementById('record-btn').style.background = ''; // Убираем индикацию
-        }
-    }
+        // Отключаем контекстное меню при долгом нажатии на телефоне
+        recordBtn.oncontextmenu = (e) => e.preventDefault();
 
+        const startRec = async (e) => {
+            if (e) e.preventDefault();
+            if (isRecording) return;
+
+            // Жесткая проверка на HTTP
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Микрофон заблокирован! Чат должен быть открыт по защищенному протоколу HTTPS.");
+                return;
+            }
+
+            try {
+                audioChunks = []; // Очищаем буфер
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    if (audioChunks.length === 0) return;
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioChunks = [];
+
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'voice.webm');
+
+                    try {
+                        const response = await fetch('/upload', { method: 'POST', body: formData });
+                        const result = await response.json();
+                        if (result.url) {
+                            const audioMessage = `<audio controls src="${result.url}" style="height: 40px; outline: none;"></audio>`;
+                            socket.emit('send_message', { room_id: currentRoomId, text: audioMessage });
+                        }
+                    } catch (uploadErr) {
+                        alert("Ошибка отправки голосового сообщения.");
+                    }
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.style.background = '#ef4444'; // Кнопка становится красной
+            } catch (err) {
+                alert("Разрешите доступ к микрофону во всплывающем окне браузера!");
+                console.error("Ошибка микрофона:", err);
+            }
+        };
+
+        const stopRec = (e) => {
+            // Проверяем, идет ли запись, прежде чем останавливать
+            if (isRecording && mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                // Отключаем аппаратный стрим, чтобы исчез красный значок записи во вкладке
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                recordBtn.style.background = '#6b7280'; // Возвращаем серый цвет
+            }
+        };
+
+        // Привязываем события для мышки (десктоп)
+        recordBtn.addEventListener('mousedown', startRec);
+        window.addEventListener('mouseup', stopRec); // Ловим отпускание, даже если мышка ушла с кнопки
+
+        // Привязываем события для пальца (смартфоны)
+        recordBtn.addEventListener('touchstart', startRec, {passive: false});
+        window.addEventListener('touchend', stopRec);
+    }
     async function showUserInfo(userId) {
         try {
             const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
@@ -526,7 +555,12 @@
             if (data.success) {
                 sessionToken = data.token; currentUser = data.user;
                 document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
-                renderEmojiGrid('smile'); connectSockets(); initUIEventListeners(); initMentionLogic(); initScreenshotEditorLogic();
+                renderEmojiGrid('smile'); 
+                connectSockets(); 
+                initUIEventListeners(); 
+                initMentionLogic(); 
+                initScreenshotEditorLogic();
+                initMicrophone();
             }
         } catch (err) { alert("Не удалось связаться с сервером."); }
     }
