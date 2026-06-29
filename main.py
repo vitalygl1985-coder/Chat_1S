@@ -593,24 +593,10 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session['role'] == 'admin':
-            query = """
-                SELECT id_room, name, type, created_by, 
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
-                FROM rooms
-                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
-                
-                UNION
-                
-                SELECT r.id_room, r.name, r.type, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-                FROM rooms r
-                INNER JOIN room_participants rp ON r.id_room = rp.id_room
-                WHERE r.id_org = %s::uuid AND rp.id_user = %s
-                
-                ORDER BY name ASC
-            """
-            # Передаем: id_org для admin_group, id_org для обычных групп, id_user для обычных групп
-            cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
+            query = "SELECT name, type FROM rooms WHERE id_org = %s::uuid"
+            cur.execute(query, (str(session['id_org']),))
+            all_db_rooms = cur.fetchall()
+            print(f"DEBUG_ALL_ROOMS: В базе для этой организации найдено: {[r['name'] for r in all_db_rooms]}")
 
         else:
             # Обычный юзер видит только то, где он участник
