@@ -546,32 +546,41 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '30 seconds'", (data.ticket,))
+        # Увеличим время жизни билета до 60 секунд (на случай задержек сети)
+        cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '60 seconds'", (data.ticket,))
         ticket_data = cur.fetchone()
+        
         if not ticket_data: 
             raise HTTPException(status_code=403, detail="Билет авторизации истек или не существует.")
             
         cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
         session_token = secrets.token_hex(32)
         
-        cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (ticket_data['id_user'],))
+        # Явное приведение UUID к строке для безопасности
+        user_id = str(ticket_data['id_user'])
+        org_id = str(ticket_data['id_org'])
+        
+        cur.execute("DELETE FROM api_sessions WHERE id_user = %s", (user_id,))
         cur.execute(
-            "INSERT INTO api_sessions (token, id_user, id_org, username, role) VALUES (%s, %s, %s, %s, %s)", 
-            (session_token, ticket_data['id_user'], ticket_data['id_org'], ticket_data['username'], ticket_data['role'])
+            "INSERT INTO api_sessions (token, id_user, id_org, username, role) VALUES (%s, %s, %s::uuid, %s, %s)", 
+            (session_token, user_id, org_id, ticket_data['username'], ticket_data['role'])
         )
         conn.commit()
+        
         return {
             "success": True, 
             "token": session_token, 
             "user": {
-                "id_user": ticket_data['id_user'], 
+                "id_user": user_id, 
                 "username": ticket_data['username'], 
                 "role": ticket_data['role'], 
-                "id_org": str(ticket_data['id_org'])
+                "id_org": org_id
             }
         }
     except Exception as e: 
         conn.rollback()
+        # ВАЖНО: это выведет реальную ошибку в логи Railway
+        print(f"DEBUG ERROR: {type(e).__name__}: {str(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
     finally: 
         cur.close(); conn.close()
@@ -584,14 +593,21 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session['role'] == 'admin':
+            # Админ видит ВСЕ admin_group организации + свои личные/магазинные группы
             query = """
-                SELECT id_room, name, type FROM rooms WHERE id_org = %s::uuid
+                SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                FROM rooms r
+                LEFT JOIN room_participants rp ON r.id_room = rp.id_room
+                WHERE r.id_org = %s::uuid 
+                  AND (
+                      TRIM(r.type) = 'admin_group' 
+                      OR rp.id_user = %s
+                  )
+                ORDER BY CASE WHEN TRIM(r.type)='admin_group' THEN 1 ELSE 2 END, r.name ASC
             """
-            cur.execute(query, (str(session['id_org']),))
-            all_data = cur.fetchall()
-            print(f"DEBUG: АДМИН ВИДИТ ВСЕГО КОМНАТ: {len(all_data)}")
-            for row in all_data:
-                print(f"DEBUG: Комната '{row['name']}' имеет тип '{row['type']}'")
+            print(session['id_org'])
+            cur.execute(query, (str(session['id_org']), session['id_user']))
 
         else:
             # Обычный юзер видит только то, где он участник

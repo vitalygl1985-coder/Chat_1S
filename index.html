@@ -656,8 +656,10 @@
             const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
             div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
             
-            if (room.participants_count < 2) { 
-                inactiveContainer.appendChild(div); inactiveCount++; 
+           const isSystemAdminRoom = (room.type === 'admin_group' && currentUser.role === 'admin');
+            if (room.participants_count < 2 && !isSystemAdminRoom) { 
+                inactiveContainer.appendChild(div); 
+                inactiveCount++; 
             } else { 
                 activeContainer.appendChild(div); 
             }
