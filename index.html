@@ -391,6 +391,12 @@
 <script>
     window.onerror = function() { return true; };
 
+    console.log("СКРИПТЫ ЗАГРУЖЕНЫ");
+        window.onerror = function(msg, url, line) {
+            alert("Критическая ошибка JS: " + msg + " в строке " + line);
+            return true;
+        };
+
     let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
     let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
     let onlineUsersCache = {}, messageReadsMap = {}; 
@@ -1347,8 +1353,10 @@
     // ИНИЦИАЛИЗАЦИЯ
     if (Notification.permission === "default") Notification.requestPermission();
     document.addEventListener("DOMContentLoaded", initApplication);
-    
-    window.onload = initApplication;
+
+    //window.onload = initApplication;
+    console.log("Попытка запуска initApplication...");
+    initApplication();
     
     fetch('/api/admin/settings')
     .then(res => res.json())
