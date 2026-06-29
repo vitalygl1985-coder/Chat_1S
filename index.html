@@ -142,6 +142,9 @@
         .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
         .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 13px; }
         .modal-user-item:hover { background: var(--bg-main); }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; }
+        .modal-row { margin-bottom: 8px; font-size: 13px; }
+        .modal-label { font-weight: bold; }
         .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
         .participant-checkbox { width: 16px; height: 16px; cursor: pointer; }
         
@@ -1287,26 +1290,19 @@
         // Ожидание оффера мы перехватываем в socket.on('offer')
     }
 
-    // --- ИСПРАВЛЕННЫЙ WEBRTC БЛОК ---
-    
+    // --- WEBRTC ЛОГИКА ---
     function setupPeerConnection(targetSid) {
-        // Если соединение уже есть, закрываем его перед созданием нового
         if (peerConnection) peerConnection.close();
-        
         const pc = new RTCPeerConnection(config);
         
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('ice_candidate', { target_sid: targetSid, candidate: event.candidate });
-            }
+        pc.onicecandidate = (e) => {
+            if (e.candidate) socket.emit('ice_candidate', { target_sid: targetSid, candidate: e.candidate });
         };
-
-        pc.ontrack = (event) => {
+        pc.ontrack = (e) => {
             const remoteAudio = new Audio();
-            remoteAudio.srcObject = event.streams[0];
+            remoteAudio.srcObject = e.streams[0];
             remoteAudio.play();
         };
-
         return pc;
     }
 
@@ -1314,12 +1310,10 @@
         const targetSid = await new Promise((resolve) => {
             socket.emit('get_sid_by_user', { user_id: targetUserId }, (sid) => resolve(sid));
         });
-
         if (!targetSid) { alert("Пользователь не в сети!"); return; }
 
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         peerConnection = setupPeerConnection(targetSid);
-        
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
         const offer = await peerConnection.createOffer();
@@ -1332,17 +1326,13 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 peerConnection = setupPeerConnection(data.from_sid);
-                
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 
                 await peerConnection.setRemoteDescription(data.offer);
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
                 socket.emit('answer', { target_sid: data.from_sid, answer: answer });
-            } catch (err) {
-                console.error("Ошибка при принятии звонка:", err);
-                alert("Не удалось получить доступ к микрофону.");
-            }
+            } catch (err) { alert("Ошибка микрофона: " + err); }
         }
     });
 
@@ -1354,9 +1344,10 @@
         if (peerConnection) await peerConnection.addIceCandidate(data.candidate);
     });
 
-
+    // ИНИЦИАЛИЗАЦИЯ
     if (Notification.permission === "default") Notification.requestPermission();
-
+    document.addEventListener("DOMContentLoaded", initApplication);
+    
     window.onload = initApplication;
     
     fetch('/api/admin/settings')
