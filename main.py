@@ -580,17 +580,33 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
 async def web_get_rooms(x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
     if not session: raise HTTPException(status_code=401)
+    
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        query = """
-            SELECT r.id_room, r.name, r.type, r.created_by,
-                   (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-            FROM rooms r
-            INNER JOIN room_participants rp ON r.id_room = rp.id_room
-            WHERE r.id_org = %s::uuid AND rp.id_user = %s
-            ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
-        """
-        cur.execute(query, (str(session['id_org']), session['id_user']))
+        if session['role'] == 'admin':
+            # Админ видит: admin_group (все) + те обычные/private, где он участник
+            query = """
+                SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                FROM rooms r
+                LEFT JOIN room_participants rp ON r.id_room = rp.id_room
+                WHERE r.id_org = %s::uuid 
+                  AND (r.type = 'admin_group' OR rp.id_user = %s)
+                ORDER BY CASE WHEN r.type='admin_group' THEN 1 ELSE 2 END, r.name ASC
+            """
+            cur.execute(query, (str(session['id_org']), session['id_user']))
+        else:
+            # Обычный юзер видит только то, где он участник
+            query = """
+                SELECT r.id_room, r.name, r.type, r.created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                FROM rooms r
+                INNER JOIN room_participants rp ON r.id_room = rp.id_room
+                WHERE r.id_org = %s::uuid AND rp.id_user = %s
+                ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
+            """
+            cur.execute(query, (str(session['id_org']), session['id_user']))
+            
         all_rooms = cur.fetchall()
         return {
             "active": [r for r in all_rooms if r['participants_count'] >= 2], 
