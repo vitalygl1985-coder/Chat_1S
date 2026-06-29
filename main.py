@@ -465,7 +465,7 @@ def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=No
 
     # 2. Логика создания или использования кабинета
     if room:
-        room_id = room['id_room']
+        room_id = room['id_room'] if isinstance(room, dict) else room[0]
         # Если админ зашел в комнату, которая была создана как 'group', 
         # он может принудительно обновить её тип на 'admin_group'
         if user_role == 'admin' and room['type'] != 'admin_group':
@@ -507,7 +507,7 @@ async def onec_auth(data: OneCAuthRequest):
         """, (data.id_user, validated_org, data.username, data.role))
 
         check_and_create_global_rooms(cur, validated_org, data.id_user, data.role)
-        sync_user_shop_room(cur, validated_org, data.id_user, data.role, data.shop_name, data.shop_info)
+        sync_user_shop_room(cur, validated_org, data.id_user, data.shop_name, data.shop_info)
 
         one_time_ticket = secrets.token_hex(32)
         cur.execute("DELETE FROM auth_tickets WHERE id_user = %s", (data.id_user,))
