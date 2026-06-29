@@ -354,8 +354,9 @@
                     placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
                 </div>
 
-                <button id="record-btn" class="btn" style="background: #6b7280; padding: 10px 15px; margin-right: 5px; font-size: 16px;" title="Удерживайте для записи">🎤</button>
-
+                <<button id="record-btn" class="btn" style="background: transparent !important; padding: 4px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; margin-right: 5px;" title="Удерживайте для записи">
+                    <img src="/static/mic_btn.png" id="mic-icon-img" alt="Микрофон" style="width: 36px; height: 36px; object-fit: contain; pointer-events: none;">
+                </button>
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
@@ -488,7 +489,8 @@
 
                 mediaRecorder.start();
                 isRecording = true;
-                recordBtn.style.background = '#ef4444'; // Кнопка становится красной
+                recordBtn.style.background = 'rgba(239, 68, 68, 0.2)'; 
+                recordBtn.style.borderRadius = '50%';
             } catch (err) {
                 alert("Разрешите доступ к микрофону во всплывающем окне браузера!");
                 console.error("Ошибка микрофона:", err);
@@ -502,7 +504,8 @@
                 // Отключаем аппаратный стрим, чтобы исчез красный значок записи во вкладке
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 isRecording = false;
-                recordBtn.style.background = '#6b7280'; // Возвращаем серый цвет
+                recordBtn.style.background = 'transparent';
+                recordBtn.style.borderRadius = '0';
             }
         };
 
