@@ -353,6 +353,9 @@
                     id="input-msg" contenteditable="true" 
                     placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
                 </div>
+
+                <button id="record-btn" onmousedown="startRecording()" onmouseup="stopRecording()" class="btn btn-secondary" style="padding: 10px 15px; margin-right: 5px; font-size: 16px;">🎤</button>
+
                 <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
@@ -391,6 +394,8 @@
     let roomCreatorId = null, roomSystemType = "";
     let unreadRooms = {};
     let currentReplyMessageId = null;
+    let mediaRecorder;
+    let audioChunks = [];
     
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
@@ -433,6 +438,52 @@
             this.innerText = "👥 Все сотрудники"; this.style.background = "#4b5563";
         }
     });
+
+    async function startRecording() {
+        try {
+            // Запрашиваем доступ к микрофону
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = async () => {
+                // Собираем кусочки аудио в один файл
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                audioChunks = [];
+                
+                // Отправляем файл на ваш сервер
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'voice.webm');
+                
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const result = await response.json();
+                
+                // Отправляем сообщение в чат
+                if (result.url) {
+                    const audioMessage = `<audio controls src="${result.url}" style="height: 40px;"></audio>`;
+                    socket.emit('send_message', { 
+                        room_id: currentRoomId, 
+                        text: audioMessage 
+                    });
+                }
+            };
+            
+            mediaRecorder.start();
+            document.getElementById('record-btn').style.background = 'red'; // Индикация записи
+        } catch (err) {
+            console.error("Нет доступа к микрофону:", err);
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            document.getElementById('record-btn').style.background = ''; // Убираем индикацию
+        }
+    }
 
     async function showUserInfo(userId) {
         try {
