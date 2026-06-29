@@ -624,11 +624,8 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
             
         all_rooms = cur.fetchall()
         
-        # --- DEBUG ---
-        for r in all_rooms:
-            print(f"DEBUG: Found room '{r['name']}', ID: {r['id_room']}, Type: {r['type']}, Participants: {r['participants_count']}")
-        # -------------
-
+        print(f"DEBUG: Отправляю список комнат на фронтенд: {[r['name'] for r in all_rooms]}")
+    
         return {
             "active": [r for r in all_rooms if r['participants_count'] >= 2], 
             "inactive_text_group": [r for r in all_rooms if r['participants_count'] < 2]
