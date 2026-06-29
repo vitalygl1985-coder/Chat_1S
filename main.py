@@ -593,6 +593,7 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
                 AND (TRIM(r.type) = 'admin_group' OR rp.id_user = %s)
                 ORDER BY r.name ASC
             """
+            print(session['id_org'])
             cur.execute(query, (str(session['id_org']), session['id_user']))
         else:
             # Обычный юзер видит только то, где он участник
@@ -604,6 +605,7 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
                 WHERE r.id_org = %s::uuid AND rp.id_user = %s
                 ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
             """
+            print(session['id_org'])
             cur.execute(query, (str(session['id_org']), session['id_user']))
             
         all_rooms = cur.fetchall()
