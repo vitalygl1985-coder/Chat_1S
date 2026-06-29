@@ -730,18 +730,42 @@ async def get_rooms_again(sid):
     session = await sio.get_session(sid)
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        query = """
-            SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
-                   (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-            FROM rooms r
-            INNER JOIN room_participants rp ON r.id_room = rp.id_room
-            WHERE r.id_org = %s::uuid AND rp.id_user = %s
-            ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
-        """
-        cur.execute(query, (session['id_org'], session['id_user']))
+        if session.get('role') == 'admin':
+            # Админ видит все 'admin_group' своей организации ПЛЮС все комнаты, где он участник
+            query = """
+                SELECT id_room, name, type, id_org, created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
+                FROM rooms
+                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
+                
+                UNION
+                
+                SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                FROM rooms r
+                INNER JOIN room_participants rp ON r.id_room = rp.id_room
+                WHERE r.id_org = %s::uuid AND rp.id_user = %s
+                
+                ORDER BY name ASC
+            """
+            cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
+        else:
+            # Обычный юзер видит только то, где он участник
+            query = """
+                SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
+                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+                FROM rooms r
+                INNER JOIN room_participants rp ON r.id_room = rp.id_room
+                WHERE r.id_org = %s::uuid AND rp.id_user = %s
+                ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
+            """
+            cur.execute(query, (str(session['id_org']), session['id_user']))
+            
         await sio.emit('rooms_list', cur.fetchall(), to=sid)
-    except Exception as e: print(e)
-    finally: cur.close(); conn.close()
+    except Exception as e: 
+        print(f"Ошибка в get_rooms_again: {e}")
+    finally: 
+        cur.close(); conn.close()
 
 @sio.event
 async def get_users_list(sid):
