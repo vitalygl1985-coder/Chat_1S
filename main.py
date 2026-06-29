@@ -110,7 +110,7 @@ def clean_uuid(org_id_str):
 def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=None):
     # 1. ОБЩИЙ
     cur.execute(
-        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' AND type = 'admin_group' LIMIT 1", 
+        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' LIMIT 1", 
         (id_org,)
     )
     room_general = cur.fetchone()
@@ -127,7 +127,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     # 2. АДМИН
     if user_role == 'admin':
         cur.execute(
-            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' AND type = 'admin_group' LIMIT 1", 
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' LIMIT 1", 
             (id_org,)
         )
         room_admin = cur.fetchone()
@@ -144,7 +144,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     # 3. МАГАЗИН
     if shop_name and shop_name.strip() != "":
         cur.execute(
-            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s AND type = 'group' LIMIT 1", 
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
             (id_org, shop_name)
         )
         room_shop = cur.fetchone()
