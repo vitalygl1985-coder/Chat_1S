@@ -456,20 +456,24 @@
 
     function initMicrophone() {
         const recordBtn = document.getElementById('record-btn');
-        if (!recordBtn) return;
+        if (recordBtn) {
+            recordBtn.addEventListener('mousedown', startRec);
 
-        // Отключаем контекстное меню при долгом нажатии на телефоне
-        recordBtn.oncontextmenu = (e) => e.preventDefault();
+            // Отключаем контекстное меню при долгом нажатии на телефоне
+            recordBtn.oncontextmenu = (e) => e.preventDefault();
 
-        const startRec = async (e) => {
-            if (e) e.preventDefault();
-            if (isRecording) return;
+            const startRec = async (e) => {
+                if (e) e.preventDefault();
+                if (isRecording) return;
 
-            // Жесткая проверка на HTTP
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("Микрофон заблокирован! Чат должен быть открыт по защищенному протоколу HTTPS.");
-                return;
-            }
+                // Жесткая проверка на HTTP
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert("Микрофон заблокирован! Чат должен быть открыт по защищенному протоколу HTTPS.");
+                    return;
+                }
+        } else {
+            console.warn("Элемент record-btn не найден, пропускаем инициализацию.");
+}    
 
             try {
                 audioChunks = []; // Очищаем буфер
