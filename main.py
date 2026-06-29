@@ -1049,4 +1049,25 @@ async def disconnect(sid):
         online_users.pop(session['id_user'], None)
         await sio.emit('user_statuses', online_users)
 
+@sio.event
+async def offer(sid, data):
+    """Браузер А отправляет предложение (SDP) браузеру Б"""
+    target_sid = data.get('target_sid')
+    if target_sid:
+        await sio.emit('offer', {'offer': data['offer'], 'from_sid': sid}, to=target_sid)
+
+@sio.event
+async def answer(sid, data):
+    """Браузер Б отвечает браузеру А"""
+    target_sid = data.get('target_sid')
+    if target_sid:
+        await sio.emit('answer', {'answer': data['answer'], 'from_sid': sid}, to=target_sid)
+
+@sio.event
+async def ice_candidate(sid, data):
+    """Обмен сетевыми данными (ICE Candidates)"""
+    target_sid = data.get('target_sid')
+    if target_sid:
+        await sio.emit('ice_candidate', {'candidate': data['candidate'], 'from_sid': sid}, to=target_sid)
+
 app.mount("/socket.io", socket_app)

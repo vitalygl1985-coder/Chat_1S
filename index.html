@@ -402,6 +402,10 @@
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
 
+    let localStream;
+    let peerConnection;
+
+    const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
     const inputMsg = document.getElementById('input-msg');
     const messagesStream = document.getElementById('messages-stream');
     const createRoomModal = document.getElementById('create-room-modal');
@@ -1236,6 +1240,52 @@
         document.getElementById('mention-menu').style.display = 'none'; inputMsg.focus();
         const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
+
+
+    // 1. Инициализация звонка (ОФФЕР)
+    async function startCall(targetSid) {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        peerConnection = new RTCPeerConnection(config);
+        
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        
+        // Отправляем ICE-кандидаты на сервер
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('ice_candidate', { target_sid: targetSid, candidate: event.candidate });
+            }
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        socket.emit('offer', { target_sid: targetSid, offer: offer });
+    }
+
+    // 2. Обработка входящих сигналов (слушаем сервер)
+    socket.on('offer', async (data) => {
+        if (confirm("Входящий звонок! Принять?")) {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) socket.emit('ice_candidate', { target_sid: data.from_sid, candidate: event.candidate });
+            };
+            
+            await peerConnection.setRemoteDescription(data.offer);
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', { target_sid: data.from_sid, answer: answer });
+        }
+    });
+
+    socket.on('answer', async (data) => {
+        await peerConnection.setRemoteDescription(data.answer);
+    });
+
+    socket.on('ice_candidate', async (data) => {
+        await peerConnection.addIceCandidate(data.candidate);
+    });
 
     if (Notification.permission === "default") Notification.requestPermission();
 
