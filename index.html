@@ -635,35 +635,43 @@
     }
 
     function processRoomsDivision(allRooms) {
-        const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
-        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
+        const activeContainer = document.getElementById('active-rooms-list');
+        const inactiveContainer = document.getElementById('inactive-rooms-list');
         
+        // Очистка
+        activeContainer.innerHTML = ""; 
+        inactiveContainer.innerHTML = ""; 
+        let inactiveCount = 0;
+
+        console.log("DEBUG: Рендеринг списка комнат, всего:", allRooms.length);
+
         allRooms.forEach(room => {
-            const div = document.createElement('div'); 
-            div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
-            let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
-            
-            let displayName = room.name;
-            if (room.type === 'private' && room.name.includes(' ⇄ ')) {
-                displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
-            }
-
-            if (unreadRooms[String(room.id_room)]) {
-                div.style.background = "#fee2e2";
-                div.style.borderLeft = "4px solid #ef4444";
-            }
-
-            const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
-            div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
-            
-           const isSystemAdminRoom = (room.type === 'admin_group' && currentUser.role === 'admin');
-            if (room.participants_count < 2 && !isSystemAdminRoom) { 
-                inactiveContainer.appendChild(div); 
-                inactiveCount++; 
-            } else { 
-                activeContainer.appendChild(div); 
+            try {
+                const div = document.createElement('div'); 
+                div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
+                
+                // Защита от отсутствия поля type
+                const rType = room.type || 'group';
+                let icon = rType === 'private' ? '💬 ' : (rType === 'admin_group' ? '👑 ' : '👥 ');
+                
+                const labelSpan = document.createElement('span'); 
+                labelSpan.innerText = icon + (room.name || 'Без названия'); 
+                div.appendChild(labelSpan);
+                
+                div.addEventListener('click', () => selectRoomById(room.id_room, room.name, rType, room.created_by));
+                
+                // Логика: админ-группы всегда активны (вверху)
+                if (room.participants_count < 2 && rType !== 'admin_group') { 
+                    inactiveContainer.appendChild(div); 
+                    inactiveCount++; 
+                } else { 
+                    activeContainer.appendChild(div); 
+                }
+            } catch (err) {
+                console.error("Ошибка при отрисовке комнаты:", room, err);
             }
         });
+        
         document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
     }
 
