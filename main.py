@@ -593,11 +593,17 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session['role'] == 'admin':
-            query = "SELECT name, type FROM rooms WHERE id_org = %s::uuid"
-            cur.execute(query, (str(session['id_org']),))
-            all_db_rooms = cur.fetchall()
-            print(f"DEBUG_ALL_ROOMS: В базе для этой организации найдено: {[r['name'] for r in all_db_rooms]}")
-
+            # ЗАПРОС БЕЗ ФИЛЬТРОВ ВООБЩЕ
+            cur.execute("SELECT id_room, name, type FROM rooms WHERE id_org = %s::uuid", (str(session['id_org']),))
+            all_rooms = cur.fetchall()
+            print(f"DEBUG_FINAL: БАЗА ОТДАЛА: {len(all_rooms)} комнат. Имена: {[r['name'] for r in all_rooms]}")
+            
+            # А теперь принудительно отдадим их все на фронтенд, 
+            # чтобы исключить ошибку в Python-фильтрации
+            return {
+                "active": all_rooms, 
+                "inactive_text_group": []
+            }
         else:
             # Обычный юзер видит только то, где он участник
             query = """
