@@ -584,16 +584,17 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session['role'] == 'admin':
-            # Админ видит: 
-            # 1. Все admin_group (системные)
-            # 2. Только те group/private, где он является участником
+            # Админ видит ВСЕ admin_group организации + свои личные/магазинные группы
             query = """
                 SELECT DISTINCT r.id_room, r.name, r.type, r.created_by,
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
                 FROM rooms r
                 LEFT JOIN room_participants rp ON r.id_room = rp.id_room
                 WHERE r.id_org = %s::uuid 
-                  AND (TRIM(r.type) = 'admin_group' OR rp.id_user = %s)
+                  AND (
+                      TRIM(r.type) = 'admin_group' 
+                      OR rp.id_user = %s
+                  )
                 ORDER BY CASE WHEN TRIM(r.type)='admin_group' THEN 1 ELSE 2 END, r.name ASC
             """
             print(session['id_org'])
