@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Корпоративный чат 1С</title>
     <link rel="stylesheet" href="/static/style.css?v=1">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
@@ -30,7 +30,6 @@
             max-height: calc(100vh - 25px);
             background: var(--bg-panel);
             overflow: hidden;
-            position: relative;
         }
 
         .system-footer-links {
@@ -56,11 +55,11 @@
         .accordion-content.open { display: block; }
 
         .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; }
-        .chat-header { height: 55px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; gap: 10px; }
+        .chat-header { height: 55px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; }
         
-        .chat-title-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .chat-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-title-area { display: flex; flex-direction: column; }
+        .chat-title { font-weight: 600; font-size: 15px; }
+        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; }
         .chat-actions { display: flex; gap: 6px; }
         
         .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: white; }
@@ -95,7 +94,7 @@
         .message-box:hover .msg-reply-trigger { display: block !important; }
 
         .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
-        .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; flex-wrap: wrap; }
+        .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; }
         .toolbar-item { cursor: pointer; font-size: 13px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
         .toolbar-item:hover { background: var(--bg-main); }
         .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
@@ -125,29 +124,29 @@
         .user-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
         .user-row:hover { background: var(--bg-main); }
         
-        .avatar-container { position: relative; width: 28px; height: 28px; flex-shrink: 0; }
+        .avatar-container { position: relative; width: 28px; height: 28px; }
         .avatar { width: 28px; height: 28px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: #4b5563; }
         .status-badge { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; }
         .status-badge.online { background: var(--online-color); }
         .status-badge.offline { background: var(--offline-color); }
-        .user-info-meta { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .user-role { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-info-meta { flex: 1; display: flex; flex-direction: column; }
+        .user-role { font-size: 10px; color: var(--text-muted); }
 
         .view-pane { display: none; }
         .view-pane.active { display: block; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000; }
         .modal-overlay.open { display: flex; }
-        .modal-window { width: 380px; max-width: 90vw; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
+        .modal-window { width: 380px; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
         .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
         .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 13px; }
         .modal-user-item:hover { background: var(--bg-main); }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; max-width: 90vw; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; }
         .modal-row { margin-bottom: 8px; font-size: 13px; }
         .modal-label { font-weight: bold; }
         .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
-        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; }
         
         .btn-remove-participant { border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
         .btn-remove-participant:hover { background: #ffeeeb; }
@@ -160,66 +159,47 @@
         .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
         .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
 
-        /* Анимация пульсации для звонка */
-        @keyframes pulse-green {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        /* === КРАСИВЫЙ БАННЕР ЗВОНКА === */
+        .call-banner {
+            position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
+            background: #1f2937; color: #fff; padding: 12px 20px; border-radius: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 15px;
+            z-index: 10000; transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: 1px solid rgba(255,255,255,0.1); width: 90%; max-width: 360px;
         }
-        .btn-call-action:hover { transform: scale(1.1); }
+        .call-banner.visible { top: 20px; }
+        .call-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .call-name { font-weight: bold; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .call-status { font-size: 12px; color: #9ca3af; }
+        .call-actions { display: flex; gap: 10px; align-items: center; }
+        
+        .call-btn {
+            width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s;
+            font-size: 18px;
+        }
+        .call-btn:hover { transform: scale(1.1); }
+        .call-btn.accept { background: #10b981; animation: pulse-green 1.5s infinite; }
+        .call-btn.decline, .call-btn.end { background: #ef4444; }
 
-        /* --- МОБИЛЬНАЯ АДАПТАЦИЯ --- */
-        .mobile-overlay-panel { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 90; }
-        .mobile-overlay-panel.active { display: block; }
-        .mobile-menu-btn { display: none; background: transparent; border: none; font-size: 24px; cursor: pointer; color: var(--primary-color); padding: 5px; flex-shrink: 0; }
-
-        @media (max-width: 768px) {
-            .app-container { display: flex; width: 100%; }
-            
-            .left-panel, .right-panel {
-                position: absolute; top: 0; height: 100%; z-index: 100;
-                width: 85%; max-width: 320px; transition: transform 0.3s ease;
-                background: var(--bg-panel);
-            }
-            .left-panel { left: 0; transform: translateX(-100%); border-right: 1px solid var(--border-color); }
-            .right-panel { right: 0; transform: translateX(100%); border-left: 1px solid var(--border-color); }
-            .left-panel.open, .right-panel.open { transform: translateX(0); box-shadow: 0 0 20px rgba(0,0,0,0.3); }
-            
-            .chat-panel { width: 100%; flex: 1; }
-            .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
-            
-            .chat-header { padding: 0 10px; }
-            .chat-header .logo-link { display: none; } /* Прячем лого на мобилках для экономии места в шапке */
-            
-            .chat-actions img { width: 30px !important; height: 30px !important; }
-            
-            /* Предотвращение авто-зума на iOS при фокусе инпута */
-            .input-msg-div { font-size: 16px; } 
-            
-            .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
-            .message { max-width: 90%; }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
     </style>
 </head>
 <body>
 
-<!-- МОДАЛКА ВХОДЯЩЕГО ЗВОНКА -->
-<div class="modal-overlay" id="incoming-call-modal" style="z-index: 9999;">
-    <div class="modal-window" style="width: 320px; text-align: center; padding: 20px; border-radius: 16px; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
-        <div style="width: 80px; height: 80px; background: var(--primary-color); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; margin: 0 auto 15px auto;" id="incoming-call-avatar">
-            К
-        </div>
-        <h3 style="margin-bottom: 5px; font-size: 18px; color: var(--text-main);" id="incoming-call-name">Входящий звонок</h3>
-        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 25px;">Входящий аудиовызов...</p>
-        <div style="display: flex; justify-content: center; gap: 20px;">
-            <button id="btn-decline-call" class="btn-call-action" style="background: #ef4444; color: white; border: none; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); transition: transform 0.2s;">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.58 10.58a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0-2.83-2.83l-4.59 4.59a2 2 0 0 0 0 2.83z"></path><path d="M16 2v4h-4"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path></svg>
-            </button>
-            <button id="btn-accept-call" class="btn-call-action" style="background: #10b981; color: white; border: none; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4); transition: transform 0.2s; animation: pulse-green 1.5s infinite;">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-            </button>
-        </div>
+<div class="call-banner" id="call-banner">
+    <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; flex-shrink: 0;" id="call-avatar"></div>
+    <div class="call-info">
+        <span class="call-name" id="call-name">Сотрудник</span>
+        <span class="call-status" id="call-status">Входящий вызов...</span>
     </div>
+    <div class="call-actions" id="call-actions-container">
+        </div>
 </div>
 
 <div class="modal-overlay" id="secret-prompt-modal">
@@ -326,9 +306,6 @@
 </div>
 
 <div class="app-container">
-    <!-- Слой затемнения для мобильного меню -->
-    <div class="mobile-overlay-panel" id="mobile-overlay-panel"></div>
-
     <div class="panel left-panel">
         <div class="panel-header">
             <h3 style="font-size: 14px;">Кабинеты</h3>
@@ -349,8 +326,7 @@
 
     <div class="panel chat-panel">
         <div class="chat-header">
-            <button class="mobile-menu-btn" id="btn-mobile-left">☰</button>
-            <a href="https://100letnik.md" target="_blank" class="logo-link">
+            <a href="https://100letnik.md" target="_blank">
                 <img id="chat-logo" src="/static/logo.png" alt="100ЛЕТНИК" 
                 style="height: 50px; width: 50px; margin-right: 15px; cursor: pointer;">
             </a>
@@ -358,7 +334,8 @@
                 <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
                 <div class="chat-user-identity" id="header-user-identity">Загрузка сессии...</div>
             </div>
-            <div class="chat-actions" id="chat-management-controls" style="display: none; align-items: center; gap: 10px;">
+            <div class="chat-actions" id="chat-management-controls" 
+                style="display: none; align-items: center; gap: 10px;">
                 <img src="/static/archive_btn.png" id="btn-archive-room" 
                     style="cursor:pointer; height:45px; width:45px; object-fit:contain;" 
                     title="Архивация сообщений" alt="Архив">            
@@ -366,7 +343,6 @@
                     style="cursor:pointer; height:65px; width:65px; object-fit:contain;" 
                     title="Удаление комнаты" alt="Удалить">
             </div>
-            <button class="mobile-menu-btn" id="btn-mobile-right">👥</button>
         </div>
              
         <div class="messages-container" id="messages-stream"></div>
@@ -418,7 +394,7 @@
                 </button>
                 <div class="input-msg-div" 
                     id="input-msg" contenteditable="true" 
-                    placeholder="Сообщение... Скриншот (Ctrl+V)">
+                    placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
                 </div>
 
                 <button id="record-btn" class="btn" style="background: transparent !important; padding: 4px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; margin-right: 5px;" title="Удерживайте для записи">
@@ -454,12 +430,11 @@
 
 <script>
     window.onerror = function() { return true; };
-
     console.log("СКРИПТЫ ЗАГРУЖЕНЫ");
-        window.onerror = function(msg, url, line) {
-            console.error("JS Error:", msg, "at", line);
-            return true;
-        };
+    window.onerror = function(msg, url, line) {
+        console.error("JS Error:", msg, "at", line);
+        return true;
+    };
 
     let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
     let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
@@ -478,6 +453,13 @@
     let localStream;
     let peerConnection;
     let iceCandidateQueue = []; 
+
+    // Переменные для контроля звонка (UI-баннер)
+    let incomingCallData = null;
+    let currentCallTargetSid = null;
+    let currentCallName = "";
+    let callTimerInterval = null;
+    let callSeconds = 0;
 
     const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
     const inputMsg = document.getElementById('input-msg');
@@ -660,6 +642,124 @@
 
     const beepingSound = new Audio('/static/beep.mp3');
 
+    // === ЛОГИКА УПРАВЛЕНИЯ UI ЗВОНКА ===
+    function updateCallTimer() {
+        callSeconds++;
+        const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const s = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('call-status').innerText = `${m}:${s}`;
+    }
+
+    function showCallBanner(state, name) {
+        const banner = document.getElementById('call-banner');
+        const avatar = document.getElementById('call-avatar');
+        const nameEl = document.getElementById('call-name');
+        const statusEl = document.getElementById('call-status');
+        const actionsEl = document.getElementById('call-actions-container');
+
+        nameEl.innerText = name;
+        avatar.innerText = name.charAt(0).toUpperCase();
+        banner.classList.add('visible');
+
+        actionsEl.innerHTML = '';
+
+        if (state === 'incoming') {
+            statusEl.innerText = 'Входящий аудиозвонок...';
+            actionsEl.innerHTML = `
+                <button class="call-btn accept" onclick="acceptCall()" title="Принять">📞</button>
+                <button class="call-btn decline" onclick="declineCall()" title="Отклонить">❌</button>
+            `;
+        } else if (state === 'outgoing') {
+            statusEl.innerText = 'Звоним...';
+            actionsEl.innerHTML = `
+                <button class="call-btn end" onclick="endCall()" title="Завершить">❌</button>
+            `;
+        } else if (state === 'active') {
+            callSeconds = 0;
+            if (callTimerInterval) clearInterval(callTimerInterval);
+            callTimerInterval = setInterval(updateCallTimer, 1000);
+            statusEl.innerText = '00:00';
+            actionsEl.innerHTML = `
+                <button class="call-btn end" onclick="endCall()" title="Завершить">❌</button>
+            `;
+        }
+    }
+
+    function hideCallBanner() {
+        document.getElementById('call-banner').classList.remove('visible');
+        if (callTimerInterval) clearInterval(callTimerInterval);
+        if (typeof beepingSound !== 'undefined') {
+            beepingSound.pause();
+            beepingSound.currentTime = 0;
+        }
+        incomingCallData = null;
+        currentCallTargetSid = null;
+        callSeconds = 0;
+    }
+
+    function stopMediaTracks() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+    }
+
+    // Обработчик принятия входящего звонка из баннера
+    async function acceptCall() {
+        if (!incomingCallData) return;
+        const data = incomingCallData;
+        
+        if (typeof beepingSound !== 'undefined') {
+            beepingSound.pause();
+            beepingSound.currentTime = 0;
+        }
+        showCallBanner('active', currentCallName);
+
+        try {
+            iceCandidateQueue = [];
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = setupPeerConnection(data.from_sid);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            
+            while (iceCandidateQueue.length > 0) {
+                try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
+            }
+            
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', { target_sid: data.from_sid, answer: answer });
+            currentCallTargetSid = data.from_sid;
+            
+        } catch (err) {
+            console.error("Ошибка при принятии звонка:", err);
+            alert("Не удалось установить соединение: " + err.message);
+            endCall();
+        }
+    }
+
+    // Обработчик сброса до ответа
+    function declineCall() {
+        if (incomingCallData) {
+            socket.emit('end_call', { target_sid: incomingCallData.from_sid });
+        }
+        hideCallBanner();
+    }
+
+    // Обработчик завершения идущего звонка
+    function endCall() {
+        if (currentCallTargetSid) {
+            socket.emit('end_call', { target_sid: currentCallTargetSid });
+        }
+        stopMediaTracks();
+        hideCallBanner();
+    }
+
     function setupPeerConnection(targetSid) {
         if (peerConnection) peerConnection.close();
         const pc = new RTCPeerConnection(config);
@@ -681,6 +781,12 @@
         });
         if (!targetSid) { alert("Пользователь не в сети!"); return; }
 
+        const targetUser = globalUsersCache.find(u => u.id_user === targetUserId);
+        currentCallName = targetUser ? targetUser.username : 'Коллега';
+        currentCallTargetSid = targetSid;
+        
+        showCallBanner('outgoing', currentCallName);
+
         try {
             iceCandidateQueue = []; 
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -694,6 +800,7 @@
         } catch (err) {
             console.error("Ошибка при создании звонка:", err);
             alert("Не удалось начать звонок: проверьте доступ к микрофону.");
+            hideCallBanner();
         }
     }
 
@@ -708,66 +815,28 @@
         
         socket.on('offer', async (data) => {
             if (peerConnection && peerConnection.connectionState === 'connected') {
-                return; // Звонок уже идет, игнорируем
+                // Если мы уже говорим с кем-то, отправляем отбой звонящему
+                socket.emit('end_call', { target_sid: data.from_sid });
+                return;
             }
 
-            // Открываем красивую модалку
-            const modal = document.getElementById('incoming-call-modal');
-            const callerName = data.caller_name || 'Коллега';
-            document.getElementById('incoming-call-name').innerText = callerName;
-            document.getElementById('incoming-call-avatar').innerText = callerName.charAt(0).toUpperCase();
+            incomingCallData = data;
+            currentCallTargetSid = data.from_sid;
+            currentCallName = data.caller_name || 'Коллега';
             
-            modal.classList.add('open');
+            showCallBanner('incoming', currentCallName);
 
             if (typeof beepingSound !== 'undefined') {
                 beepingSound.loop = true;
                 beepingSound.play().catch(e => console.log("Ошибка звука:", e));
             }
-
-            const acceptBtn = document.getElementById('btn-accept-call');
-            const declineBtn = document.getElementById('btn-decline-call');
-
-            const cleanupModal = () => {
-                modal.classList.remove('open');
-                if (typeof beepingSound !== 'undefined') {
-                    beepingSound.pause();
-                    beepingSound.currentTime = 0;
-                }
-            };
-
-            acceptBtn.onclick = async () => {
-                cleanupModal();
-                try {
-                    iceCandidateQueue = []; 
-                    peerConnection = setupPeerConnection(data.from_sid);
-                    
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-                    
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                    
-                    while (iceCandidateQueue.length > 0) {
-                        try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
-                    }
-                    
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    socket.emit('answer', { target_sid: data.from_sid, answer: answer });
-                    
-                } catch (err) {
-                    console.error("Ошибка при принятии звонка:", err);
-                    alert("Не удалось установить соединение: " + err.message);
-                }
-            };
-
-            declineBtn.onclick = () => {
-                cleanupModal();
-            };
         });
 
         socket.on('answer', async (data) => {
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                showCallBanner('active', currentCallName);
+                
                 while (iceCandidateQueue.length > 0) {
                     try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
                 }
@@ -780,6 +849,11 @@
             } else {
                 iceCandidateQueue.push(data.candidate);
             }
+        });
+
+        socket.on('call_ended', (data) => {
+            stopMediaTracks();
+            hideCallBanner();
         });
                 
         socket.on('new_message', (msg) => { 
@@ -796,7 +870,7 @@
                 }
 
                 if (msg.id_user_from !== currentUser.id_user) {
-                    if (typeof beepingSound !== 'undefined') {
+                    if (typeof beepingSound !== 'undefined' && document.getElementById('call-banner').className.indexOf('visible') === -1) {
                         beepingSound.loop = false;
                         beepingSound.play().catch(e => console.log("Ошибка звука:", e));
                     }
@@ -834,15 +908,12 @@
         });
 
         socket.on('message_edited', (data) => {
-            console.log("Пришло изменение для id:", data.id_message, "Текст:", data.new_text);
             const textContainer = document.getElementById(`text-container-${data.id_message}`);
             if (textContainer) {
                 renderProcessedText(textContainer, data.new_text);
                 textContainer.style.transition = "background 1s";
                 textContainer.style.background = "#fef3c7";
                 setTimeout(() => textContainer.style.background = "transparent", 2000);
-            } else {
-                console.log("Не найден контейнер для", `text-container-${data.id_message}`);
             }
         });
 
@@ -986,13 +1057,6 @@
         socket.emit('join_room_pool', { room_id: roomId }); 
         socket.emit('get_room_history', { room_id: roomId }); 
         socket.emit('get_room_participants', { room_id: roomId });
-
-        // Авто-закрытие меню на мобильных после выбора комнаты
-        if (window.innerWidth <= 768) {
-            document.querySelector('.left-panel').classList.remove('open');
-            document.querySelector('.right-panel').classList.remove('open');
-            document.getElementById('mobile-overlay-panel').classList.remove('active');
-        }
     }
 
     function displayMessage(msg, isBulkLoad) {
@@ -1264,27 +1328,6 @@
 
         document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId }); });
         document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
-
-        // --- ЛОГИКА ДЛЯ МОБИЛЬНОГО МЕНЮ ---
-        const leftPanel = document.querySelector('.left-panel');
-        const rightPanel = document.querySelector('.right-panel');
-        const mobileOverlayPanel = document.getElementById('mobile-overlay-panel');
-
-        document.getElementById('btn-mobile-left').addEventListener('click', () => {
-            leftPanel.classList.add('open');
-            mobileOverlayPanel.classList.add('active');
-        });
-
-        document.getElementById('btn-mobile-right').addEventListener('click', () => {
-            rightPanel.classList.add('open');
-            mobileOverlayPanel.classList.add('active');
-        });
-
-        mobileOverlayPanel.addEventListener('click', () => {
-            leftPanel.classList.remove('open');
-            rightPanel.classList.remove('open');
-            mobileOverlayPanel.classList.remove('active');
-        });
     }
 
     function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; userSecretKey = ""; }
