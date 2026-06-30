@@ -173,7 +173,7 @@
         .call-name { 
             font-weight: bold; 
             font-size: 14px; 
-            white-space: normal; /* Текст больше не обрезается */
+            white-space: normal;
             word-wrap: break-word; 
             line-height: 1.3;
         }
@@ -649,7 +649,12 @@
     async function initApplication() {
         const urlParams = new URLSearchParams(window.location.search);
         const ticket = urlParams.get('ticket');
-        if (!ticket) { alert("Ошибка безопасности: Отсутствует токен авторизации 1С."); return; }
+        
+        if (!ticket) { 
+            document.getElementById('header-user-identity').innerText = "Ошибка: Нет билета";
+            alert("Ошибка безопасности: Отсутствует токен авторизации 1С."); 
+            return; 
+        }
 
         try {
             const response = await fetch('/api/web/exchange-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: ticket }) });
@@ -663,8 +668,14 @@
                 initMentionLogic(); 
                 initScreenshotEditorLogic();
                 initMicrophone();
+            } else {
+                document.getElementById('header-user-identity').innerText = "Ошибка авторизации";
+                alert(data.detail || "Срок действия ссылки истек или она уже была использована. Пожалуйста, откройте чат заново из 1С.");
             }
-        } catch (err) { alert("Не удалось связаться с сервером."); }
+        } catch (err) { 
+            document.getElementById('header-user-identity').innerText = "Ошибка подключения";
+            alert("Не удалось связаться с сервером."); 
+        }
     }
 
     function renderEmojiGrid(category) {
@@ -1563,7 +1574,9 @@
     }
 
     // ИНИЦИАЛИЗАЦИЯ
-    if (Notification.permission === "default") Notification.requestPermission();
+    if ('Notification' in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
     document.addEventListener("DOMContentLoaded", initApplication);
 
     fetch('/api/admin/settings')
