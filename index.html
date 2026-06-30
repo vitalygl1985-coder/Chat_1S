@@ -393,7 +393,7 @@
 
     console.log("СКРИПТЫ ЗАГРУЖЕНЫ");
         window.onerror = function(msg, url, line) {
-            alert("Критическая ошибка JS: " + msg + " в строке " + line);
+            console.error("JS Error:", msg, "at", line);
             return true;
         };
 
@@ -607,14 +607,37 @@
         socket.on('connect', () => { refreshRoomsAndLists(); socket.emit('get_users_list'); });
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
-        socket.on('incoming_call', (data) => {
-            // data.from_sid — это SID того, кто звонит
-            if (confirm("Входящий вызов! Принять?")) {
-                // Мы подтверждаем вызов. 
-                // Теперь мы просто ждем событие 'offer', которое придет 
-                // от звонящего сразу после того, как он отправит запрос.
-                console.log("Ожидаем оффер от:", data.from_sid);
+        
+        socket.on('offer', async (data) => {
+            if (peerConnection && peerConnection.connectionState === 'connected') {
+                console.log("Уже идет звонок, игнорируем новый оффер.");
+                return;
             }
+
+            if (confirm("Входящий аудиозвонок! Принять?")) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    peerConnection = setupPeerConnection(data.from_sid);
+                    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.emit('answer', { target_sid: data.from_sid, answer: answer });
+                } catch (err) {
+                    console.error("Ошибка при принятии звонка:", err);
+                    alert("Не удалось установить соединение: " + err.message);
+                }
+            }
+        });
+
+        socket.on('answer', async (data) => {
+            if (peerConnection) await peerConnection.setRemoteDescription(data.answer);
+        });
+
+        socket.on('ice_candidate', async (data) => {
+            if (peerConnection) await peerConnection.addIceCandidate(data.candidate);
         });
                 
         socket.on('new_message', (msg) => { 
@@ -806,11 +829,11 @@
         }
     }
 
-    //*document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-    //*    var content = document.getElementById('inactive-rooms-list');
-    //*    content.classList.toggle('open');
-    //*    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
-    //*});
+    // *document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
+    // *    var content = document.getElementById('inactive-rooms-list');
+    // *    content.classList.toggle('open');
+    // *    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
+    // *});
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId; 
@@ -1241,8 +1264,8 @@
     }
 
     function requestCall(targetUserId) {
-        // Просим сервер найти SID этого пользователя и прислать нам сигнал
-        socket.emit('call_request', { target_user_id: targetUserId });
+        // Мы больше не используем call_request для имитации звонка. Запускаем напрямую.
+        startCall(targetUserId);
     }
 
     function initMentionLogic() {
@@ -1275,26 +1298,6 @@
         const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
-    // Для того, кто ПРИНИМАЕТ
-    async function answerCall(fromSid) {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        peerConnection = new RTCPeerConnection(config);
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-        
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) socket.emit('ice_candidate', { target_sid: fromSid, candidate: event.candidate });
-        };
-        
-        // Слушаем remote поток (звук от собеседника)
-        peerConnection.ontrack = (event) => {
-            const remoteAudio = new Audio();
-            remoteAudio.srcObject = event.streams[0];
-            remoteAudio.play();
-        };
-
-        // Ожидание оффера мы перехватываем в socket.on('offer')
-    }
-
     // --- WEBRTC ЛОГИКА ---
     function setupPeerConnection(targetSid) {
         if (peerConnection) peerConnection.close();
@@ -1317,54 +1320,20 @@
         });
         if (!targetSid) { alert("Пользователь не в сети!"); return; }
 
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        peerConnection = setupPeerConnection(targetSid);
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = setupPeerConnection(targetSid);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('offer', { target_sid: targetSid, offer: offer });
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('offer', { target_sid: targetSid, offer: offer });
+        } catch (err) {
+            console.error("Ошибка при создании звонка:", err);
+            alert("Не удалось начать звонок: проверьте доступ к микрофону.");
+        }
     }
-
-    socket.on('offer', async (data) => {
-        // 1. Проверяем, не заняты ли мы уже другим звонком
-        if (peerConnection && peerConnection.connectionState === 'connected') {
-            alert("У вас уже идет активный звонок!");
-            return;
-        }
-
-        if (confirm("Входящий вызов! Принять?")) {
-            try {
-                // 2. Сначала получаем доступ к микрофону
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // 3. Инициализируем соединение через вашу функцию
-                peerConnection = setupPeerConnection(data.from_sid);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-                
-                // 4. Применяем оффер
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                
-                // 5. Создаем и отправляем ответ
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                socket.emit('answer', { target_sid: data.from_sid, answer: answer });
-                
-            } catch (err) {
-                console.error("Ошибка при принятии звонка:", err);
-                alert("Не удалось установить соединение: " + err.message);
-            }
-        }
-    });
-
-    socket.on('answer', async (data) => {
-        if (peerConnection) await peerConnection.setRemoteDescription(data.answer);
-    });
-
-    socket.on('ice_candidate', async (data) => {
-        if (peerConnection) await peerConnection.addIceCandidate(data.candidate);
-    });
-
+    
     // ИНИЦИАЛИЗАЦИЯ
     if (Notification.permission === "default") Notification.requestPermission();
     document.addEventListener("DOMContentLoaded", initApplication);

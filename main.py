@@ -694,6 +694,7 @@ async def download_archive_endpoint(file_uuid: str):
 # СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO
 # Глобальный словарь для поиска: {id_user: sid}
 user_sid_map = {}
+
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -720,13 +721,6 @@ async def connect(sid, environ, auth=None):
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
     online_users[id_user] = username
     await sio.emit('user_statuses', online_users)
-
-@sio.event
-async def call_request(sid, data):
-    target_user_id = data.get('target_user_id')
-    target_sid = user_sid_map.get(target_user_id)
-    if target_sid:
-        await sio.emit('incoming_call', {'from_sid': sid}, to=target_sid)
 
 @sio.event
 async def join_room_pool(sid, data):
