@@ -456,27 +456,26 @@
 
     function initMicrophone() {
         const recordBtn = document.getElementById('record-btn');
-        if (recordBtn) {
-            recordBtn.addEventListener('mousedown', startRec);
-
-            // Отключаем контекстное меню при долгом нажатии на телефоне
-            recordBtn.oncontextmenu = (e) => e.preventDefault();
-
-            const startRec = async (e) => {
-                if (e) e.preventDefault();
-                if (isRecording) return;
-
-                // Жесткая проверка на HTTP
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    alert("Микрофон заблокирован! Чат должен быть открыт по защищенному протоколу HTTPS.");
-                    return;
-                }
-        } else 
+        if (!recordBtn) {
             console.warn("Элемент record-btn не найден, пропускаем инициализацию.");
-        }    
+            return;
+        }
+
+        // Отключаем контекстное меню при долгом нажатии
+        recordBtn.oncontextmenu = (e) => e.preventDefault();
+
+        const startRec = async (e) => {
+            if (e) e.preventDefault();
+            if (isRecording) return;
+
+            // Проверка HTTPS
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Микрофон заблокирован! Чат должен быть открыт по HTTPS.");
+                return;
+            }
 
             try {
-                audioChunks = []; // Очищаем буфер
+                audioChunks = [];
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
 
@@ -506,19 +505,17 @@
 
                 mediaRecorder.start();
                 isRecording = true;
-                recordBtn.style.background = 'rgba(239, 68, 68, 0.2)'; 
+                recordBtn.style.background = 'rgba(239, 68, 68, 0.2)';
                 recordBtn.style.borderRadius = '50%';
             } catch (err) {
-                alert("Разрешите доступ к микрофону во всплывающем окне браузера!");
+                alert("Разрешите доступ к микрофону!");
                 console.error("Ошибка микрофона:", err);
             }
         };
 
         const stopRec = (e) => {
-            // Проверяем, идет ли запись, прежде чем останавливать
             if (isRecording && mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
-                // Отключаем аппаратный стрим, чтобы исчез красный значок записи во вкладке
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 isRecording = false;
                 recordBtn.style.background = 'transparent';
@@ -526,14 +523,13 @@
             }
         };
 
-        // Привязываем события для мышки (десктоп)
+        // Привязка событий
         recordBtn.addEventListener('mousedown', startRec);
-        window.addEventListener('mouseup', stopRec); // Ловим отпускание, даже если мышка ушла с кнопки
-
-        // Привязываем события для пальца (смартфоны)
-        recordBtn.addEventListener('touchstart', startRec, {passive: false});
+        window.addEventListener('mouseup', stopRec);
+        recordBtn.addEventListener('touchstart', startRec, { passive: false });
         window.addEventListener('touchend', stopRec);
     }
+
     async function showUserInfo(userId) {
         try {
             const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
