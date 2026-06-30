@@ -725,13 +725,6 @@ async def connect(sid, environ, auth=None):
     await sio.emit('user_statuses', online_users)
 
 @sio.event
-async def call_request(sid, data):
-    target_user_id = data.get('target_user_id')
-    target_sid = user_sid_map.get(target_user_id)
-    if target_sid:
-        await sio.emit('incoming_call', {'from_sid': sid}, to=target_sid)
-
-@sio.event
 async def join_room_pool(sid, data):
     room_id = data.get('room_id')
     if not room_id: return
@@ -1074,7 +1067,11 @@ async def offer(sid, data):
     """Браузер А отправляет предложение (SDP) браузеру Б"""
     target_sid = data.get('target_sid')
     if target_sid:
-        await sio.emit('offer', {'offer': data['offer'], 'from_sid': sid}, to=target_sid)
+        await sio.emit('offer', {
+            'offer': data['offer'], 
+            'from_sid': sid,
+            'caller_name': data.get('caller_name', 'Коллега')
+        }, to=target_sid)
 
 @sio.event
 async def answer(sid, data):

@@ -158,9 +158,36 @@
         .editor-toolbar { padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
         .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
+
+        /* Анимация пульсации для звонка */
+        @keyframes pulse-green {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .btn-call-action:hover { transform: scale(1.1); }
     </style>
 </head>
 <body>
+
+<!-- МОДАЛКА ВХОДЯЩЕГО ЗВОНКА -->
+<div class="modal-overlay" id="incoming-call-modal" style="z-index: 9999;">
+    <div class="modal-window" style="width: 320px; text-align: center; padding: 20px; border-radius: 16px; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+        <div style="width: 80px; height: 80px; background: var(--primary-color); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; margin: 0 auto 15px auto;" id="incoming-call-avatar">
+            К
+        </div>
+        <h3 style="margin-bottom: 5px; font-size: 18px; color: var(--text-main);" id="incoming-call-name">Входящий звонок</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 25px;">Входящий аудиовызов...</p>
+        <div style="display: flex; justify-content: center; gap: 20px;">
+            <button id="btn-decline-call" class="btn-call-action" style="background: #ef4444; color: white; border: none; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); transition: transform 0.2s;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.58 10.58a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0-2.83-2.83l-4.59 4.59a2 2 0 0 0 0 2.83z"></path><path d="M16 2v4h-4"></path><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path></svg>
+            </button>
+            <button id="btn-accept-call" class="btn-call-action" style="background: #10b981; color: white; border: none; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4); transition: transform 0.2s; animation: pulse-green 1.5s infinite;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            </button>
+        </div>
+    </div>
+</div>
 
 <div class="modal-overlay" id="secret-prompt-modal">
     <div class="modal-window" style="width: 380px;">
@@ -413,7 +440,7 @@
 
     let localStream;
     let peerConnection;
-    let iceCandidateQueue = []; // Массив для очереди ICE-кандидатов
+    let iceCandidateQueue = [];
 
     const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
     const inputMsg = document.getElementById('input-msg');
@@ -457,14 +484,11 @@
 
     function initMicrophone() {
         const recordBtn = document.getElementById('record-btn');
-        
-        // 1. Безопасная проверка: если кнопки нет, просто выходим
         if (!recordBtn) {
-            console.warn("Кнопка record-btn не найдена в DOM, пропускаем инициализацию микрофона.");
+            console.warn("Кнопка record-btn не найдена в DOM.");
             return;
         }
 
-        // 2. Безопасная установка событий
         recordBtn.oncontextmenu = (e) => e.preventDefault();
 
         const startRec = async (e) => {
@@ -523,7 +547,6 @@
             }
         };
 
-        // 3. Вешаем обработчики
         recordBtn.addEventListener('mousedown', startRec);
         window.addEventListener('mouseup', stopRec);
         recordBtn.addEventListener('touchstart', startRec, { passive: false });
@@ -600,7 +623,6 @@
 
     const beepingSound = new Audio('/static/beep.mp3');
 
-    // --- WEBRTC ЛОГИКА ---
     function setupPeerConnection(targetSid) {
         if (peerConnection) peerConnection.close();
         const pc = new RTCPeerConnection(config);
@@ -623,14 +645,16 @@
         if (!targetSid) { alert("Пользователь не в сети!"); return; }
 
         try {
-            iceCandidateQueue = []; // Очищаем очередь при новом звонке
+            iceCandidateQueue = []; 
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             peerConnection = setupPeerConnection(targetSid);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-            socket.emit('offer', { target_sid: targetSid, offer: offer });
+            
+            // Передаем имя текущего юзера вместе с оффером
+            socket.emit('offer', { target_sid: targetSid, offer: offer, caller_name: currentUser.username });
         } catch (err) {
             console.error("Ошибка при создании звонка:", err);
             alert("Не удалось начать звонок: проверьте доступ к микрофону.");
@@ -646,16 +670,40 @@
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         
-        // --- ОБРАБОТКА ВХОДЯЩЕГО ЗВОНКА И WebRTC ---
         socket.on('offer', async (data) => {
             if (peerConnection && peerConnection.connectionState === 'connected') {
-                alert("У вас уже идет активный звонок!");
-                return;
+                return; // Звонок уже идет, игнорируем
             }
 
-            if (confirm("Входящий вызов! Принять?")) {
+            // Открываем красивую модалку
+            const modal = document.getElementById('incoming-call-modal');
+            const callerName = data.caller_name || 'Коллега';
+            document.getElementById('incoming-call-name').innerText = callerName;
+            document.getElementById('incoming-call-avatar').innerText = callerName.charAt(0).toUpperCase();
+            
+            modal.classList.add('open');
+
+            // Запускаем звук звонка (циклично)
+            if (typeof beepingSound !== 'undefined') {
+                beepingSound.loop = true;
+                beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+            }
+
+            const acceptBtn = document.getElementById('btn-accept-call');
+            const declineBtn = document.getElementById('btn-decline-call');
+
+            const cleanupModal = () => {
+                modal.classList.remove('open');
+                if (typeof beepingSound !== 'undefined') {
+                    beepingSound.pause();
+                    beepingSound.currentTime = 0;
+                }
+            };
+
+            acceptBtn.onclick = async () => {
+                cleanupModal();
                 try {
-                    iceCandidateQueue = []; // Очищаем очередь перед принятием
+                    iceCandidateQueue = []; 
                     peerConnection = setupPeerConnection(data.from_sid);
                     
                     localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -663,7 +711,6 @@
                     
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                     
-                    // Применяем всех кандидатов, которые прилетели, пока юзер смотрел на confirm
                     while (iceCandidateQueue.length > 0) {
                         try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
                     }
@@ -676,13 +723,16 @@
                     console.error("Ошибка при принятии звонка:", err);
                     alert("Не удалось установить соединение: " + err.message);
                 }
-            }
+            };
+
+            declineBtn.onclick = () => {
+                cleanupModal();
+            };
         });
 
         socket.on('answer', async (data) => {
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                // Если мы звонящие, и кандидаты от получателя пришли раньше ответа:
                 while (iceCandidateQueue.length > 0) {
                     try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
                 }
@@ -693,8 +743,6 @@
             if (peerConnection && peerConnection.remoteDescription) {
                 try { await peerConnection.addIceCandidate(data.candidate); } catch(e) {}
             } else {
-                // Если remoteDescription еще не установлен (например, висит confirm), 
-                // сохраняем кандидатов в очередь
                 iceCandidateQueue.push(data.candidate);
             }
         });
@@ -713,7 +761,9 @@
                 }
 
                 if (msg.id_user_from !== currentUser.id_user) {
+                    // Звук сообщения
                     if (typeof beepingSound !== 'undefined') {
+                        beepingSound.loop = false; // Убедимся, что обычный звук не зациклен
                         beepingSound.play().catch(e => console.log("Ошибка звука:", e));
                     }
 
@@ -1338,8 +1388,6 @@
     // ИНИЦИАЛИЗАЦИЯ
     if (Notification.permission === "default") Notification.requestPermission();
     document.addEventListener("DOMContentLoaded", initApplication);
-    
-    // Удален дублирующийся прямой вызов initApplication() для устранения ошибки 500
 
     fetch('/api/admin/settings')
     .then(res => res.json())
