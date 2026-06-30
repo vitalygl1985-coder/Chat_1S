@@ -578,6 +578,7 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
             }
         }
     except HTTPException:
+        # ПРОПУСКАЕМ НАШИ 403 ОШИБКИ БЕЗ ИЗМЕНЕНИЙ (Чтобы Railway не сыпал 500)
         conn.rollback()
         raise
     except Exception as e: 
@@ -697,6 +698,7 @@ async def download_archive_endpoint(file_uuid: str):
 # СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO
 # Глобальный словарь для поиска: {id_user: sid}
 user_sid_map = {}
+
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -1086,5 +1088,12 @@ async def ice_candidate(sid, data):
     target_sid = data.get('target_sid')
     if target_sid:
         await sio.emit('ice_candidate', {'candidate': data['candidate'], 'from_sid': sid}, to=target_sid)
+
+@sio.event
+async def end_call(sid, data):
+    """Событие для завершения звонка"""
+    target_sid = data.get('target_sid')
+    if target_sid:
+        await sio.emit('call_ended', {'from_sid': sid}, to=target_sid)
 
 app.mount("/socket.io", socket_app)
