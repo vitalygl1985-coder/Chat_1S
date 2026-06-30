@@ -546,7 +546,7 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Увеличим время жизни билета до 60 секунд (на случай задержек сети)
+        # Увеличим время жизни билета до 60 секунд
         cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '60 seconds'", (data.ticket,))
         ticket_data = cur.fetchone()
         
@@ -556,7 +556,6 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
         cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
         session_token = secrets.token_hex(32)
         
-        # Явное приведение UUID к строке для безопасности
         user_id = str(ticket_data['id_user'])
         org_id = str(ticket_data['id_org'])
         
@@ -577,9 +576,12 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
                 "id_org": org_id
             }
         }
+    except HTTPException:
+        # ПРОПУСКАЕМ НАШИ 403 ОШИБКИ БЕЗ ИЗМЕНЕНИЙ
+        conn.rollback()
+        raise
     except Exception as e: 
         conn.rollback()
-        # ВАЖНО: это выведет реальную ошибку в логи Railway
         print(f"DEBUG ERROR: {type(e).__name__}: {str(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
     finally: 
