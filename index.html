@@ -801,7 +801,7 @@
         showCallBanner('active', currentCallName);
 
         try {
-            iceCandidateQueue = [];
+            //iceCandidateQueue = [];
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             peerConnection = setupPeerConnection(data.from_sid);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
