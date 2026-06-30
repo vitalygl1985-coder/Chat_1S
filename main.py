@@ -546,7 +546,7 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Увеличим время жизни билета до 60 секунд
+        # Увеличим время жизни билета до 60 секунд (на случай задержек сети)
         cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '60 seconds'", (data.ticket,))
         ticket_data = cur.fetchone()
         
@@ -556,6 +556,7 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
         cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
         session_token = secrets.token_hex(32)
         
+        # Явное приведение UUID к строке для безопасности
         user_id = str(ticket_data['id_user'])
         org_id = str(ticket_data['id_org'])
         
@@ -577,11 +578,11 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
             }
         }
     except HTTPException:
-        # ПРОПУСКАЕМ НАШИ 403 ОШИБКИ БЕЗ ИЗМЕНЕНИЙ
         conn.rollback()
         raise
     except Exception as e: 
         conn.rollback()
+        # ВАЖНО: это выведет реальную ошибку в логи Railway
         print(f"DEBUG ERROR: {type(e).__name__}: {str(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
     finally: 
@@ -696,7 +697,6 @@ async def download_archive_endpoint(file_uuid: str):
 # СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO
 # Глобальный словарь для поиска: {id_user: sid}
 user_sid_map = {}
-
 @sio.event
 async def connect(sid, environ, auth=None):
     query_params = environ.get('QUERY_STRING', '')
@@ -723,6 +723,13 @@ async def connect(sid, environ, auth=None):
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
     online_users[id_user] = username
     await sio.emit('user_statuses', online_users)
+
+@sio.event
+async def call_request(sid, data):
+    target_user_id = data.get('target_user_id')
+    target_sid = user_sid_map.get(target_user_id)
+    if target_sid:
+        await sio.emit('incoming_call', {'from_sid': sid}, to=target_sid)
 
 @sio.event
 async def join_room_pool(sid, data):

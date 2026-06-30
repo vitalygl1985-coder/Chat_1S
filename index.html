@@ -413,6 +413,7 @@
 
     let localStream;
     let peerConnection;
+    let iceCandidateQueue = []; // Массив для очереди ICE-кандидатов
 
     const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
     const inputMsg = document.getElementById('input-msg');
@@ -599,6 +600,43 @@
 
     const beepingSound = new Audio('/static/beep.mp3');
 
+    // --- WEBRTC ЛОГИКА ---
+    function setupPeerConnection(targetSid) {
+        if (peerConnection) peerConnection.close();
+        const pc = new RTCPeerConnection(config);
+        
+        pc.onicecandidate = (e) => {
+            if (e.candidate) socket.emit('ice_candidate', { target_sid: targetSid, candidate: e.candidate });
+        };
+        pc.ontrack = (e) => {
+            const remoteAudio = new Audio();
+            remoteAudio.srcObject = e.streams[0];
+            remoteAudio.play();
+        };
+        return pc;
+    }
+
+    async function startCall(targetUserId) {
+        const targetSid = await new Promise((resolve) => {
+            socket.emit('get_sid_by_user', { user_id: targetUserId }, (sid) => resolve(sid));
+        });
+        if (!targetSid) { alert("Пользователь не в сети!"); return; }
+
+        try {
+            iceCandidateQueue = []; // Очищаем очередь при новом звонке
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = setupPeerConnection(targetSid);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('offer', { target_sid: targetSid, offer: offer });
+        } catch (err) {
+            console.error("Ошибка при создании звонка:", err);
+            alert("Не удалось начать звонок: проверьте доступ к микрофону.");
+        }
+    }
+
     function connectSockets() {
         let callerSid = null;
         const socketUrl = window.location.protocol + '//' + window.location.host;
@@ -608,23 +646,32 @@
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         
+        // --- ОБРАБОТКА ВХОДЯЩЕГО ЗВОНКА И WebRTC ---
         socket.on('offer', async (data) => {
             if (peerConnection && peerConnection.connectionState === 'connected') {
-                console.log("Уже идет звонок, игнорируем новый оффер.");
+                alert("У вас уже идет активный звонок!");
                 return;
             }
 
-            if (confirm("Входящий аудиозвонок! Принять?")) {
+            if (confirm("Входящий вызов! Принять?")) {
                 try {
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    iceCandidateQueue = []; // Очищаем очередь перед принятием
                     peerConnection = setupPeerConnection(data.from_sid);
+                    
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
+                    
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-
+                    
+                    // Применяем всех кандидатов, которые прилетели, пока юзер смотрел на confirm
+                    while (iceCandidateQueue.length > 0) {
+                        try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
+                    }
+                    
                     const answer = await peerConnection.createAnswer();
                     await peerConnection.setLocalDescription(answer);
                     socket.emit('answer', { target_sid: data.from_sid, answer: answer });
+                    
                 } catch (err) {
                     console.error("Ошибка при принятии звонка:", err);
                     alert("Не удалось установить соединение: " + err.message);
@@ -633,11 +680,23 @@
         });
 
         socket.on('answer', async (data) => {
-            if (peerConnection) await peerConnection.setRemoteDescription(data.answer);
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                // Если мы звонящие, и кандидаты от получателя пришли раньше ответа:
+                while (iceCandidateQueue.length > 0) {
+                    try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
+                }
+            }
         });
 
         socket.on('ice_candidate', async (data) => {
-            if (peerConnection) await peerConnection.addIceCandidate(data.candidate);
+            if (peerConnection && peerConnection.remoteDescription) {
+                try { await peerConnection.addIceCandidate(data.candidate); } catch(e) {}
+            } else {
+                // Если remoteDescription еще не установлен (например, висит confirm), 
+                // сохраняем кандидатов в очередь
+                iceCandidateQueue.push(data.candidate);
+            }
         });
                 
         socket.on('new_message', (msg) => { 
@@ -772,29 +831,20 @@
         const inactiveContainer = document.getElementById('inactive-rooms-list');
         const inactiveCountElem = document.getElementById('inactive-count');
 
-        // Проверка: пришел ли вообще массив?
-        if (!Array.isArray(allRooms)) {
-            console.error("DEBUG: Ошибка, allRooms не является массивом:", allRooms);
-            return;
-        }
+        if (!Array.isArray(allRooms)) return;
         
-        // Очистка
         if (activeContainer) activeContainer.innerHTML = ""; 
         if (inactiveContainer) inactiveContainer.innerHTML = ""; 
         let inactiveCount = 0;
 
-        console.log("DEBUG: Рендеринг списка комнат, всего:", allRooms.length);
-
         allRooms.forEach(room => {
             try {
-                // Проверка, что room — это объект
                 if (!room || typeof room !== 'object') return;
 
                 const div = document.createElement('div'); 
                 div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
                 
-                // Защита от отсутствия полей
-                const rType = room.type ? room.type.trim() : 'group'; // trim() на случай пробелов
+                const rType = room.type ? room.type.trim() : 'group';
                 const rName = room.name || 'Без названия';
                 
                 let icon = rType === 'private' ? '💬 ' : (rType === 'admin_group' ? '👑 ' : '👥 ');
@@ -805,8 +855,6 @@
                 
                 div.addEventListener('click', () => selectRoomById(room.id_room, rName, rType, room.created_by));
                 
-                // Логика: админ-группы всегда активны (вверху)
-                // Добавили принудительную проверку count
                 const participants = parseInt(room.participants_count) || 0;
                 
                 if (participants < 2 && rType !== 'admin_group') { 
@@ -819,21 +867,13 @@
                         activeContainer.appendChild(div); 
                     }
                 }
-            } catch (err) {
-                console.error("Ошибка при отрисовке конкретной комнаты:", room, err);
-            }
+            } catch (err) {}
         });
         
         if (inactiveCountElem) {
             inactiveCountElem.innerText = `(${inactiveCount}) ▼`;
         }
     }
-
-    // *document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-    // *    var content = document.getElementById('inactive-rooms-list');
-    // *    content.classList.toggle('open');
-    // *    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
-    // *});
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId; 
@@ -951,7 +991,6 @@
 
     let editingMsgId = null;
 
-    // Привязка закрытия модалки
     document.getElementById('btn-close-edit-modal').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
     document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
 
@@ -1247,7 +1286,6 @@
             if (u.id_user === currentUser.id_user) return;
             const div = document.createElement('div'); div.className = "user-row";
             const isOnline = !!onlineUsersCache[u.id_user];
-            // Замените блок внутри users.forEach на этот:
             div.innerHTML = `
                 <div class="avatar-container">
                     <div class="avatar" style="background:${isOnline ? '#10b981' : '#9ca3af'}">${u.username.charAt(0).toUpperCase()}</div>
@@ -1264,7 +1302,6 @@
     }
 
     function requestCall(targetUserId) {
-        // Мы больше не используем call_request для имитации звонка. Запускаем напрямую.
         startCall(targetUserId);
     }
 
@@ -1298,56 +1335,17 @@
         const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
-    // --- WEBRTC ЛОГИКА ---
-    function setupPeerConnection(targetSid) {
-        if (peerConnection) peerConnection.close();
-        const pc = new RTCPeerConnection(config);
-        
-        pc.onicecandidate = (e) => {
-            if (e.candidate) socket.emit('ice_candidate', { target_sid: targetSid, candidate: e.candidate });
-        };
-        pc.ontrack = (e) => {
-            const remoteAudio = new Audio();
-            remoteAudio.srcObject = e.streams[0];
-            remoteAudio.play();
-        };
-        return pc;
-    }
-
-    async function startCall(targetUserId) {
-        const targetSid = await new Promise((resolve) => {
-            socket.emit('get_sid_by_user', { user_id: targetUserId }, (sid) => resolve(sid));
-        });
-        if (!targetSid) { alert("Пользователь не в сети!"); return; }
-
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            peerConnection = setupPeerConnection(targetSid);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            socket.emit('offer', { target_sid: targetSid, offer: offer });
-        } catch (err) {
-            console.error("Ошибка при создании звонка:", err);
-            alert("Не удалось начать звонок: проверьте доступ к микрофону.");
-        }
-    }
-    
     // ИНИЦИАЛИЗАЦИЯ
     if (Notification.permission === "default") Notification.requestPermission();
     document.addEventListener("DOMContentLoaded", initApplication);
-
-    //window.onload = initApplication;
-    //console.log("Попытка запуска initApplication...");
-    //initApplication();
     
+    // Удален дублирующийся прямой вызов initApplication() для устранения ошибки 500
+
     fetch('/api/admin/settings')
     .then(res => res.json())
     .then(settings => {
         const color = settings.theme_primary_color;
         if (color) {
-            // Применяем цвет для кнопок, шапок и активных элементов
             const styleSheet = document.createElement("style");
             styleSheet.type = "text/css";
             styleSheet.innerText = `
