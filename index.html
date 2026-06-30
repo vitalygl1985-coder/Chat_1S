@@ -38,7 +38,7 @@
             display: grid;
             grid-template-columns: 260px 1fr 280px;
             flex: 1;
-            min-height: 0; /* Предотвращает выталкивание поля ввода за пределы экрана */
+            min-height: 0; 
             background: var(--bg-panel);
             overflow: hidden;
             position: relative;
@@ -215,7 +215,6 @@
         @media (max-width: 768px) {
             .app-container { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; }
             
-            /* Скрываем нижнюю плашку на мобилках для освобождения места под клавиатуру */
             .system-footer-links { display: none !important; }
 
             .left-panel, .right-panel {
@@ -235,7 +234,17 @@
             
             .chat-actions img { width: 30px !important; height: 30px !important; }
             
-            .input-msg-div { font-size: 16px; } 
+            .input-area { padding: 8px 10px; }
+            .input-msg-div { 
+                min-height: 50px; 
+                max-height: 120px; 
+                font-size: 16px; 
+                padding: 14px 12px;
+                border-radius: 12px;
+            } 
+            .controls-row { align-items: flex-end; }
+            #btn-send-message { height: 50px; padding: 0 16px; border-radius: 12px; }
+            #btn-attach-file img, #record-btn img { width: 44px !important; height: 44px !important; }
             
             .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
             .message { max-width: 90%; }
@@ -243,6 +252,8 @@
     </style>
 </head>
 <body>
+
+<audio id="remote-audio" autoplay playsinline style="display:none;"></audio>
 
 <div class="call-banner" id="call-banner">
     <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; flex-shrink: 0;" id="call-avatar"></div>
@@ -449,13 +460,13 @@
                 </button>
                 <div class="input-msg-div" 
                     id="input-msg" contenteditable="true" 
-                    placeholder="Сообщение... Скриншот (Ctrl+V)">
+                    placeholder="Сообщение...">
                 </div>
 
                 <button id="record-btn" class="btn" style="background: transparent !important; padding: 4px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; margin-right: 5px;" title="Удерживайте для записи">
                     <img src="/static/mic_btn.png" id="mic-icon-img" alt="Микрофон" style="width: 36px; height: 36px; object-fit: contain; pointer-events: none;">
                 </button>
-                <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
+                <button class="btn btn-primary" id="btn-send-message">Отправить</button>
             </div>
         </div>
     </div>
@@ -779,6 +790,10 @@
         if (!incomingCallData) return;
         const data = incomingCallData;
         
+        // Разрешаем проигрывание аудио в контексте прямого клика (важно для iOS)
+        const remoteAudio = document.getElementById('remote-audio');
+        remoteAudio.play().catch(e => {});
+        
         if (typeof beepingSound !== 'undefined') {
             beepingSound.pause();
             beepingSound.currentTime = 0;
@@ -834,9 +849,11 @@
             if (e.candidate) socket.emit('ice_candidate', { target_sid: targetSid, candidate: e.candidate });
         };
         pc.ontrack = (e) => {
-            const remoteAudio = new Audio();
-            remoteAudio.srcObject = e.streams[0];
-            remoteAudio.play();
+            const remoteAudio = document.getElementById('remote-audio');
+            if (remoteAudio.srcObject !== e.streams[0]) {
+                remoteAudio.srcObject = e.streams[0];
+                remoteAudio.play().catch(err => console.log('Audio error:', err));
+            }
         };
         return pc;
     }
@@ -875,7 +892,16 @@
         const socketUrl = window.location.protocol + '//' + window.location.host;
         socket = io(socketUrl, { path: '/socket.io', transports: ['polling', 'websocket'], query: { id_user: currentUser.id_user, id_org: currentUser.id_org, username: currentUser.username, role: currentUser.role } });
 
-        socket.on('connect', () => { refreshRoomsAndLists(); socket.emit('get_users_list'); });
+        socket.on('connect', () => { 
+            refreshRoomsAndLists(); 
+            socket.emit('get_users_list'); 
+            
+            // Восстановление комнаты при выходе из спящего режима телефона
+            if (currentRoomId) {
+                socket.emit('join_room_pool', { room_id: currentRoomId });
+                socket.emit('get_room_history', { room_id: currentRoomId });
+            }
+        });
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         

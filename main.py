@@ -1060,9 +1060,12 @@ async def get_sid_by_user(sid, data):
 async def disconnect(sid):
     session = await sio.get_session(sid)
     if session and 'id_user' in session:
-        online_users.pop(session['id_user'], None)
-        user_sid_map.pop(session['id_user'], None)
-        await sio.emit('user_statuses', online_users)
+        id_user = session['id_user']
+        # Проверяем, что отключается именно текущая активная сессия (предотвращает ложные оффлайны при переподключении телефона)
+        if user_sid_map.get(id_user) == sid:
+            online_users.pop(id_user, None)
+            user_sid_map.pop(id_user, None)
+            await sio.emit('user_statuses', online_users)
 
 @sio.event
 async def offer(sid, data):
