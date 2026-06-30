@@ -1328,17 +1328,33 @@
     }
 
     socket.on('offer', async (data) => {
+        // 1. Проверяем, не заняты ли мы уже другим звонком
+        if (peerConnection && peerConnection.connectionState === 'connected') {
+            alert("У вас уже идет активный звонок!");
+            return;
+        }
+
         if (confirm("Входящий вызов! Принять?")) {
             try {
+                // 2. Сначала получаем доступ к микрофону
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // 3. Инициализируем соединение через вашу функцию
                 peerConnection = setupPeerConnection(data.from_sid);
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 
-                await peerConnection.setRemoteDescription(data.offer);
+                // 4. Применяем оффер
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                
+                // 5. Создаем и отправляем ответ
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
                 socket.emit('answer', { target_sid: data.from_sid, answer: answer });
-            } catch (err) { alert("Ошибка микрофона: " + err); }
+                
+            } catch (err) {
+                console.error("Ошибка при принятии звонка:", err);
+                alert("Не удалось установить соединение: " + err.message);
+            }
         }
     });
 
