@@ -456,21 +456,22 @@
 
     function initMicrophone() {
         const recordBtn = document.getElementById('record-btn');
+        
+        // 1. Безопасная проверка: если кнопки нет, просто выходим
         if (!recordBtn) {
-            console.warn("Элемент record-btn не найден, пропускаем инициализацию.");
+            console.warn("Кнопка record-btn не найдена в DOM, пропускаем инициализацию микрофона.");
             return;
         }
 
-        // Отключаем контекстное меню при долгом нажатии
+        // 2. Безопасная установка событий
         recordBtn.oncontextmenu = (e) => e.preventDefault();
 
         const startRec = async (e) => {
             if (e) e.preventDefault();
             if (isRecording) return;
 
-            // Проверка HTTPS
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("Микрофон заблокирован! Чат должен быть открыт по HTTPS.");
+                alert("Микрофон недоступен (нужен HTTPS).");
                 return;
             }
 
@@ -495,12 +496,10 @@
                         const response = await fetch('/upload', { method: 'POST', body: formData });
                         const result = await response.json();
                         if (result.url) {
-                            const audioMessage = `<audio controls src="${result.url}" style="height: 40px; outline: none;"></audio>`;
+                            const audioMessage = `<audio controls src="${result.url}" style="height: 40px;"></audio>`;
                             socket.emit('send_message', { room_id: currentRoomId, text: audioMessage });
                         }
-                    } catch (uploadErr) {
-                        alert("Ошибка отправки голосового сообщения.");
-                    }
+                    } catch (uploadErr) { alert("Ошибка отправки."); }
                 };
 
                 mediaRecorder.start();
@@ -508,8 +507,8 @@
                 recordBtn.style.background = 'rgba(239, 68, 68, 0.2)';
                 recordBtn.style.borderRadius = '50%';
             } catch (err) {
-                alert("Разрешите доступ к микрофону!");
-                console.error("Ошибка микрофона:", err);
+                console.error("Ошибка доступа к микрофону:", err);
+                alert("Разрешите доступ к микрофону во всплывающем окне!");
             }
         };
 
@@ -523,7 +522,7 @@
             }
         };
 
-        // Привязка событий
+        // 3. Вешаем обработчики
         recordBtn.addEventListener('mousedown', startRec);
         window.addEventListener('mouseup', stopRec);
         recordBtn.addEventListener('touchstart', startRec, { passive: false });
