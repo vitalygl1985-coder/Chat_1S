@@ -529,6 +529,42 @@ async def onec_auth(data: OneCAuthRequest):
         cur.close()
         conn.close()
 
+@app.get("/api/1c/files")
+async def get_uploads_list_for_1c():
+    mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
+    file_map = {}
+    
+    # 1. Читаем карту соответствия имён, если она существует
+    if os.path.exists(mapping_file):
+        try:
+            with open(mapping_file, "r", encoding="utf-8") as f:
+                file_map = json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка чтения карты файлов: {str(e)}")
+    
+    files_list = []
+    
+    # 2. Сканируем папку с файлами
+    if os.path.exists(UPLOAD_DIR):
+        for filename in os.listdir(UPLOAD_DIR):
+            # Пропускаем сам файл карты и любые другие служебные файлы json
+            if filename == "file_map.json" or filename.startswith("archive_"):
+                continue
+                
+            # Выделяем UUID из имени файла (из "имя_файла.экстра" получаем "имя_файла")
+            file_uuid = os.path.splitext(filename)[0]
+            
+            # Ищем оригинальное имя в карте, если нет — оставляем имя с диска
+            original_name = file_map.get(file_uuid, filename)
+            
+            files_list.append({
+                "storage_name": filename,          # Имя файла на сервере (UUID + расширение)
+                "original_name": original_name,    # Исходное имя (например, "Отчет.xlsx")
+                "download_url": f"/download/{filename}" # Готовая относительная ссылка для скачивания
+            })
+            
+    return {"success": True, "files": files_list}
+
 @app.get("/api/web/user-info/{user_id}")
 async def get_user_info(user_id: str, x_token: Optional[str] = Header(None)):
     session = get_session_by_token(x_token)
