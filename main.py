@@ -866,15 +866,15 @@ async def get_files_history(sid, data):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Выбираем сообщения-вложения только из тех комнат, где пользователь является участником
+        # ВАЖНО: В psycopg2 знак процента в строке запроса нужно экранировать как %%
         query = """
             SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
-                   m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, r.name as room_name
+                   m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, r.name as room_name, m.reply_to
             FROM messages m 
             LEFT JOIN users u ON m.id_user_from = u.id_user 
             INNER JOIN room_participants rp ON m.id_room = rp.id_room
             INNER JOIN rooms r ON m.id_room = r.id_room
-            WHERE rp.id_user = %s AND m.encrypted_text LIKE '/download/%'
+            WHERE rp.id_user = %s AND m.encrypted_text LIKE '/download/%%'
         """
         params = [user_id]
 
