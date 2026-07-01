@@ -857,43 +857,56 @@ async def get_room_history(sid, data):
 @sio.event
 async def get_files_history(sid, data):
     room_id = data.get('room_id')
-    extension = data.get('extension')  # 'all', 'png', 'pdf', 'xlsx' и т.д.
+    category = data.get('extension')  # Теперь это умная категория (image, doc, excel, archive, all)
     session = await sio.get_session(sid)
     if not session: 
         return
 
     user_id = session['id_user']
+    role = session.get('role', 'user')
+    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # ВАЖНО: В psycopg2 знак процента в строке запроса нужно экранировать как %%
+        # Базовый запрос (убрали жесткий INNER JOIN с участниками, который блокировал админов)
         query = """
             SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
                    m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, r.name as room_name, m.reply_to
             FROM messages m 
             LEFT JOIN users u ON m.id_user_from = u.id_user 
-            INNER JOIN room_participants rp ON m.id_room = rp.id_room
             INNER JOIN rooms r ON m.id_room = r.id_room
-            WHERE rp.id_user = %s AND m.encrypted_text LIKE '/download/%%'
+            WHERE m.encrypted_text LIKE '/download/%%'
         """
-        params = [user_id]
+        params = []
 
-        # Если конкретная комната выбрана — фильтруем по ней
+        # Логика доступа: если комната выбрана, показываем её файлы. 
+        # Если не выбрана (общий фильтр), показываем файлы из всех доступных юзеру комнат.
         if room_id:
             query += " AND m.id_room = %s"
             params.append(room_id)
-            
-        # Если выбрано конкретное расширение — фильтруем строку вложения
-        if extension and extension != 'all':
-            query += " AND m.encrypted_text ILIKE %s"
-            params.append(f"%.{extension}%")
+        else:
+            if role == 'admin':
+                query += " AND (m.id_room IN (SELECT id_room FROM room_participants WHERE id_user = %s) OR r.type = 'admin_group')"
+                params.append(user_id)
+            else:
+                query += " AND m.id_room IN (SELECT id_room FROM room_participants WHERE id_user = %s)"
+                params.append(user_id)
+
+        # Умная фильтрация сразу по группам расширений
+        if category and category != 'all':
+            if category == 'image':
+                query += " AND (m.encrypted_text ILIKE '%.png%' OR m.encrypted_text ILIKE '%.jpg%' OR m.encrypted_text ILIKE '%.jpeg%' OR m.encrypted_text ILIKE '%.webp%' OR m.encrypted_text ILIKE '%.gif%')"
+            elif category == 'doc':
+                query += " AND (m.encrypted_text ILIKE '%.pdf%' OR m.encrypted_text ILIKE '%.docx%' OR m.encrypted_text ILIKE '%.doc%' OR m.encrypted_text ILIKE '%.txt%')"
+            elif category == 'excel':
+                query += " AND (m.encrypted_text ILIKE '%.xlsx%' OR m.encrypted_text ILIKE '%.xls%' OR m.encrypted_text ILIKE '%.csv%')"
+            elif category == 'archive':
+                query += " AND (m.encrypted_text ILIKE '%.zip%' OR m.encrypted_text ILIKE '%.rar%' OR m.encrypted_text ILIKE '%.7z%')"
 
         query += " ORDER BY m.created_at DESC LIMIT 300"
         
         cur.execute(query, tuple(params))
         messages = cur.fetchall()
-        
-        # Разворачиваем в хронологический порядок для отображения в чате
         messages.reverse()
         
         for m in messages:
