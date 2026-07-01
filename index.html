@@ -449,6 +449,16 @@
                 <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
                 <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
+                <img src="/static/LoadFile.png" id="btn-filter-files" title="Режим просмотра файлов" style="cursor:pointer; height:22px; width:22px; object-fit:contain; margin-left: 8px; vertical-align: middle; padding: 2px; border-radius: 4px;">
+                <select id="file-ext-select" style="display:none; font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; margin-left: 5px; vertical-align: middle;">
+                    <option value="all">Все файлы</option>
+                    <option value="png">Изображения (PNG)</option>
+                    <option value="jpg">Изображения (JPG)</option>
+                    <option value="pdf">Документы (PDF)</option>
+                    <option value="xlsx">Таблицы (XLSX)</option>
+                    <option value="docx">Документы (DOCX)</option>
+                    <option value="zip">Архивы (ZIP/RAR)</option>
+                </select>
             </div>
 
             <div class="controls-row">
@@ -503,6 +513,7 @@
     };
 
     let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
+    let isFileMode = false; // Включен ли сейчас фильтр только по файлам
     let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
     let onlineUsersCache = {}, messageReadsMap = {}; 
     let isSecretMode = false, userSecretKey = "";
@@ -1064,6 +1075,33 @@
 
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
+
+        socket.on('files_history_response', (data) => {
+            messagesStream.innerHTML = "";
+            
+            if (!data.messages || data.messages.length === 0) {
+                messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>📎 В данном разрезе файлы не найдены</div>";
+                return;
+            }
+            
+            data.messages.forEach(msg => {
+                if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
+                
+                // Рендерим стандартное сообщение чата
+                displayMessage(msg, true);
+                
+                // Если комната не была выбрана (глобальный просмотр), дописываем к автору имя кабинета, откуда файл
+                if (!data.room_id) {
+                    const lastMessageNode = messagesStream.lastChild;
+                    if (lastMessageNode) {
+                        const authorElement = lastMessageNode.querySelector('.msg-author');
+                        if (authorElement && msg.room_name) {
+                            authorElement.innerHTML += ` <span style="font-weight:normal; color:var(--primary-color); font-size:11px; margin-left:5px;">[Кабинет: ${msg.room_name}]</span>`;
+                        }
+                    }
+                }
+            });
+        });
     }
 
     function refreshRoomsAndLists() { if (socket) socket.emit('get_rooms_again'); }
@@ -1147,7 +1185,13 @@
 
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId }); 
-        socket.emit('get_room_history', { room_id: roomId }); 
+
+        if (isFileMode) {
+            requestFilesHistory();
+        } else {
+            socket.emit('get_room_history', { room_id: roomId }); 
+        }
+
         socket.emit('get_room_participants', { room_id: roomId });
 
         // Авто-закрытие меню на мобильных после выбора комнаты
@@ -1343,6 +1387,7 @@
         if (!currentUser) return;
         socket.emit('message_read_click', { message_id: messageId, username: currentUser.username });
     };
+
     function initUIEventListeners() {
         document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
 
@@ -1449,6 +1494,54 @@
             leftPanel.classList.remove('open');
             rightPanel.classList.remove('open');
             mobileOverlayPanel.classList.remove('active');
+        });
+
+        // Логика кнопки фильтрации файлов
+        const btnFilterFiles = document.getElementById('btn-filter-files');
+        const fileExtSelect = document.getElementById('file-ext-select');
+
+        btnFilterFiles.addEventListener('click', function() {
+            isFileMode = !isFileMode;
+            
+            if (isFileMode) {
+                btnFilterFiles.style.background = '#dbeafe'; // Подсветка активного состояния
+                fileExtSelect.style.display = 'inline-block';
+                requestFilesHistory();
+            } else {
+                btnFilterFiles.style.background = 'transparent';
+                fileExtSelect.style.display = 'none';
+                
+                // Возвращаем обычное поведение чата
+                if (currentRoomId) {
+                    const activeRoom = latestRoomsListCache.find(r => r.id_room == currentRoomId);
+                    selectRoomById(currentRoomId, activeRoom ? activeRoom.name : "Кабинет", activeRoom ? activeRoom.type : "group", activeRoom ? activeRoom.created_by : null);
+                } else {
+                    messagesStream.innerHTML = "";
+                    document.getElementById('current-chat-title').innerText = "Выберите чат для начала общения";
+                }
+            }
+        });
+
+        // Смена расширения в выпадающем списке
+        fileExtSelect.addEventListener('change', function() {
+            if (isFileMode) {
+                requestFilesHistory();
+            }
+        });
+    }
+
+    function requestFilesHistory() {
+        if (!socket) return;
+        const selectedExt = document.getElementById('file-ext-select').value;
+        messagesStream.innerHTML = "";
+        
+        if (!currentRoomId) {
+            document.getElementById('current-chat-title').innerText = "Все доступные файлы (Общий фильтр)";
+        }
+        
+        socket.emit('get_files_history', { 
+            room_id: currentRoomId, 
+            extension: selectedExt 
         });
     }
 

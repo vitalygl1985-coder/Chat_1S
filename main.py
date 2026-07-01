@@ -855,6 +855,60 @@ async def get_room_history(sid, data):
     finally: cur.close(); conn.close()
 
 @sio.event
+async def get_files_history(sid, data):
+    room_id = data.get('room_id')
+    extension = data.get('extension')  # 'all', 'png', 'pdf', 'xlsx' и т.д.
+    session = await sio.get_session(sid)
+    if not session: 
+        return
+
+    user_id = session['id_user']
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Выбираем сообщения-вложения только из тех комнат, где пользователь является участником
+        query = """
+            SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
+                   m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, r.name as room_name
+            FROM messages m 
+            LEFT JOIN users u ON m.id_user_from = u.id_user 
+            INNER JOIN room_participants rp ON m.id_room = rp.id_room
+            INNER JOIN rooms r ON m.id_room = r.id_room
+            WHERE rp.id_user = %s AND m.encrypted_text LIKE '/download/%'
+        """
+        params = [user_id]
+
+        # Если конкретная комната выбрана — фильтруем по ней
+        if room_id:
+            query += " AND m.id_room = %s"
+            params.append(room_id)
+            
+        # Если выбрано конкретное расширение — фильтруем строку вложения
+        if extension and extension != 'all':
+            query += " AND m.encrypted_text ILIKE %s"
+            params.append(f"%.{extension}%")
+
+        query += " ORDER BY m.created_at DESC LIMIT 300"
+        
+        cur.execute(query, tuple(params))
+        messages = cur.fetchall()
+        
+        # Разворачиваем в хронологический порядок для отображения в чате
+        messages.reverse()
+        
+        for m in messages:
+            if m['created_at']: 
+                m['created_at'] = m['created_at'].isoformat()
+            m['reads'] = message_reads.get(m['id_message'], [])
+            
+        await sio.emit('files_history_response', {'messages': messages, 'room_id': room_id}, to=sid)
+    except Exception as e: 
+        print(f"Ошибка получения файлов: {e}")
+    finally: 
+        cur.close()
+        conn.close()
+
+@sio.event
 async def send_message(sid, data):
     room_id, text, is_secret, ui_styles = data.get('room_id'), data.get('text'), data.get('is_secret', False), data.get('ui_styles', '{}')
     reply_to = data.get('reply_to')
