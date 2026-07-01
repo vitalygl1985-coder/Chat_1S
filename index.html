@@ -1322,16 +1322,24 @@
     function renderProcessedText(targetElement, contentText) {
         if (contentText.startsWith("/download/")) {
             const lower = contentText.toLowerCase();
+            
+            // Модифицируем ссылку, добавляя в параметры токен текущей сессии пользователя
+            // Переменная sessionToken у вас уже объявлена глобально в скрипте index.html
+            const secureUrl = `${contentText}?token=${sessionToken}`;
+
             if (lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".gif") || lower.includes(".webp")) {
                 targetElement.innerHTML = `
-                    <img src="${contentText}" alt="Скриншот" onclick="window.open('${contentText}', '_blank')">
-                    <a class="img-download-link" href="${contentText}" target="_blank">📁 Скачать файл</a>
+                    <img src="${secureUrl}" alt="Скриншот" onclick="window.open('${secureUrl}', '_blank')">
+                    <a class="img-download-link" href="${secureUrl}" target="_blank">📁 Скачать файл</a>
                 `;
             } else {
                 const parts = contentText.split('|');
-                targetElement.innerHTML = `📁 <a href="${parts[0]}" target="_blank" style="color:var(--primary-color); font-weight:600;">${parts[1] || "Скачать файл"}</a>`;
+                const fileUrl = `${parts[0]}?token=${sessionToken}`;
+                targetElement.innerHTML = `📁 <a href="${fileUrl}" target="_blank" style="color:var(--primary-color); font-weight:600;">${parts[1] || "Скачать файл"}</a>`;
             }
-        } else { targetElement.innerHTML = contentText; }
+        } else { 
+            targetElement.innerHTML = contentText; 
+        }
     }
 
     window.requestDeleteMessage = function(msgId) { 

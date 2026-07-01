@@ -13,7 +13,12 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import secrets
 from fastapi.staticfiles import StaticFiles
+from fastapi import Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 
+# Секретный ключ, который будете знать только вы и ваша 1С
+API_KEY_1C = "MasterKey@For1C_5835234"
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 app = FastAPI()
 
 # Убедись, что папка static существует
@@ -529,40 +534,34 @@ async def onec_auth(data: OneCAuthRequest):
         cur.close()
         conn.close()
 
+async def verify_1c_key(header_key: str = Security(api_key_header)):
+    if header_key == API_KEY_1C:
+        return header_key
+    raise HTTPException(status_code=403, detail="Доступ запрещен: неверный API-ключ")
+
 @app.get("/api/1c/files")
-async def get_uploads_list_for_1c():
+async def get_uploads_list_for_1c(auth: str = Depends(verify_1c_key)):
     mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
     file_map = {}
     
-    # 1. Читаем карту соответствия имён, если она существует
     if os.path.exists(mapping_file):
-        try:
-            with open(mapping_file, "r", encoding="utf-8") as f:
-                file_map = json.load(f)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ошибка чтения карты файлов: {str(e)}")
-    
+        with open(mapping_file, "r", encoding="utf-8") as f:
+            file_map = json.load(f)
+            
     files_list = []
-    
-    # 2. Сканируем папку с файлами
     if os.path.exists(UPLOAD_DIR):
         for filename in os.listdir(UPLOAD_DIR):
-            # Пропускаем сам файл карты и любые другие служебные файлы json
             if filename == "file_map.json" or filename.startswith("archive_"):
                 continue
-                
-            # Выделяем UUID из имени файла (из "имя_файла.экстра" получаем "имя_файла")
             file_uuid = os.path.splitext(filename)[0]
-            
-            # Ищем оригинальное имя в карте, если нет — оставляем имя с диска
             original_name = file_map.get(file_uuid, filename)
             
+            # В ссылку для скачивания сразу подставляем ключ, чтобы 1С могла скачать файл
             files_list.append({
-                "storage_name": filename,          # Имя файла на сервере (UUID + расширение)
-                "original_name": original_name,    # Исходное имя (например, "Отчет.xlsx")
-                "download_url": f"/download/{filename}" # Готовая относительная ссылка для скачивания
+                "storage_name": filename,
+                "original_name": original_name,
+                "download_url": f"/download/{filename}?api_key={API_KEY_1C}" 
             })
-            
     return {"success": True, "files": files_list}
 
 @app.get("/api/web/user-info/{user_id}")
@@ -706,20 +705,40 @@ async def upload_logo(file: UploadFile = File(...)):
     return {"info": f"Логотип обновлен: {file_location}"}
 
 @app.get("/download/{file_uuid_with_ext}")
-async def download_file(file_uuid_with_ext: str):
+async def download_file(file_uuid_with_ext: str, token: Optional[str] = None, api_key: Optional[str] = None):
+    # 1. Проверяем авторизацию (запрос идет либо от пользователя с токеном, либо от 1С с api_key)
+    is_authorized = False
+    
+    if api_key == API_KEY_1C:
+        is_authorized = True
+    elif token:
+        # Используем вашу существующую функцию проверки токена сессии
+        session = get_session_by_token(token)
+        if session:
+            is_authorized = True
+
+    if not is_authorized:
+        raise HTTPException(status_code=403, detail="У вас нет прав для скачивания этого файла")
+
+    # 2. Если авторизован — отдаем файл (ваш текущий код)
     file_uuid = file_uuid_with_ext.split(".")[0]
     target_filename = ""
     if os.path.exists(UPLOAD_DIR):
         for filename in os.listdir(UPLOAD_DIR):
-            if filename.startswith(file_uuid): target_filename = filename; break
+            if filename.startswith(file_uuid): 
+                target_filename = filename
+                break
+                
     if target_filename:
         file_path = os.path.join(UPLOAD_DIR, target_filename)
         mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
         original_name = None
         if os.path.exists(mapping_file):
-            with open(mapping_file, "r", encoding="utf-8") as f: original_name = json.load(f).get(file_uuid)
+            with open(mapping_file, "r", encoding="utf-8") as f: 
+                original_name = json.load(f).get(file_uuid)
         encoded_name = urllib.parse.quote(original_name or target_filename)
         return FileResponse(file_path, media_type='application/force-download', headers={'Content-Disposition': f'attachment; filename="{encoded_name}"; filename*=UTF-8\'\' {encoded_name}'})
+        
     return HTMLResponse("Файл не найден", status_code=404)
 
 @app.get("/download-archive/{file_uuid}")
