@@ -9,6 +9,20 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
+
+        /* Убираем синюю обводку при клике на выпадающий список */
+        select:focus {
+            outline: none !important;
+            border-color: #14b865 !important;
+            box-shadow: 0 0 0 2px rgba(20, 184, 101, 0.3) !important;
+        }
+
+        /* Перекрашиваем выбранный пункт внутри списка (работает в Firefox и частично в Chrome) */
+        select option:checked, select option:hover {
+            background-color: #166534 !important;
+            color: white !important;
+        }
+
         :root {
             --primary-color: #2563eb;
             --bg-main: #f3f4f6;
@@ -1109,19 +1123,20 @@
             banner.style = `
                 background: #59745E; 
                 color: white; 
-                padding: 40px 20px; 
+                padding: 15px; /* Уменьшили высоту в 2 раза */
                 border-radius: 12px; 
                 text-align: center; 
-                margin-bottom: 25px; 
-                box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+                margin-bottom: 15px; 
+                box-shadow: 0 4px 15px rgba(0,0,0,0.15);
             `;
             banner.innerHTML = `
-                <div style="font-size: 60px; margin-bottom: 15px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15));">📁</div>
-                <h2 style="text-transform: uppercase; letter-spacing: 1.5px; font-size: 26px; margin-bottom: 8px; font-weight: 350;">Режим файлов</h2>
-                <p style="font-size: 14px; opacity: 0.9; margin-bottom: 30px; font-weight: 300; text-transform: uppercase;">Просмотр и фильтрация вложений</p>
-                <div id="file-upload-card" style="background: var(--primary-color); color: white; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; display: inline-block; transition: all 0.2s; box-shadow: 0 4px 12px rgba(20, 184, 101, 0.2);" 
-                    onmouseover="this.style.background='#109652'; this.style.transform='scale(1.02)';" onmouseout="this.style.background='var(--primary-color)'; this.style.transform='scale(1)';">
-                    ЗАГРУЗИТЬ НОВЫЙ ФАЙЛ <br><span style="font-size:22px; line-height: 1;">+</span>
+                <div style="font-size: 34px; margin-bottom: 5px;">📁</div>
+                <h2 style="text-transform: uppercase; font-size: 20px; margin-bottom: 5px;">Режим файлов</h2>
+                <p style="font-size: 12px; opacity: 0.9; margin-bottom: 15px;">Просмотр и фильтрация вложений</p>
+                <div id="file-upload-card" style="background: #166534; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-block; transition: all 0.2s;" 
+                    onmouseover="this.style.background='#22c55e'; this.style.transform='scale(1.02)';" 
+                    onmouseout="this.style.background='#166534'; this.style.transform='scale(1)';">
+                    ЗАГРУЗИТЬ НОВЫЙ ФАЙЛ <span style="font-size:16px; margin-left:5px;">+</span>
                 </div>
             `;
             messagesStream.appendChild(banner);
