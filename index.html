@@ -449,14 +449,16 @@
                 <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
                 <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
-                <img src="/static/LoadFile.png" id="btn-filter-files" title="Режим просмотра файлов" style="cursor:pointer; height:22px; width:22px; object-fit:contain; margin-left: 8px; vertical-align: middle; padding: 2px; border-radius: 4px;">
-                <select id="file-ext-select" style="display:none; font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; margin-left: 5px; vertical-align: middle;">
-                    <option value="all">Все файлы</option>
+                <img src="/static/LoadFile.png" id="btn-filter-files" title="Режим просмотра файлов" 
+                    style="cursor:pointer; height:32px; width:32px; object-fit:contain; margin-left: 10px; vertical-align: middle; padding: 4px; border-radius: 6px; transition: background 0.2s;"
+                    onmouseover="this.style.background='rgba(63, 98, 68, 0.15)'" onmouseout="this.style.background='transparent'">
+                <select id="file-ext-select" style="display:none; font-size: 12px; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 6px; margin-left: 8px; vertical-align: middle; background: white; color: var(--text-main); font-weight: 500;">
+                    <option value="all">Все вложения</option>
                     <option value="png">Изображения (PNG)</option>
                     <option value="jpg">Изображения (JPG)</option>
                     <option value="pdf">Документы (PDF)</option>
-                    <option value="xlsx">Таблицы (XLSX)</option>
-                    <option value="docx">Документы (DOCX)</option>
+                    <option value="xlsx">Таблицы (EXCEL)</option>
+                    <option value="docx">Документы (WORD)</option>
                     <option value="zip">Архивы (ZIP/RAR)</option>
                 </select>
             </div>
@@ -1076,32 +1078,138 @@
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
 
+        //socket.on('files_history_response', (data) => {
+        //    messagesStream.innerHTML = "";         
+        //    if (!data.messages || data.messages.length === 0) {
+        //        messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>📎 В данном разрезе файлы не найдены</div>";
+        //        return;
+        //    }    
+        //    data.messages.forEach(msg => {
+        //        if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;        
+        //        // Рендерим стандартное сообщение чата
+        //        displayMessage(msg, true);        
+        //        // Если комната не была выбрана (глобальный просмотр), дописываем к автору имя кабинета, откуда файл
+        //        if (!data.room_id) {
+        //            const lastMessageNode = messagesStream.lastChild;
+        //            if (lastMessageNode) {
+        //                const authorElement = lastMessageNode.querySelector('.msg-author');
+        //                if (authorElement && msg.room_name) {
+        //                    authorElement.innerHTML += ` <span style="font-weight:normal; color:var(--primary-color); font-size:11px; margin-left:5px;">[Кабинет: ${msg.room_name}]</span>`;
+        //                }
+        //            }
+        //        }
+        //    });
+        //});
+
         socket.on('files_history_response', (data) => {
             messagesStream.innerHTML = "";
             
+            // 1. Создаем большой стилизованный баннер сверху рабочего пространства
+            const banner = document.createElement('div');
+            banner.style = `
+                background: var(--primary-color); 
+                color: white; 
+                padding: 35px 20px; 
+                border-radius: 12px; 
+                text-align: center; 
+                margin-bottom: 25px; 
+                box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 44px; margin-bottom: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));">📁</div>
+                <h2 style="text-transform: uppercase; letter-spacing: 1.5px; font-size: 22px; margin-bottom: 6px; font-weight: 700;">Режим файлов</h2>
+                <p style="font-size: 13px; opacity: 0.85; margin-bottom: 25px; font-weight: 500;">Просмотр и фильтрация вложений</p>
+                <div id="file-upload-card" style="background: #16a34a; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-block; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.1);" 
+                    onmouseover="this.style.background='#15803d'; this.style.transform='scale(1.02)';" onmouseout="this.style.background='#16a34a'; this.style.transform='scale(1)';">
+                    ЗАГРУЗИТЬ НОВЫЙ ФАЙЛ <span style="font-size:16px; margin-left:6px; vertical-align: middle;">+</span>
+                </div>
+            `;
+            messagesStream.appendChild(banner);
+
+            // Привязываем триггер загрузки к кнопке внутри баннера
+            document.getElementById('file-upload-card').addEventListener('click', () => {
+                document.getElementById('global-file-input').click();
+            });
+
+            // Если файлы отсутствуют в этой ветке фильтра
             if (!data.messages || data.messages.length === 0) {
-                messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>📎 В данном разрезе файлы не найдены</div>";
+                const noFiles = document.createElement('div');
+                noFiles.style = 'text-align:center; color:var(--text-muted); margin: 40px 0; font-size:14px; font-weight:500;';
+                noFiles.innerText = '📎 В данном разрезе файлы не найдены';
+                messagesStream.appendChild(noFiles);
                 return;
             }
+
+            // 2. Контейнер для списка документов
+            const listContainer = document.createElement('div');
+            listContainer.style = 'display: flex; flex-direction: column; gap: 10px; padding: 2px;';
             
             data.messages.forEach(msg => {
-                if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
+                let rawText = msg.encrypted_text || msg.text || "";
+                if (!rawText.startsWith('/download/')) return;
+
+                const author = msg.username || "Сотрудник";
+                const roomNameInfo = !data.room_id && msg.room_name ? ` • [Кабинет: ${msg.room_name}]` : "";
                 
-                // Рендерим стандартное сообщение чата
-                displayMessage(msg, true);
-                
-                // Если комната не была выбрана (глобальный просмотр), дописываем к автору имя кабинета, откуда файл
-                if (!data.room_id) {
-                    const lastMessageNode = messagesStream.lastChild;
-                    if (lastMessageNode) {
-                        const authorElement = lastMessageNode.querySelector('.msg-author');
-                        if (authorElement && msg.room_name) {
-                            authorElement.innerHTML += ` <span style="font-weight:normal; color:var(--primary-color); font-size:11px; margin-left:5px;">[Кабинет: ${msg.room_name}]</span>`;
-                        }
-                    }
+                // Извлекаем чистую ссылку и оригинальное название документа
+                let fileUrl = rawText;
+                let fileName = "Файл";
+                if (rawText.includes('|')) {
+                    const parts = rawText.split('|');
+                    fileUrl = parts[0];
+                    fileName = parts[1];
+                } else {
+                    fileName = rawText.substring(rawText.lastIndexOf('/') + 1);
                 }
+
+                let ext = fileName.split('.').pop().toLowerCase();
+                
+                // Цвета и иконки под конкретные типы расширений
+                let icon = "📄";
+                let iconBg = "#64748b";
+                if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { icon = "🖼️"; iconBg = "#0284c7"; }
+                else if (ext === 'pdf') { icon = "📕"; iconBg = "#dc2626"; }
+                else if (['xlsx', 'xls'].includes(ext)) { icon = "📊"; iconBg = "#16a34a"; }
+                else if (['docx', 'doc'].includes(ext)) { icon = "📝"; iconBg = "#2563eb"; }
+                else if (['zip', 'rar', '7z'].includes(ext)) { icon = "📦"; iconBg = "#d97706"; }
+
+                const fileRow = document.createElement('div');
+                fileRow.style = `
+                    display: flex; 
+                    align-items: center; 
+                    gap: 15px; 
+                    background: white; 
+                    padding: 14px; 
+                    border-radius: 10px; 
+                    border: 1px solid var(--border-color);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                `;
+                
+                fileRow.innerHTML = `
+                    <div style="background: ${iconBg}; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.1);">
+                        ${icon}
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; font-size: 14px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <a href="${fileUrl}" target="_blank" style="color: inherit; text-decoration: none;">${fileName}</a>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; font-weight: 500;">
+                            Отправитель: ${author}${roomNameInfo}
+                        </div>
+                    </div>
+                    <a href="${fileUrl}" target="_blank" style="background: var(--bg-main); padding: 8px 16px; border-radius: 6px; color: var(--text-main); text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.15s;" 
+                    onmouseover="this.style.background='#cbd5e1'" onmouseout="this.style.background='var(--bg-main)'">
+                        Открыть
+                    </a>
+                `;
+                
+                listContainer.appendChild(fileRow);
             });
+            
+            messagesStream.appendChild(listContainer);
+            messagesStream.scrollTop = 0; // Переводим скролл наверх, чтобы сразу видеть панель управления
         });
+
     }
 
     function refreshRoomsAndLists() { if (socket) socket.emit('get_rooms_again'); }
