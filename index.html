@@ -1173,6 +1173,14 @@
 
                 let ext = fileName.split('.').pop().toLowerCase();
                 
+                // --- ДОБАВЛЕНО: Форматирование даты и времени ---
+                let dateStr = "";
+                if (msg.created_at) {
+                    const d = new Date(msg.created_at + 'Z');
+                    dateStr = d.toLocaleDateString('ru-RU') + ' в ' + d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                }
+                // ------------------------------------------------
+                
                 let icon = "📄"; let iconBg = "#64748b";
                 if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { icon = "🖼️"; iconBg = "#6495ED"; }
                 else if (ext === 'pdf') { icon = "📕"; iconBg = "#e11d48"; }
@@ -1191,6 +1199,7 @@
                     border: 1px solid var(--border-color);
                 `;
                 
+                // --- ИЗМЕНЕНО: Вывод переменной dateStr ---
                 fileRow.innerHTML = `
                     <div style="background: ${iconBg}; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0;">
                         ${icon}
@@ -1200,7 +1209,7 @@
                             <a href="${fileUrl}" target="_blank" style="color: inherit; text-decoration: none;">${fileName}</a>
                         </div>
                         <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; font-weight: 500;">
-                            Отправитель: ${author}${roomNameInfo}
+                            Отправитель: ${author}${roomNameInfo} <span style="margin-left: 8px; color: var(--primary-color);">🕒 ${dateStr}</span>
                         </div>
                     </div>
                     <a href="${fileUrl}" target="_blank" style="background: var(--bg-main); padding: 8px 16px; border-radius: 6px; color: var(--text-main); text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.15s;" 
