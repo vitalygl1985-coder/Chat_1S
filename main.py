@@ -831,10 +831,11 @@ async def get_users_list(sid):
 @sio.event
 async def get_room_history(sid, data):
     room_id = data.get('room_id')
+    filter_date = data.get('date')  # Получаем дату из интерфейса
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("""
+        query = """
             SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
                    m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, m.reply_to,
                    rm.encrypted_text as reply_text, COALESCE(u2.username, rm.id_user_from) as reply_author
@@ -843,8 +844,17 @@ async def get_room_history(sid, data):
             LEFT JOIN messages rm ON m.reply_to = rm.id_message
             LEFT JOIN users u2 ON rm.id_user_from = u2.id_user
             WHERE m.id_room = %s 
-            ORDER BY m.created_at ASC LIMIT 100
-        """, (room_id,))
+        """
+        params = [room_id]
+        
+        # Фильтруем по дате, если она выбрана
+        if filter_date:
+            query += " AND DATE(m.created_at) = %s"
+            params.append(filter_date)
+            
+        query += " ORDER BY m.created_at ASC LIMIT 100"
+        
+        cur.execute(query, tuple(params))
         messages = cur.fetchall()
         for m in messages:
             msg_id = m['id_message']
@@ -857,7 +867,8 @@ async def get_room_history(sid, data):
 @sio.event
 async def get_files_history(sid, data):
     room_id = data.get('room_id')
-    category = data.get('extension')  # Теперь это умная категория (image, doc, excel, archive, all)
+    category = data.get('extension')
+    filter_date = data.get('date') # Получаем дату из интерфейса
     session = await sio.get_session(sid)
     if not session: 
         return
@@ -868,7 +879,6 @@ async def get_files_history(sid, data):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Базовый запрос (убрали жесткий INNER JOIN с участниками, который блокировал админов)
         query = """
             SELECT m.id_message, m.id_room, m.id_user_from, COALESCE(u.username, m.id_user_from) as username, 
                    m.encrypted_text, m.is_user_encrypted, m.ui_styles, m.created_at, r.name as room_name, m.reply_to
@@ -879,8 +889,6 @@ async def get_files_history(sid, data):
         """
         params = []
 
-        # Логика доступа: если комната выбрана, показываем её файлы. 
-        # Если не выбрана (общий фильтр), показываем файлы из всех доступных юзеру комнат.
         if room_id:
             query += " AND m.id_room = %s"
             params.append(room_id)
@@ -892,16 +900,20 @@ async def get_files_history(sid, data):
                 query += " AND m.id_room IN (SELECT id_room FROM room_participants WHERE id_user = %s)"
                 params.append(user_id)
 
-        # Умная фильтрация сразу по группам расширений
         if category and category != 'all':
             if category == 'image':
-                query += " AND (m.encrypted_text ILIKE '%.png%' OR m.encrypted_text ILIKE '%.jpg%' OR m.encrypted_text ILIKE '%.jpeg%' OR m.encrypted_text ILIKE '%.webp%' OR m.encrypted_text ILIKE '%.gif%')"
+                query += " AND (m.encrypted_text ILIKE '%%.png%%' OR m.encrypted_text ILIKE '%%.jpg%%' OR m.encrypted_text ILIKE '%%.jpeg%%' OR m.encrypted_text ILIKE '%%.webp%%' OR m.encrypted_text ILIKE '%%.gif%%')"
             elif category == 'doc':
-                query += " AND (m.encrypted_text ILIKE '%.pdf%' OR m.encrypted_text ILIKE '%.docx%' OR m.encrypted_text ILIKE '%.doc%' OR m.encrypted_text ILIKE '%.txt%')"
+                query += " AND (m.encrypted_text ILIKE '%%.pdf%%' OR m.encrypted_text ILIKE '%%.docx%%' OR m.encrypted_text ILIKE '%%.doc%%' OR m.encrypted_text ILIKE '%%.txt%%')"
             elif category == 'excel':
-                query += " AND (m.encrypted_text ILIKE '%.xlsx%' OR m.encrypted_text ILIKE '%.xls%' OR m.encrypted_text ILIKE '%.csv%')"
+                query += " AND (m.encrypted_text ILIKE '%%.xlsx%%' OR m.encrypted_text ILIKE '%%.xls%%' OR m.encrypted_text ILIKE '%%.csv%%')"
             elif category == 'archive':
-                query += " AND (m.encrypted_text ILIKE '%.zip%' OR m.encrypted_text ILIKE '%.rar%' OR m.encrypted_text ILIKE '%.7z%')"
+                query += " AND (m.encrypted_text ILIKE '%%.zip%%' OR m.encrypted_text ILIKE '%%.rar%%' OR m.encrypted_text ILIKE '%%.7z%%')"
+
+        # Фильтруем по дате, если она выбрана
+        if filter_date:
+            query += " AND DATE(m.created_at) = %s"
+            params.append(filter_date)
 
         query += " ORDER BY m.created_at DESC LIMIT 300"
         

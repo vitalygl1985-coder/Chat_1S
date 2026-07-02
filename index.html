@@ -473,6 +473,8 @@
                     <option value="excel">ТАБЛИЦЫ (EXCEL)</option>
                     <option value="archive">АРХИВЫ (ZIP, RAR)</option>
                 </select>
+                <input type="date" id="date-filter-input" style="font-size: 11px; padding: 3px 6px; border: 1px solid var(--border-color); border-radius: 6px; margin-left: 8px; vertical-align: middle; background: var(--bg-panel); color: var(--text-main); outline: none;" title="Фильтр по дате">
+                <button id="btn-clear-date" style="display:none; background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; vertical-align:middle; margin-left:2px;" title="Сбросить дату">✖</button>
             </div>
 
             <div class="controls-row">
@@ -1311,7 +1313,7 @@
         if (isFileMode) {
             requestFilesHistory();
         } else {
-            socket.emit('get_room_history', { room_id: roomId }); 
+            ssocket.emit('get_room_history', { room_id: roomId, date: document.getElementById('date-filter-input').value });
         }
 
         socket.emit('get_room_participants', { room_id: roomId });
@@ -1331,8 +1333,8 @@
 
         let rawText = msg.encrypted_text || msg.text || "";
         const author = msg.username || "Сотрудник";
-        const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
-        
+        const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleString('ru-RU', {day: '2-digit', month:'2-digit', year:'2-digit', hour: '2-digit', minute:'2-digit'}) : "";
+
         let customStyleCSS = "";
         try {
             const styles = typeof msg.ui_styles === 'string' ? JSON.parse(msg.ui_styles || '{}') : msg.ui_styles;
@@ -1650,11 +1652,35 @@
                 requestFilesHistory();
             }
         });
+
+        const dateFilterInput = document.getElementById('date-filter-input');
+        const btnClearDate = document.getElementById('btn-clear-date');
+
+        dateFilterInput.addEventListener('change', function() {
+            btnClearDate.style.display = this.value ? 'inline-block' : 'none';
+            reloadCurrentView();
+        });
+
+        btnClearDate.addEventListener('click', function() {
+            dateFilterInput.value = '';
+            this.style.display = 'none';
+            reloadCurrentView();
+        });
+    }
+
+    function reloadCurrentView() {
+        if (isFileMode) {
+            requestFilesHistory();
+        } else if (currentRoomId) {
+            messagesStream.innerHTML = "";
+            socket.emit('get_room_history', { room_id: currentRoomId, date: dateFilterInput.value });
+        }
     }
 
     function requestFilesHistory() {
         if (!socket) return;
         const selectedExt = document.getElementById('file-ext-select').value;
+        const selectedDate = document.getElementById('date-filter-input').value;
         messagesStream.innerHTML = "";
         
         if (!currentRoomId) {
@@ -1663,7 +1689,8 @@
         
         socket.emit('get_files_history', { 
             room_id: currentRoomId, 
-            extension: selectedExt 
+            extension: selectedExt,
+            date: selectedDate 
         });
     }
 
