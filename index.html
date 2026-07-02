@@ -1059,9 +1059,17 @@
         socket.on('room_participants_list', (data) => { 
             roomParticipantsCache = data.participants || []; 
             renderCurrentRoomParticipants(roomParticipantsCache); 
-        });        
+        });  
+
         socket.on('room_history', (data) => {
+            messagesStream.innerHTML = ""; 
+            
             if (data && data.messages) {
+                if (data.messages.length === 0) {
+                    messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>В эту дату сообщений не было</div>";
+                    return;
+                }
+                
                 data.messages.forEach(msg => {
                     if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
                     displayMessage(msg, true);
@@ -1313,7 +1321,8 @@
         if (isFileMode) {
             requestFilesHistory();
         } else {
-            ssocket.emit('get_room_history', { room_id: roomId, date: document.getElementById('date-filter-input').value });
+            const dateInput = document.getElementById('date-filter-input');
+            socket.emit('get_room_history', { room_id: roomId, date: dateInput ? dateInput.value : "" }); 
         }
 
         socket.emit('get_room_participants', { room_id: roomId });

@@ -831,7 +831,7 @@ async def get_users_list(sid):
 @sio.event
 async def get_room_history(sid, data):
     room_id = data.get('room_id')
-    filter_date = data.get('date')  # Получаем дату из интерфейса
+    filter_date = data.get('date')  # Ловим дату
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -847,9 +847,8 @@ async def get_room_history(sid, data):
         """
         params = [room_id]
         
-        # Фильтруем по дате, если она выбрана
         if filter_date:
-            query += " AND DATE(m.created_at) = %s"
+            query += " AND m.created_at::date = %s::date"
             params.append(filter_date)
             
         query += " ORDER BY m.created_at ASC LIMIT 100"
