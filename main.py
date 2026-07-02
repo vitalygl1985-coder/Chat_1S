@@ -831,7 +831,8 @@ async def get_users_list(sid):
 @sio.event
 async def get_room_history(sid, data):
     room_id = data.get('room_id')
-    filter_date = data.get('date')  # Ловим дату
+    date_from = data.get('date_from') # Принимаем точную секунду начала дня
+    date_to = data.get('date_to')     # Принимаем точную секунду конца дня
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -847,9 +848,10 @@ async def get_room_history(sid, data):
         """
         params = [room_id]
         
-        if filter_date:
-            query += " AND m.created_at::date = %s::date"
-            params.append(filter_date)
+        # Фильтруем сообщения, попавшие строго в этот отрезок
+        if date_from and date_to:
+            query += " AND m.created_at >= %s AND m.created_at <= %s"
+            params.extend([date_from, date_to])
             
         query += " ORDER BY m.created_at ASC LIMIT 100"
         
@@ -867,7 +869,8 @@ async def get_room_history(sid, data):
 async def get_files_history(sid, data):
     room_id = data.get('room_id')
     category = data.get('extension')
-    filter_date = data.get('date') # Получаем дату из интерфейса
+    date_from = data.get('date_from') # Принимаем точную секунду начала дня
+    date_to = data.get('date_to')     # Принимаем точную секунду конца дня
     session = await sio.get_session(sid)
     if not session: 
         return
@@ -909,10 +912,10 @@ async def get_files_history(sid, data):
             elif category == 'archive':
                 query += " AND (m.encrypted_text ILIKE '%%.zip%%' OR m.encrypted_text ILIKE '%%.rar%%' OR m.encrypted_text ILIKE '%%.7z%%')"
 
-        # Фильтруем по дате, если она выбрана
-        if filter_date:
-            query += " AND DATE(m.created_at) = %s"
-            params.append(filter_date)
+        # Фильтруем сообщения, попавшие строго в этот отрезок
+        if date_from and date_to:
+            query += " AND m.created_at >= %s AND m.created_at <= %s"
+            params.extend([date_from, date_to])
 
         query += " ORDER BY m.created_at DESC LIMIT 300"
         

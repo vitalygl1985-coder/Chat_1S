@@ -1321,8 +1321,12 @@
         if (isFileMode) {
             requestFilesHistory();
         } else {
-            const dateInput = document.getElementById('date-filter-input');
-            socket.emit('get_room_history', { room_id: roomId, date: dateInput ? dateInput.value : "" }); 
+            const bounds = getDateBounds();
+            socket.emit('get_room_history', { 
+                room_id: roomId, 
+                date_from: bounds.date_from, 
+                date_to: bounds.date_to 
+            }); 
         }
 
         socket.emit('get_room_participants', { room_id: roomId });
@@ -1677,19 +1681,39 @@
         });
     }
 
+    // НОВАЯ ФУНКЦИЯ: Высчитывает начало и конец дня в формате UTC
+    function getDateBounds() {
+        const val = document.getElementById('date-filter-input').value;
+        if (!val) return { date_from: "", date_to: "" };
+        
+        // Создаем локальные даты начала и конца выбранного дня
+        const d1 = new Date(val + 'T00:00:00');
+        const d2 = new Date(val + 'T23:59:59.999');
+        
+        return {
+            date_from: d1.toISOString().slice(0, 19).replace('T', ' '),
+            date_to: d2.toISOString().slice(0, 19).replace('T', ' ')
+        };
+    }
+
     function reloadCurrentView() {
         if (isFileMode) {
             requestFilesHistory();
         } else if (currentRoomId) {
             messagesStream.innerHTML = "";
-            socket.emit('get_room_history', { room_id: currentRoomId, date: dateFilterInput.value });
+            const bounds = getDateBounds(); // Получаем точный диапазон
+            socket.emit('get_room_history', { 
+                room_id: currentRoomId, 
+                date_from: bounds.date_from, 
+                date_to: bounds.date_to 
+            });
         }
     }
 
     function requestFilesHistory() {
         if (!socket) return;
         const selectedExt = document.getElementById('file-ext-select').value;
-        const selectedDate = document.getElementById('date-filter-input').value;
+        const bounds = getDateBounds(); // Получаем точный диапазон
         messagesStream.innerHTML = "";
         
         if (!currentRoomId) {
@@ -1699,7 +1723,8 @@
         socket.emit('get_files_history', { 
             room_id: currentRoomId, 
             extension: selectedExt,
-            date: selectedDate 
+            date_from: bounds.date_from,
+            date_to: bounds.date_to
         });
     }
 
