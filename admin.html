@@ -108,20 +108,22 @@
                     <button onclick="uploadSpecificStatic()">Заменить иконку</button>
                 </div>
             </div>
+            
             <div id="styles-tab" class="tab">
                 <div class="card">
                     <h3>🖌️ CSS Стили организации</h3>
                     <div class="form-group">
-                        <label>ID организации:</label>
-                        <input type="text" id="style-org-id" placeholder="ID организации...">
+                        <label>ID организации (Автоматически подставлен):</label>
+                        <input type="text" id="style-org-id" disabled style="background:#e5e7eb;">
                     </div>
                     <div class="form-group">
                         <label>CSS код:</label>
-                        <textarea id="css-editor" placeholder=":root { --brand-green: #28a745; }"></textarea>
+                        <textarea id="css-editor" placeholder=":root { --primary-color: #28a745; }"></textarea>
                     </div>
                     <button onclick="saveStyles()">💾 Применить стили</button>
                 </div>
             </div>
+            
             <div id="users-tab" class="tab">
                 <div class="card">
                     <h3>👥 Редактирование ролей пользователей</h3>
@@ -193,16 +195,20 @@
     <script>
         let currentAdmin = null;
         let systemUsers = [];
+        let activeOrgId = ""; // Изоляция: ID текущей организации
         
-        async function saveStyles() {
-            const id_org = document.getElementById('style-org-id').value;
-            const css_content = document.getElementById('css-editor').value;
-            const res = await fetch('/api/admin/save-styles', {
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({id_org, css_content})
-            });
-            if((await res.json()).success) showToast("Стили сохранены!");
+        // Умная обертка для запросов: сама добавляет ID организации
+        async function adminFetch(url, options = {}) {
+            options.headers = options.headers || {};
+            options.headers['id_org'] = activeOrgId; // Жестко привязываем к организации
+            
+            // Если мы не отправляем файлы (FormData), добавляем Content-Type JSON
+            if (!(options.body instanceof FormData) && !options.headers['Content-Type']) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+            
+            const response = await fetch(url, options);
+            return await response.json();
         }
 
         function showToast(message, isError = false) {
@@ -216,15 +222,15 @@
         async function login() {
             const login = document.getElementById('login-input').value;
             const password = document.getElementById('password-input').value;
-            const id_org = document.getElementById('login-org-id').value;
+            activeOrgId = document.getElementById('login-org-id').value;
+            document.getElementById('style-org-id').value = activeOrgId; // Заполняем поле в стилях
             
             try {
-                const response = await fetch('/api/admin/auth', {
+                const data = await adminFetch('/api/admin/auth', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ login, password, id_org })
+                    body: JSON.stringify({ login, password, id_org: activeOrgId })
                 });
-                const data = await response.json();
+                
                 if (data.success) {
                     currentAdmin = data.admin;
                     document.getElementById('login-overlay').style.display = 'none';
@@ -250,11 +256,33 @@
             if(tabName === 'rooms') loadRooms();
             if(tabName === 'users') loadUsers();
             if(tabName === 'logs') loadLogs();
+            if(tabName === 'styles') loadCurrentStyles();
+        }
+
+        async function loadCurrentStyles() {
+            try {
+                const data = await adminFetch(`/api/get-styles/${activeOrgId}`);
+                if (data && data.css) {
+                    document.getElementById('css-editor').value = data.css;
+                } else {
+                    document.getElementById('css-editor').value = "";
+                }
+            } catch (e) {
+                console.error("Ошибка загрузки стилей:", e);
+            }
+        }
+
+        async function saveStyles() {
+            const css_content = document.getElementById('css-editor').value;
+            const d = await adminFetch('/api/admin/save-styles', {
+                method: 'POST',
+                body: JSON.stringify({ id_org: activeOrgId, css_content: css_content })
+            });
+            if(d.success) showToast("Стили сохранены!");
         }
 
         async function loadRooms() {
-            const res = await fetch('/api/admin/rooms');
-            const rooms = await res.json();
+            const rooms = await adminFetch('/api/admin/rooms');
             const tbody = document.getElementById('rooms-tbody');
             tbody.innerHTML = '';
             
@@ -283,20 +311,17 @@
             const name = document.getElementById(`rname-${id}`).value;
             const type = document.getElementById(`rtype-${id}`).value;
             const created_by = document.getElementById(`rcreate-${id}`).value;
-            const res = await fetch('/api/admin/update-room', {
+            const d = await adminFetch('/api/admin/update-room', {
                 method: 'POST',
-                headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({id_room: id, name, type, created_by})
             });
-            const d = await res.json();
             if(d.success) showToast("Кабинет обновлен!");
             else showToast("Ошибка: " + d.message, true);
         }
 
         async function loadUsers() {
             try {
-                const res = await fetch('/api/admin/users');
-                systemUsers = await res.json();
+                systemUsers = await adminFetch('/api/admin/users');
                 const tbody = document.querySelector('#users-tbody');
                 tbody.innerHTML = '';
                 systemUsers.forEach(u => {
@@ -310,19 +335,16 @@
         async function updateRole() {
             const id_user = document.getElementById('edit-user-id').value;
             const role = document.getElementById('edit-user-role').value;
-            const res = await fetch('/api/admin/update-role', {
+            const d = await adminFetch('/api/admin/update-role', {
                 method:'POST',
-                headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({id_user, role})
             });
-            const d = await res.json();
             if(d.success) { showToast("Роль обновлена!"); loadUsers(); }
             else showToast("Ошибка: " + d.message, true);
         }
 
         async function loadFilesList(folder) {
-            const res = await fetch(`/api/admin/files/${folder}`);
-            const files = await res.json();
+            const files = await adminFetch(`/api/admin/files/${folder}`);
             
             if (folder === 'uploads') {
                 const tbody = document.getElementById('uploads-tbody');
@@ -342,8 +364,7 @@
         }
 
         async function deleteUpload(filename) {
-            const res = await fetch(`/api/admin/files/uploads/${filename}`, { method: 'DELETE' });
-            const d = await res.json();
+            const d = await adminFetch(`/api/admin/files/uploads/${filename}`, { method: 'DELETE' });
             if(d.success) { showToast("Файл успешно удален из хранилища"); loadFilesList('uploads'); }
             else showToast("Ошибка: " + d.message, true);
         }
@@ -353,8 +374,8 @@
             if(!file) return;
             const formData = new FormData();
             formData.append("file", file, forceName || file.name);
-            const res = await fetch('/api/admin/upload-file/static', { method: 'POST', body: formData });
-            if((await res.json()).success) { showToast("Файл успешно заменен!"); loadFilesList('static'); }
+            const d = await adminFetch('/api/admin/upload-file/static', { method: 'POST', body: formData });
+            if(d.success) { showToast("Файл успешно заменен!"); loadFilesList('static'); }
         }
 
         async function uploadSpecificStatic() {
@@ -366,8 +387,8 @@
             }
             const formData = new FormData();
             formData.append("file", file, forceName);
-            const res = await fetch('/api/admin/upload-file/static', { method: 'POST', body: formData });
-            if((await res.json()).success) { showToast("Иконка успешно заменена в каталоге static!"); }
+            const d = await adminFetch('/api/admin/upload-file/static', { method: 'POST', body: formData });
+            if(d.success) { showToast("Иконка успешно заменена в каталоге static!"); }
         }
 
        async function loadDbTables() {
@@ -377,18 +398,15 @@
                 WHERE table_schema = 'public' 
                 ORDER BY table_name, ordinal_position;
             `;
-            const res = await fetch('/api/admin/sql', {
+            const d = await adminFetch('/api/admin/sql', {
                 method: 'POST', 
-                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ sql: sqlQ })
             });
-            const d = await res.json();
             const box = document.getElementById('tables-list-box');
             
             if (d.success && d.data) {
                 box.style.display = 'block';
                 
-                // Группируем таблицы
                 const tables = {};
                 d.data.forEach(row => {
                     if (!tables[row.table_name]) tables[row.table_name] = [];
@@ -408,28 +426,24 @@
 
         async function saveSettings() {
             const color = document.getElementById('primary-color').value;
-            const res = await fetch('/api/admin/settings', {
+            const d = await adminFetch('/api/admin/settings', {
                 method:'POST',
-                headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({theme_primary_color: color})
             });
-            if((await res.json()).success) showToast("Цвет сохранен!");
+            if(d.success) showToast("Цвет сохранен!");
         }
 
         async function executeSQL() {
             const sql = document.getElementById('sql-query').value;
-            const res = await fetch('/api/admin/sql', {
+            const d = await adminFetch('/api/admin/sql', {
                 method:'POST',
-                headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({sql})
             });
-            const d = await res.json();
             document.getElementById('sql-result').innerText = JSON.stringify(d.data || d.message, null, 2);
         }
 
         async function loadLogs() {
-            const res = await fetch('/api/admin/logs');
-            const logs = await res.json();
+            const logs = await adminFetch('/api/admin/logs');
             const resultDiv = document.getElementById('logs-result');
             resultDiv.innerHTML = logs.map(l => `
                 <div>[${new Date(l.created_at).toLocaleString()}] <b>${l.admin_login}</b>: ${l.action}</div>

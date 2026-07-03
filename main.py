@@ -116,7 +116,7 @@ def clean_uuid(org_id_str):
 def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=None):
     # 1. ОБЩИЙ
     cur.execute(
-        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' LIMIT 1", 
+        "SELECT id_room FROM rooms WHERE id_org = %s::uuid", (id_org,) AND UPPER(name) = 'ОБЩИЙ' LIMIT 1", 
         (id_org,)
     )
     room_general = cur.fetchone()
@@ -133,7 +133,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     # 2. АДМИН
     if user_role == 'admin':
         cur.execute(
-            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' LIMIT 1", 
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid", (id_org,) AND UPPER(name) = 'АДМИН' LIMIT 1", 
             (id_org,)
         )
         room_admin = cur.fetchone()
@@ -150,7 +150,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     # 3. МАГАЗИН
     if shop_name and shop_name.strip() != "":
         cur.execute(
-            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid", (id_org,) AND name = %s LIMIT 1", 
             (id_org, shop_name)
         )
         room_shop = cur.fetchone()
@@ -294,15 +294,15 @@ async def get_org_config(id_org: str):
     return res['settings_json'] if res else {"primary_color": "#2563eb", "logo_url": "/static/logo.png"}
 
 @app.post("/api/admin/save-styles")
-async def save_org_styles(data: dict):
-    # data: {"id_org": "...", "css_content": "..."}
+async def save_org_styles(data: dict, id_org: str = Header(...)):
+    # Игнорируем то, что прислали в теле, берем id_org из заголовка для безопасности
     conn = get_db_connection(); cur = conn.cursor()
     try:
         cur.execute("""
             INSERT INTO org_styles (id_org, css_content) 
             VALUES (%s::uuid, %s) 
             ON CONFLICT (id_org) DO UPDATE SET css_content = EXCLUDED.css_content
-        """, (data['id_org'], data['css_content']))
+        """, (id_org, data['css_content']))
         conn.commit()
         return {"success": True}
     finally: cur.close(); conn.close()
@@ -380,11 +380,12 @@ async def admin_update_role(data: UpdateUserRoleRequest):
         cur.close(); conn.close()
 
 @app.get("/api/admin/rooms")
-async def admin_get_rooms():
+async def admin_get_rooms(id_org: str = Header(...)): # Метод теперь требует заголовок
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT id_room, name, type, created_by FROM rooms")
+        # Фильтрация по организации
+        cur.execute("SELECT id_room, name, type, created_by FROM rooms WHERE id_org = %s::uuid", (id_org,))
         return cur.fetchall()
     finally:
         cur.close(); conn.close()
@@ -500,7 +501,7 @@ def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=No
 
     # 1. Пытаемся найти существующий кабинет по имени
     cur.execute(
-        "SELECT id_room, type FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
+        "SELECT id_room, type FROM rooms WHERE id_org = %s::uuid", (id_org,) AND name = %s LIMIT 1", 
         (id_org, shop_name)
     )
     room = cur.fetchone()
@@ -695,7 +696,7 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
                 SELECT id_room, name, type, created_by, 
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
                 FROM rooms
-                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
+                WHERE id_org = %s::uuid", (id_org,) AND TRIM(type) = 'admin_group'
                 
                 UNION
                 
@@ -822,7 +823,7 @@ async def get_rooms_again(sid):
                 SELECT id_room, name, type, id_org, created_by,
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
                 FROM rooms
-                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
+                WHERE id_org = %s::uuid", (id_org,) AND TRIM(type) = 'admin_group'
                 
                 UNION
                 
@@ -858,7 +859,7 @@ async def get_users_list(sid):
     session = await sio.get_session(sid)
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute('SELECT id_user, username, role FROM users WHERE id_org = %s::uuid AND is_active = true ORDER BY username ASC', (session['id_org'],))
+        cur.execute('SELECT id_user, username, role FROM users WHERE id_org = %s::uuid", (id_org,) AND is_active = true ORDER BY username ASC', (session['id_org'],))
         await sio.emit('users_list', cur.fetchall(), to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
