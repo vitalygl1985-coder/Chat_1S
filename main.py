@@ -281,6 +281,18 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
+# В main.py
+@app.get("/api/get-org-config/{id_org}")
+async def get_org_config(id_org: str):
+    # Запрашиваем из таблицы org_styles настройки
+    # Предположим, там хранится JSON: {"primary_color": "#28a745", "logo_url": "/static/logo1.png", ...}
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT settings_json FROM org_styles WHERE id_org = %s::uuid", (id_org,))
+    res = cur.fetchone()
+    cur.close(); conn.close()
+    return res['settings_json'] if res else {"primary_color": "#2563eb", "logo_url": "/static/logo.png"}
+
 @app.post("/api/admin/save-styles")
 async def save_org_styles(data: dict):
     # data: {"id_org": "...", "css_content": "..."}

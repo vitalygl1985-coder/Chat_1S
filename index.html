@@ -746,6 +746,23 @@
         }
     }
 
+    async function applyOrgSettings() {
+        if (!currentUser || !currentUser.id_org) return;
+        
+        const config = await fetch(`/api/get-org-config/${currentUser.id_org}`).then(r => r.json());
+        
+        // Применяем цвета через переменные CSS
+        document.documentElement.style.setProperty('--primary-color', config.primary_color);
+        
+        // Меняем логотип
+        const logo = document.getElementById('chat-logo');
+        if (logo) logo.src = config.logo_url;
+        
+        // Меняем ссылки
+        const footerLink = document.querySelector('#footer-onec-block a');
+        if (footerLink) footerLink.href = config.onec_url;
+    }
+
     function renderEmojiGrid(category) {
         const grid = document.getElementById('emoji-grid'); grid.innerHTML = "";
         const emojis = emojiCategories[category] || [];

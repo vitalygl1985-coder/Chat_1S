@@ -1,8 +1,36 @@
-/* static/style.css - ТОЛЬКО СТРУКТУРА */
+/* static/style.css - БАЗОВАЯ ВЕРСТКА */
+:root {
+    --primary-color: #2563eb; /* Значение по умолчанию */
+}
+
+/* Кнопки и элементы управления */
+.btn-primary, .btn, .btn-send, .header, .pane-header { 
+    background-color: var(--primary-color) !important; 
+    border-color: var(--primary-color) !important; 
+}
+
+button.btn-info-user {
+    all: unset !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    cursor: pointer !important;
+    margin-left: 8px !important;
+    color: var(--primary-color) !important;
+}
+button.btn-info-user svg { stroke: var(--primary-color) !important; }
+
+/* Бабблы сообщений */
+.message.my .message-box { background: var(--primary-color) !important; opacity: 0.8; }
+
+/* Нижняя панель */
+.system-footer-links { background: #fff !important; border-top: 2px solid var(--primary-color) !important; }
+.system-footer-links a { color: var(--primary-color) !important; }
+
+/* Остальная верстка (оставьте тут grid, flex и размеры из вашего старого файла) */
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-body, html { height: 100%; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-.app-container { display: grid; grid-template-columns: 260px 1fr 280px; flex: 1; overflow: hidden; }
-/* ... (здесь вся верстка: grid, flex, размеры, отступы, мобильные медиа-запросы) ... */
-.message-box { padding: 8px 12px; border-radius: 12px; }
-#chat-logo { max-height: 35px; width: auto; }
-/* НИКАКИХ ЦВЕТОВ ЗДЕСЬ НЕ ДОЛЖНО БЫТЬ */
+body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+.app-container { display: grid; grid-template-columns: 260px 1fr 280px; flex: 1; min-height: 0; overflow: hidden; }
+/* ... (здесь весь ваш layout-код: .panel, .chat-panel, .message, .input-area и т.д.) ... */
