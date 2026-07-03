@@ -76,6 +76,20 @@
             </div>
 
             <div id="theme-tab" class="tab">
+                <div id="styles-tab" class="tab">
+                    <div class="card">
+                        <h3>🎨 CSS Стили организации</h3>
+                        <div class="form-group">
+                            <label>ID организации:</label>
+                            <input type="text" id="style-org-id" placeholder="ID организации...">
+                        </div>
+                        <div class="form-group">
+                            <label>CSS код:</label>
+                            <textarea id="css-editor" placeholder=":root { --primary-color: #28a745; }"></textarea>
+                        </div>
+                        <button onclick="saveStyles()">💾 Применить стили для организации</button>
+                    </div>
+                </div>
                 <div class="card">
                     <h3>🎨 Внешний вид и цвета кнопок</h3>
                     <div class="form-group">
@@ -180,6 +194,17 @@
         let currentAdmin = null;
         let systemUsers = [];
         
+        async function saveStyles() {
+            const id_org = document.getElementById('style-org-id').value;
+            const css_content = document.getElementById('css-editor').value;
+            const res = await fetch('/api/admin/save-styles', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({id_org, css_content})
+            });
+            if((await res.json()).success) showToast("Стили сохранены!");
+        }
+
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.textContent = message;

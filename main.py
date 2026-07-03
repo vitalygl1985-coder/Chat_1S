@@ -281,6 +281,29 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
+@app.post("/api/admin/save-styles")
+async def save_org_styles(data: dict):
+    # data: {"id_org": "...", "css_content": "..."}
+    conn = get_db_connection(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO org_styles (id_org, css_content) 
+            VALUES (%s::uuid, %s) 
+            ON CONFLICT (id_org) DO UPDATE SET css_content = EXCLUDED.css_content
+        """, (data['id_org'], data['css_content']))
+        conn.commit()
+        return {"success": True}
+    finally: cur.close(); conn.close()
+
+# Эндпоинт для чата, чтобы он запрашивал стили своей организации
+@app.get("/api/get-styles/{id_org}")
+async def get_org_styles(id_org: str):
+    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT css_content FROM org_styles WHERE id_org = %s::uuid", (id_org,))
+    res = cur.fetchone()
+    cur.close(); conn.close()
+    return {"css": res['css_content'] if res else None}
+
 @app.get("/api/admin/logs")
 async def get_admin_logs():
     conn = get_db_connection()

@@ -709,7 +709,12 @@
             const response = await fetch('/api/web/exchange-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: ticket }) });
             const data = await response.json();
             if (data.success) {
-                sessionToken = data.token; currentUser = data.user;
+                sessionToken = data.token; 
+                currentUser = data.user;
+                
+                // ВЫЗЫВАЕМ ПРИМЕНЕНИЕ СТИЛЕЙ ОРГАНИЗАЦИИ
+                await applyOrgStyles(); 
+
                 document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
                 renderEmojiGrid('smile'); 
                 connectSockets(); 
@@ -724,6 +729,21 @@
         } catch (err) { 
             document.getElementById('header-user-identity').innerText = "Ошибка подключения";
             alert("Не удалось связаться с сервером."); 
+        }
+    }
+
+    async function applyOrgStyles() {
+        if (!currentUser || !currentUser.id_org) return;
+        try {
+            const res = await fetch(`/api/get-styles/${currentUser.id_org}`);
+            const data = await res.json();
+            if (data.css) {
+                const style = document.createElement('style');
+                style.innerHTML = data.css;
+                document.head.appendChild(style);
+            }
+        } catch (e) {
+            console.error("Не удалось загрузить стили организации", e);
         }
     }
 
