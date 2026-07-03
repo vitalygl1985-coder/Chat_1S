@@ -116,7 +116,7 @@ def clean_uuid(org_id_str):
 def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=None):
     # 1. ОБЩИЙ
     cur.execute(
-        "SELECT id_room FROM rooms WHERE id_org = %s::uuid", (id_org,) AND UPPER(name) = 'ОБЩИЙ' LIMIT 1", 
+        "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' LIMIT 1", 
         (id_org,)
     )
     room_general = cur.fetchone()
@@ -133,7 +133,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     # 2. АДМИН
     if user_role == 'admin':
         cur.execute(
-            "SELECT id_room FROM rooms WHERE id_org = %s::uuid", (id_org,) AND UPPER(name) = 'АДМИН' LIMIT 1", 
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' LIMIT 1", 
             (id_org,)
         )
         room_admin = cur.fetchone()
@@ -150,7 +150,7 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     # 3. МАГАЗИН
     if shop_name and shop_name.strip() != "":
         cur.execute(
-            "SELECT id_room FROM rooms WHERE id_org = %s::uuid", (id_org,) AND name = %s LIMIT 1", 
+            "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
             (id_org, shop_name)
         )
         room_shop = cur.fetchone()
@@ -281,11 +281,8 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
-# В main.py
 @app.get("/api/get-org-config/{id_org}")
 async def get_org_config(id_org: str):
-    # Запрашиваем из таблицы org_styles настройки
-    # Предположим, там хранится JSON: {"primary_color": "#28a745", "logo_url": "/static/logo1.png", ...}
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT settings_json FROM org_styles WHERE id_org = %s::uuid", (id_org,))
@@ -295,7 +292,6 @@ async def get_org_config(id_org: str):
 
 @app.post("/api/admin/save-styles")
 async def save_org_styles(data: dict, id_org: str = Header(...)):
-    # Игнорируем то, что прислали в теле, берем id_org из заголовка для безопасности
     conn = get_db_connection(); cur = conn.cursor()
     try:
         cur.execute("""
@@ -307,7 +303,6 @@ async def save_org_styles(data: dict, id_org: str = Header(...)):
         return {"success": True}
     finally: cur.close(); conn.close()
 
-# Эндпоинт для чата, чтобы он запрашивал стили своей организации
 @app.get("/api/get-styles/{id_org}")
 async def get_org_styles(id_org: str):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -380,11 +375,10 @@ async def admin_update_role(data: UpdateUserRoleRequest):
         cur.close(); conn.close()
 
 @app.get("/api/admin/rooms")
-async def admin_get_rooms(id_org: str = Header(...)): # Метод теперь требует заголовок
+async def admin_get_rooms(id_org: str = Header(...)):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Фильтрация по организации
         cur.execute("SELECT id_room, name, type, created_by FROM rooms WHERE id_org = %s::uuid", (id_org,))
         return cur.fetchall()
     finally:
@@ -420,7 +414,6 @@ async def admin_upload_file(folder: str, file: UploadFile = File(...)):
     with open(file_location, "wb+") as file_object:
         file_object.write(file.file.read())
     
-    # Логирование замены/добавления статики/лого
     log_admin_action("Admin", f"Загружен или обновлен файл '{file.filename}' в директорию '{folder}'")
     return {"success": True, "filename": file.filename}
 
@@ -463,7 +456,6 @@ async def admin_execute_sql(data: dict):
         sql_query = data.get("sql", "")
         cur.execute(sql_query)
         
-        # Логируем выполнение произвольных SQL запросов (кроме запросов структуры)
         if not sql_query.strip().lower().startswith("select") and not "information_schema" in sql_query:
             log_admin_action("Admin", "Выполнен прямой SQL-запрос изменения данных")
 
@@ -485,11 +477,9 @@ async def get_style():
     return FileResponse("style.css", media_type="text/css")
 
 def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=None):
-    # Проверка: shop_name должен быть строкой и не быть пустым
     if not isinstance(shop_name, str) or shop_name.strip() == "":
         return
 
-    # Сохраняем информацию о магазине
     if shop_info:
         cur.execute("""
             INSERT INTO user_shop_info (id_user, shop_name, address, phones, schedule, note)
@@ -499,24 +489,19 @@ def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=No
             phones = EXCLUDED.phones, schedule = EXCLUDED.schedule, note = EXCLUDED.note
         """, (user_id, shop_name, shop_info.address, shop_info.phones, shop_info.schedule, shop_info.note))
 
-    # 1. Пытаемся найти существующий кабинет по имени
     cur.execute(
-        "SELECT id_room, type FROM rooms WHERE id_org = %s::uuid", (id_org,) AND name = %s LIMIT 1", 
+        "SELECT id_room, type FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
         (id_org, shop_name)
     )
     room = cur.fetchone()
 
-    # 2. Логика создания или использования кабинета
     if room:
-        # Извлекаем ID корректно для любого типа курсора
         room_id = room['id_room'] if isinstance(room, dict) else room[0]
         room_type = room['type'] if isinstance(room, dict) else room[1]
         
-        # Если админ зашел в комнату, которая была создана как 'group', обновляем до 'admin_group'
         if user_role == 'admin' and room_type != 'admin_group':
             cur.execute("UPDATE rooms SET type = 'admin_group' WHERE id_room = %s", (room_id,))
     else:
-        # Кабинета нет — создаем с нужным типом
         new_type = 'admin_group' if user_role == 'admin' else 'group'
         cur.execute(
             "INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, %s, %s, %s) RETURNING id_room", 
@@ -524,7 +509,6 @@ def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=No
         )
         room_id = cur.fetchone()[0]
 
-    # 3. Добавляем пользователя, если его нет в участниках
     cur.execute(
         "INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
         (room_id, user_id)
@@ -576,7 +560,6 @@ async def verify_1c_key(header_key: str = Security(api_key_header)):
         return header_key
     raise HTTPException(status_code=403, detail="Доступ запрещен: неверный API-ключ")
 
-# 1С делает запрос сюда с заголовком X-API-Key. Эндпоинт защищен.
 @app.get("/api/1c/files")
 async def get_uploads_list_for_1c(auth: str = Depends(verify_1c_key)):
     mapping_file = os.path.join(UPLOAD_DIR, "file_map.json")
@@ -597,11 +580,10 @@ async def get_uploads_list_for_1c(auth: str = Depends(verify_1c_key)):
             files_list.append({
                 "storage_name": filename,
                 "original_name": original_name,
-                "download_url": f"/download/{filename}" # Ссылка снова простая
+                "download_url": f"/download/{filename}"
             })
     return {"success": True, "files": files_list}
 
-# Скачивание файла по UUID. Доступно без токенов.
 @app.get("/download/{file_uuid_with_ext}")
 async def download_file(file_uuid_with_ext: str):
     file_uuid = file_uuid_with_ext.split(".")[0]
@@ -641,7 +623,6 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Увеличим время жизни билета до 60 секунд (на случай задержек сети)
         cur.execute("SELECT * FROM auth_tickets WHERE ticket = %s AND created_at >= NOW() - INTERVAL '60 seconds'", (data.ticket,))
         ticket_data = cur.fetchone()
         
@@ -651,7 +632,6 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
         cur.execute("DELETE FROM auth_tickets WHERE ticket = %s", (data.ticket,))
         session_token = secrets.token_hex(32)
         
-        # Явное приведение UUID к строке для безопасности
         user_id = str(ticket_data['id_user'])
         org_id = str(ticket_data['id_org'])
         
@@ -673,12 +653,10 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
             }
         }
     except HTTPException:
-        # ПРОПУСКАЕМ НАШИ 403 ОШИБКИ БЕЗ ИЗМЕНЕНИЙ (Чтобы Railway не сыпал 500)
         conn.rollback()
         raise
     except Exception as e: 
         conn.rollback()
-        # ВАЖНО: это выведет реальную ошибку в логи Railway
         print(f"DEBUG ERROR: {type(e).__name__}: {str(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
     finally: 
@@ -696,7 +674,7 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
                 SELECT id_room, name, type, created_by, 
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
                 FROM rooms
-                WHERE id_org = %s::uuid", (id_org,) AND TRIM(type) = 'admin_group'
+                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
                 
                 UNION
                 
@@ -708,11 +686,9 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
                 
                 ORDER BY name ASC
             """
-            # Передаем: id_org для admin_group, id_org для обычных групп, id_user для обычных групп
             cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
 
         else:
-            # Обычный юзер видит только то, где он участник
             query = """
                 SELECT r.id_room, r.name, r.type, r.created_by,
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
@@ -774,7 +750,6 @@ async def download_archive_endpoint(file_uuid: str):
     return FileResponse(path=os.path.join(UPLOAD_DIR, target_filename), media_type="application/json", headers={'Content-Disposition': f'attachment; filename="{urllib.parse.quote(file_map[file_uuid])}"'})
 
 # СВЯЗЫВАНИЕ СОБЫТИЙ SOCKET.IO
-# Глобальный словарь для поиска: {id_user: sid}
 user_sid_map = {}
 
 @sio.event
@@ -785,7 +760,7 @@ async def connect(sid, environ, auth=None):
     id_org = clean_uuid(urllib.parse.unquote(params.get('id_org', '')))
     username = urllib.parse.unquote(params.get('username', ''))
     user_role = urllib.parse.unquote(params.get('role', 'user'))
-    user_sid_map[id_user] = sid # Запоминаем связь
+    user_sid_map[id_user] = sid 
 
     if not id_user: return False
 
@@ -818,12 +793,11 @@ async def get_rooms_again(sid):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if session.get('role') == 'admin':
-            # Админ видит все 'admin_group' своей организации ПЛЮС все комнаты, где он участник
             query = """
                 SELECT id_room, name, type, id_org, created_by,
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
                 FROM rooms
-                WHERE id_org = %s::uuid", (id_org,) AND TRIM(type) = 'admin_group'
+                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
                 
                 UNION
                 
@@ -837,7 +811,6 @@ async def get_rooms_again(sid):
             """
             cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
         else:
-            # Обычный юзер видит только то, где он участник
             query = """
                 SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
                        (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
@@ -859,7 +832,7 @@ async def get_users_list(sid):
     session = await sio.get_session(sid)
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute('SELECT id_user, username, role FROM users WHERE id_org = %s::uuid", (id_org,) AND is_active = true ORDER BY username ASC', (session['id_org'],))
+        cur.execute("SELECT id_user, username, role FROM users WHERE id_org = %s::uuid AND is_active = true ORDER BY username ASC", (session['id_org'],))
         await sio.emit('users_list', cur.fetchall(), to=sid)
     except Exception as e: print(e)
     finally: cur.close(); conn.close()
@@ -867,8 +840,8 @@ async def get_users_list(sid):
 @sio.event
 async def get_room_history(sid, data):
     room_id = data.get('room_id')
-    date_from = data.get('date_from') # Принимаем точную секунду начала дня
-    date_to = data.get('date_to')     # Принимаем точную секунду конца дня
+    date_from = data.get('date_from') 
+    date_to = data.get('date_to')     
     if not room_id: return
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -884,7 +857,6 @@ async def get_room_history(sid, data):
         """
         params = [room_id]
         
-        # Фильтруем сообщения, попавшие строго в этот отрезок
         if date_from and date_to:
             query += " AND m.created_at >= %s AND m.created_at <= %s"
             params.extend([date_from, date_to])
@@ -905,8 +877,8 @@ async def get_room_history(sid, data):
 async def get_files_history(sid, data):
     room_id = data.get('room_id')
     category = data.get('extension')
-    date_from = data.get('date_from') # Принимаем точную секунду начала дня
-    date_to = data.get('date_to')     # Принимаем точную секунду конца дня
+    date_from = data.get('date_from') 
+    date_to = data.get('date_to')     
     session = await sio.get_session(sid)
     if not session: 
         return
@@ -948,7 +920,6 @@ async def get_files_history(sid, data):
             elif category == 'archive':
                 query += " AND (m.encrypted_text ILIKE '%%.zip%%' OR m.encrypted_text ILIKE '%%.rar%%' OR m.encrypted_text ILIKE '%%.7z%%')"
 
-        # Фильтруем сообщения, попавшие строго в этот отрезок
         if date_from and date_to:
             query += " AND m.created_at >= %s AND m.created_at <= %s"
             params.extend([date_from, date_to])
@@ -1072,11 +1043,9 @@ async def add_user_to_room(sid, data):
         room = cur.fetchone()
         
         if room:
-            # Админ-группы могут модерироваться только админами
             if room['type'] == 'admin_group' and session['role'] != 'admin':
                 await sio.emit('system_alert', {"message": "Добавлять в этот официальный кабинет может только Администратор!"}, to=sid); return
             
-            # Обычные группы/кабинеты - только их создателем
             if room['type'] == 'group' and str(room['created_by']) != str(session['id_user']) and session['role'] != 'admin':
                 await sio.emit('system_alert', {"message": "Добавлять участников может только создатель кабинета!"}, to=sid); return
 
@@ -1220,7 +1189,6 @@ async def disconnect(sid):
     session = await sio.get_session(sid)
     if session and 'id_user' in session:
         id_user = session['id_user']
-        # Проверяем, что отключается именно текущая активная сессия (предотвращает ложные оффлайны при переподключении телефона)
         if user_sid_map.get(id_user) == sid:
             online_users.pop(id_user, None)
             user_sid_map.pop(id_user, None)
@@ -1228,7 +1196,6 @@ async def disconnect(sid):
 
 @sio.event
 async def offer(sid, data):
-    """Браузер А отправляет предложение (SDP) браузеру Б"""
     target_sid = data.get('target_sid')
     if target_sid:
         await sio.emit('offer', {
@@ -1239,21 +1206,18 @@ async def offer(sid, data):
 
 @sio.event
 async def answer(sid, data):
-    """Браузер Б отвечает браузеру А"""
     target_sid = data.get('target_sid')
     if target_sid:
         await sio.emit('answer', {'answer': data['answer'], 'from_sid': sid}, to=target_sid)
 
 @sio.event
 async def ice_candidate(sid, data):
-    """Обмен сетевыми данными (ICE Candidates)"""
     target_sid = data.get('target_sid')
     if target_sid:
         await sio.emit('ice_candidate', {'candidate': data['candidate'], 'from_sid': sid}, to=target_sid)
 
 @sio.event
 async def end_call(sid, data):
-    """Событие для завершения звонка"""
     target_sid = data.get('target_sid')
     if target_sid:
         await sio.emit('call_ended', {'from_sid': sid}, to=target_sid)
