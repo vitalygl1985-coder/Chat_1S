@@ -1,13 +1,16 @@
-/* Переменные */
-:root { --brand-green: #28a745; }
+/* --- СТИЛЬ 100LETNIK.MD --- */
+/* 1. Брендовый цвет */
+:root {
+    --brand-green: #28a745 !important;
+}
 
-/* 1. Брендирование кнопок */
-.btn-primary, #send-btn, .header { background-color: var(--brand-green) !important; }
+/* 2. Перекрашиваем только нужные кнопки, не трогая размеры */
+.btn-primary, #send-btn, .btn-send, .header, .pane-header { 
+    background-color: var(--brand-green) !important; 
+    border-color: var(--brand-green) !important; 
+}
 
-/* 2. Брендирование сообщений */
-.message.my .message-box { background-color: #d8f3dc !important; }
-
-/* 3. Кнопка (i) - точечный фикс */
+/* 3. Оставляем кнопку (i) без рамки */
 button.btn-info-user {
     all: unset !important;
     display: inline-flex !important;
@@ -16,118 +19,32 @@ button.btn-info-user {
     width: 24px !important;
     height: 24px !important;
     cursor: pointer !important;
+    margin-left: 8px !important;
     color: var(--brand-green) !important;
 }
-button.btn-info-user svg { stroke: var(--brand-green) !important; width: 22px; height: 22px; }
+button.btn-info-user svg { stroke: var(--brand-green) !important; }
 
-/* 4. Исправление логотипа, чтобы не ломал верстку */
-#chat-logo {
-    height: 64px !important;  /* Устанавливаем высоту */
-    width: auto !important;   /* Сохраняем пропорции */
-    display: block !important;
-}
+/* 4. Исправляем бабблы сообщений (не ломая их ширину) */
+.message.my .message-box { background: #d8f3dc !important; }
 
-/* Увеличиваем кнопки управления в шапке */
-#btn-archive-room, #btn-delete-room {
-    height: 55px !important; /* Увеличенный размер */
-    width: 55px !important;
-    cursor: pointer !important;
-    transition: transform 0.2s;
+/* 5. Исправляем кнопки в модальных окнах, чтобы они не были зелеными, если это "Отмена" */
+.btn { background-color: var(--brand-green) !important; }
+#btn-cancel-room-creation, #btn-cancel-screenshot, .btn-remove-participant { 
+    background-color: #9ca3af !important; 
 }
-#btn-archive-room:hover, #btn-delete-room:hover {
-    transform: scale(1.1); /* Легкий зум при наведении */
-}
-#btn-attach-file:hover {
-    opacity: 0.6; /* Легкое затемнение при наведении */
+/* Ограничиваем логотип, чтобы он не ломал шапку */
+#chat-logo { 
+    max-height: 35px !important; 
+    width: auto !important; 
+    display: block !important; 
 }
 
-/* Показываем плейсхолдер, когда div пуст */
-/* Этот код заставляет плейсхолдер работать в div */
-.input-msg-div:empty:before {
-    content: attr(placeholder);
-    color: #9ca3af;
-    pointer-events: none;
-    display: block;
+/* Принудительно выравниваем шапку */
+.chat-header { 
+    display: flex !important; 
+    align-items: center !important; 
+    flex-wrap: nowrap !important; 
 }
-
-/* Убираем плейсхолдер, как только пользователь начинает писать */
-.input-msg-div:focus:before {
-    display: none;
-}
-
-/* Применяем фон к области сообщений */
-.messages-container {
-    background-image: url('/static/chat_bg.jpg') !important;
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-}
-
-/* 2. Принудительно задаем размер кнопок в шапке */
-.chat-actions img {
-    height: 35px !important;
-    width: auto !important;
-    object-fit: contain;
-}
-
-/* 3. Фикс кнопки прикрепления (чтобы она не лезла в кнопки удаления) */
-/* Принудительная очистка фона для кнопки прикрепления */
-#btn-attach-file {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-    filter: none !important;
-}
-/* На случай, если кнопка имеет класс btn или btn-primary */
-.btn-primary#btn-attach-file {
-    background: transparent !important;
-    background-color: transparent !important;
-}
-/* Настройка кнопок-картинок */
-#btn-archive-room, #btn-delete-room {
-    transition: transform 0.2s, filter 0.2s;
-}
-
-#btn-archive-room:hover, #btn-delete-room:hover {
-    transform: scale(1.05); /* Легкое увеличение при наведении */
-    filter: brightness(1.1); /* Легкое свечение */
-}
-
-/* Сделаем сообщения на фоне кирпичной стены чуть прозрачнее, 
-   чтобы фон был виден, но текст оставался читаемым */
-/* Делаем сообщения чуть прозрачными, чтобы фон был виден */
-.message-box {
-    background: rgba(255, 255, 255, 0.95) !important;
-}
-.message.my .message-box { 
-    background: #d8f3dc !important; /* Твои сообщения останутся зелеными */
-}
-.message-box:hover .msg-reply-trigger { display: block !important; }
-.message-box:hover .msg-edit-trigger { display: block !important; }
-
-/* Делаем основной текст в модальном окне светлее */
-.modal-row {
-    color: #2f783e !important; /* Мягкий серый цвет, хорошо читается на белом */
-    margin-bottom: 10px;
-    font-size: 13px;
-}
-
-/* Выделяем заголовки (метки) более темным, но не черным цветом */
-.modal-label {
-    font-weight: 600 !important;
-    color: #389033 !important; /* Чуть темнее основного текста */
-    display: inline-block;
-    min-width: 100px;
-}
-#modalBody {
-    padding: 20px !important;
-    background: #ffffff;
-}
-
-/* Добавляем легкую обводку или разделитель для строк */
-.modal-row {
-    border-bottom: 1px solid #f3f4f6;
-    padding-bottom: 8px;
-}
+/* Нижняя панель */
+.system-footer-links { background: #fff !important; border-top: 2px solid var(--brand-green) !important; }
+.system-footer-links a { color: var(--brand-green) !important; }

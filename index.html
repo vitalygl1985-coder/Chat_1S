@@ -9,36 +9,24 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
-        /* Базовая структура, НЕ УДАЛЯТЬ */
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body, html { height: 100%; height: -webkit-fill-available; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-        
+        /* БАЗОВАЯ ВЕРСТКА - ЭТО НЕ ЦВЕТА, ЭТО ПОЗИЦИИ ЭЛЕМЕНТОВ */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
         .app-container { display: grid; grid-template-columns: 260px 1fr 280px; flex: 1; min-height: 0; overflow: hidden; position: relative; }
         .panel { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .panel-header { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
-        .panel-scroll-area { flex: 1; overflow-y: auto; padding: 8px; }
-        
         .chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .chat-header { height: 55px; padding: 0 15px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 10px; }
-        .chat-title-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .chat-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
+        .chat-header { height: 55px; padding: 0 15px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
         .messages-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .input-area { padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .controls-row { display: flex; gap: 8px; align-items: center; }
+        .input-msg-div { flex: 1; min-height: 36px; max-height: 80px; overflow-y: auto; padding: 8px; }
         .message { max-width: 75%; display: flex; flex-direction: column; margin-bottom: 2px; align-self: flex-start; }
         .message.my { align-self: flex-end; }
-        .message-box { padding: 8px 12px; border-radius: 12px; position: relative; }
-        
-        .input-area { padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
-        .toolbar { display: flex; gap: 8px; align-items: center; padding-bottom: 6px; position: relative; flex-wrap: wrap; }
-        .controls-row { display: flex; gap: 8px; align-items: center; }
-        .input-msg-div { flex: 1; min-height: 36px; max-height: 80px; overflow-y: auto; padding: 8px; outline: none; font-size: 13px; }
-
-        /* Мобильная адаптация - ВАЖНО ДЛЯ ВЕРСТКИ */
-        .mobile-overlay-panel { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 90; }
-        .mobile-overlay-panel.active { display: block; }
+        /* Мобильная адаптация */
         @media (max-width: 768px) {
             .app-container { display: flex; flex-direction: column; width: 100%; }
-            .left-panel, .right-panel { position: absolute; top: 0; height: 100%; z-index: 100; width: 85%; max-width: 320px; transition: transform 0.3s ease; }
+            .left-panel, .right-panel { position: absolute; top: 0; height: 100%; z-index: 100; width: 85%; transition: transform 0.3s; }
             .left-panel { left: 0; transform: translateX(-100%); }
             .right-panel { right: 0; transform: translateX(100%); }
             .left-panel.open, .right-panel.open { transform: translateX(0); }

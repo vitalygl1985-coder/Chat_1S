@@ -1,50 +1,8 @@
-/* --- СТИЛЬ 100LETNIK.MD --- */
-/* 1. Брендовый цвет */
-:root {
-    --brand-green: #28a745 !important;
-}
-
-/* 2. Перекрашиваем только нужные кнопки, не трогая размеры */
-.btn-primary, #send-btn, .btn-send, .header, .pane-header { 
-    background-color: var(--brand-green) !important; 
-    border-color: var(--brand-green) !important; 
-}
-
-/* 3. Оставляем кнопку (i) без рамки */
-button.btn-info-user {
-    all: unset !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 24px !important;
-    height: 24px !important;
-    cursor: pointer !important;
-    margin-left: 8px !important;
-    color: var(--brand-green) !important;
-}
-button.btn-info-user svg { stroke: var(--brand-green) !important; }
-
-/* 4. Исправляем бабблы сообщений (не ломая их ширину) */
-.message.my .message-box { background: #d8f3dc !important; }
-
-/* 5. Исправляем кнопки в модальных окнах, чтобы они не были зелеными, если это "Отмена" */
-.btn { background-color: var(--brand-green) !important; }
-#btn-cancel-room-creation, #btn-cancel-screenshot, .btn-remove-participant { 
-    background-color: #9ca3af !important; 
-}
-/* Ограничиваем логотип, чтобы он не ломал шапку */
-#chat-logo { 
-    max-height: 35px !important; 
-    width: auto !important; 
-    display: block !important; 
-}
-
-/* Принудительно выравниваем шапку */
-.chat-header { 
-    display: flex !important; 
-    align-items: center !important; 
-    flex-wrap: nowrap !important; 
-}
-/* Нижняя панель */
-.system-footer-links { background: #fff !important; border-top: 2px solid var(--brand-green) !important; }
-.system-footer-links a { color: var(--brand-green) !important; }
+/* static/style.css - ТОЛЬКО СТРУКТУРА */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+body, html { height: 100%; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+.app-container { display: grid; grid-template-columns: 260px 1fr 280px; flex: 1; overflow: hidden; }
+/* ... (здесь вся верстка: grid, flex, размеры, отступы, мобильные медиа-запросы) ... */
+.message-box { padding: 8px 12px; border-radius: 12px; }
+#chat-logo { max-height: 35px; width: auto; }
+/* НИКАКИХ ЦВЕТОВ ЗДЕСЬ НЕ ДОЛЖНО БЫТЬ */
