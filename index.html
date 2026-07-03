@@ -1338,10 +1338,11 @@
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId }); 
 
+        const bounds = getDateBounds(); // ВСЕГДА берем актуальный диапазон из календаря
+        
         if (isFileMode) {
             requestFilesHistory();
         } else {
-            const bounds = getDateBounds();
             socket.emit('get_room_history', { 
                 room_id: roomId, 
                 date_from: bounds.date_from, 

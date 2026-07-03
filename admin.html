@@ -57,6 +57,7 @@
             <nav>
                 <a id="nav-rooms" onclick="showTab('rooms')">🗄️ Кабинеты</a>
                 <a id="nav-theme" onclick="showTab('theme')">🎨 Оформление и CSS</a>
+                <a id="nav-styles" onclick="showTab('styles')">🖌️ CSS Организаций</a> 
                 <a id="nav-users" onclick="showTab('users')">👥 Пользователи и роли</a>
                 <a id="nav-files" onclick="showTab('files')">📁 Файлы проекта</a>
                 <a id="nav-sql" onclick="showTab('sql')">🖥️ SQL и Таблицы</a>
@@ -76,20 +77,6 @@
             </div>
 
             <div id="theme-tab" class="tab">
-                <div id="styles-tab" class="tab">
-                    <div class="card">
-                        <h3>🎨 CSS Стили организации</h3>
-                        <div class="form-group">
-                            <label>ID организации:</label>
-                            <input type="text" id="style-org-id" placeholder="ID организации...">
-                        </div>
-                        <div class="form-group">
-                            <label>CSS код:</label>
-                            <textarea id="css-editor" placeholder=":root { --primary-color: #28a745; }"></textarea>
-                        </div>
-                        <button onclick="saveStyles()">💾 Применить стили для организации</button>
-                    </div>
-                </div>
                 <div class="card">
                     <h3>🎨 Внешний вид и цвета кнопок</h3>
                     <div class="form-group">
@@ -121,7 +108,20 @@
                     <button onclick="uploadSpecificStatic()">Заменить иконку</button>
                 </div>
             </div>
-            
+            <div id="styles-tab" class="tab">
+                <div class="card">
+                    <h3>🖌️ CSS Стили организации</h3>
+                    <div class="form-group">
+                        <label>ID организации:</label>
+                        <input type="text" id="style-org-id" placeholder="ID организации...">
+                    </div>
+                    <div class="form-group">
+                        <label>CSS код:</label>
+                        <textarea id="css-editor" placeholder=":root { --brand-green: #28a745; }"></textarea>
+                    </div>
+                    <button onclick="saveStyles()">💾 Применить стили</button>
+                </div>
+            </div>
             <div id="users-tab" class="tab">
                 <div class="card">
                     <h3>👥 Редактирование ролей пользователей</h3>
