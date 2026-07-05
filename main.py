@@ -417,29 +417,32 @@ async def admin_update_room(data: UpdateRoomRequest, id_org: str = Header(...)):
 
 @app.get("/api/admin/files/{folder}")
 async def admin_get_files(folder: str, id_org: str = Header(...)):
-    target = os.path.join("static", id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
+    # ИСПРАВЛЕНО: Теперь ищем файлы в папках Volume
+    target = os.path.join(STATIC_DIR, id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
     if os.path.exists(target):
         return os.listdir(target)
     return []
 
 @app.post("/api/admin/upload-file/{folder}")
 async def admin_upload_file(folder: str, file: UploadFile = File(...), id_org: str = Header(...)):
-    target_dir = os.path.join("static", id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
+    # ИСПРАВЛЕНО: Сохраняем строго на Volume
+    target_dir = os.path.join(STATIC_DIR, id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
     os.makedirs(target_dir, exist_ok=True)
     
     file_location = os.path.join(target_dir, file.filename)
     with open(file_location, "wb+") as file_object:
         file_object.write(file.file.read())
     
-    log_admin_action("Admin", f"Загружен или обновлен файл '{file.filename}' в директорию '{folder}'", id_org)
+    log_admin_action("Admin", f"Загружен файл '{file.filename}' в {folder}", id_org)
     return {"success": True, "filename": file.filename}
 
 @app.delete("/api/admin/files/uploads/{filename}")
 async def admin_delete_upload(filename: str, id_org: str = Header(...)):
+    # ИСПРАВЛЕНО: Удаляем строго с Volume
     file_path = os.path.join(UPLOAD_DIR, id_org, filename)
     if os.path.exists(file_path):
         os.remove(file_path)
-        log_admin_action("Admin", f"Вручную удален файл вложений: {filename}", id_org)
+        log_admin_action("Admin", f"Удален файл: {filename}", id_org)
         return {"success": True}
     raise HTTPException(status_code=404, detail="Файл не найден")
 
