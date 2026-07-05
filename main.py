@@ -532,9 +532,9 @@ async def get_chat_page():
     with open(os.path.join(current_dir, "index.html"), "r", encoding="utf-8") as f: 
         return f.read()
 
-@app.get("/style.css")
+@app.get("/static/style.css")
 async def get_style():
-    return FileResponse("style.css", media_type="text/css")
+    return FileResponse("static/style.css", media_type="text/css")
 
 def sync_user_shop_room(cur, id_org, user_id, user_role, shop_name, shop_info=None):
     if not isinstance(shop_name, str) or shop_name.strip() == "":
