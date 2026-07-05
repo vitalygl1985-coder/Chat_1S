@@ -455,24 +455,32 @@ async def get_org_styles(id_org: str):
     res_color = cur.fetchone()
     cur.close(); conn.close()
     
-    # 1. Сначала берем основной CSS из админки
+    # 1. Основной CSS из админки
     css = res['css_content'] if res and res.get('css_content') else ""
     
+    # Инициализируем переменную фона пустым значением
+    bg_url_variable = "none"
+
     # 2. ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ
-    org_static_dir = os.path.join("static", id_org)
+    org_static_dir = os.path.join(STATIC_DIR, id_org)
     if os.path.exists(org_static_dir):
         for f in os.listdir(org_static_dir):
             file_url = f"/static/{id_org}/{f}"
             f_lower = f.lower()
+            
+            # Если файл содержит "bg" в названии, сохраняем его как переменную фона
             if "bg" in f_lower and f_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; background-attachment: fixed !important; }}"
+                bg_url_variable = f"url('{file_url}')"
+            
             elif f == "logo.png":
                 css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
             elif f_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
                 css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
 
-    # 3. ДИНАМИЧЕСКИЙ ЦВЕТ — ВСЕГДА В КОНЦЕ
-    # Переменная --primary-color, определенная здесь, перекроет всё, что было в CSS выше
+    # Добавляем переменную фона в :root (она будет доступна во всем CSS)
+    css += f"\n:root {{ --chat-bg-url: {bg_url_variable} !important; }}"
+
+    # 3. ДИНАМИЧЕСКИЙ ЦВЕТ
     if res_color and res_color.get('value'):
         css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
                 
