@@ -330,24 +330,26 @@ async def get_org_styles(id_org: str):
     res_color = cur.fetchone()
     cur.close(); conn.close()
     
-    # Исправленное безопасное извлечение
+    # 1. Сначала берем основной CSS из админки
     css = res['css_content'] if res and res.get('css_content') else ""
     
-    # Добавляем динамический цвет
-    if res_color and res_color.get('value'):
-        css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
-
-    # Инъекция файлов
+    # 2. ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ
     org_static_dir = os.path.join("static", id_org)
     if os.path.exists(org_static_dir):
         for f in os.listdir(org_static_dir):
             file_url = f"/static/{id_org}/{f}"
-            if f == "chat_bg.jpg":
-                css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; }}"
+            f_lower = f.lower()
+            if "bg" in f_lower and f_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; background-attachment: fixed !important; }}"
             elif f == "logo.png":
                 css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
-            elif f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+            elif f_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
                 css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
+
+    # 3. ДИНАМИЧЕСКИЙ ЦВЕТ — ВСЕГДА В КОНЦЕ
+    # Переменная --primary-color, определенная здесь, перекроет всё, что было в CSS выше
+    if res_color and res_color.get('value'):
+        css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
                 
     return {"css": css}
 
