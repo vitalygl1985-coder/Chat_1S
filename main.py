@@ -17,42 +17,31 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Security, Depends
 from fastapi.security.api_key import APIKeyHeader
 
-# Секретный ключ, который будете знать только вы и ваша 1С
-API_KEY_1C = "MasterKey@For1C_5835234"
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+# 1. Инициализация приложения
+app = FastAPI()
 
-# Путь, куда подключен ваш Volume согласно image_35f5ef.png
+# 2. Настройка путей к Volume (ОДИН РАЗ!)
 VOLUME_DIR = "/app/uploads"
-
-# Создаем подпапки внутри этого Volume, чтобы не сваливать всё в кучу
 STATIC_DIR = os.path.join(VOLUME_DIR, "static")
 UPLOAD_DIR = os.path.join(VOLUME_DIR, "uploads")
 
-# Создаем их при запуске, если их нет
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ОЧЕНЬ ВАЖНО: 
-# Поскольку папка static теперь находится вне корня проекта, 
-# вам нужно "примонтировать" её в FastAPI, чтобы сервер мог отдавать из нее картинки:
+# 3. Монтирование папки (ОДИН РАЗ!)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-app = FastAPI()
+# Секретный ключ
+API_KEY_1C = "MasterKey@For1C_5835234"
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-# Убедись, что папка static существует
-if not os.path.exists("static"):
-    os.makedirs("static")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
-
+# Обработчик ошибок
 @app.exception_handler(422)
 async def validation_exception_handler(request: Request, exc):
     print(f"Ошибка валидации JSON: {exc.errors()}") 
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
+# Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -66,7 +55,7 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 # СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ
 online_users = {}       
-message_reads = {}      
+message_reads = {}   
 
 # Pydantic модели
 class ShopInfo(BaseModel):
