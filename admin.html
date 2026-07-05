@@ -426,11 +426,12 @@
 
         async function saveSettings() {
             const color = document.getElementById('primary-color').value;
+            // Используем уже созданную вами adminFetch, которая сама добавит заголовок id-org
             const d = await adminFetch('/api/admin/settings', {
-                method:'POST',
-                body: JSON.stringify({theme_primary_color: color})
+                method: 'POST',
+                body: JSON.stringify({ theme_primary_color: color })
             });
-            if(d.success) showToast("Цвет сохранен!");
+            if(d.success) showToast("Цвет сохранен для организации!");
         }
 
         async function executeSQL() {

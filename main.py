@@ -326,11 +326,18 @@ async def get_org_styles(id_org: str):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT css_content FROM org_styles WHERE id_org = %s::uuid", (id_org,))
     res = cur.fetchone()
+    cur.execute("SELECT value FROM admin_settings WHERE key = 'theme_primary_color' AND id_org = %s::uuid", (id_org,))
+    res_color = cur.fetchone()
     cur.close(); conn.close()
     
-    css = res['css_content'] if res and res['css_content'] else ""
+    # Исправленное безопасное извлечение
+    css = res['css_content'] if res and res.get('css_content') else ""
     
-    # АВТОМАТИЧЕСКАЯ ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ ОРГАНИЗАЦИИ В CSS
+    # Добавляем динамический цвет
+    if res_color and res_color.get('value'):
+        css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
+
+    # Инъекция файлов
     org_static_dir = os.path.join("static", id_org)
     if os.path.exists(org_static_dir):
         for f in os.listdir(org_static_dir):
@@ -339,8 +346,7 @@ async def get_org_styles(id_org: str):
                 css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; }}"
             elif f == "logo.png":
                 css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
-            elif f.endswith(".png") or f.endswith(".jpg") or f.endswith(".gif") or f.endswith(".webp"):
-                # Авто-подмена всех кнопок по имени файла
+            elif f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
                 css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
                 
     return {"css": css}
