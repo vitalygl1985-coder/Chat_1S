@@ -1408,7 +1408,7 @@
         let editBtnHtml = "";
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
-            editBtnHtml = `<span class="msg-edit-trigger" style="display: none;" onclick="requestEditMessage(${msgId}, '${escapedText}')" title="Изменить">✏️</span>`;
+            editBtnHtml = `<span class="msg-edit-trigger" style="display: none;" onclick='requestEditMessage(${msgId}, ${JSON.stringify(rawText)})' title="Изменить">✏️</span>`;
         }
 
         let replyBtnHtml = `<span class="msg-reply-trigger" style="display: none;" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
@@ -1474,10 +1474,17 @@
     document.getElementById('btn-close-edit-modal').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
     document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
 
-    window.requestEditMessage = async function(msgId, currentText) {
+    window.handleEditClick = function(element) {
+        const msgId = element.getAttribute('data-msg-id');
+        const text = JSON.parse(element.getAttribute('data-text'));
+        requestEditMessage(msgId, text);
+    };
+
+    window.requestEditMessage = function(msgId, currentText) {
         editingMsgId = msgId;
         const textarea = document.getElementById('edit-msg-textarea');
-        textarea.value = currentText.replace(/\\'/g, "'").replace(/\\"/g, '"');
+        // currentText теперь приходит уже как чистая строка, ничего менять не надо
+        textarea.value = currentText; 
         document.getElementById('edit-message-modal').classList.add('open');
         textarea.focus();
     };
@@ -1508,6 +1515,7 @@
         document.getElementById('reply-panel').style.display = 'none';
     };
 
+    
     function showCustomPrompt() {
         return new Promise((resolve) => {
             const modal = document.getElementById('secret-prompt-modal');
