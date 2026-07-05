@@ -200,7 +200,7 @@
         // Умная обертка для запросов: сама добавляет ID организации
         async function adminFetch(url, options = {}) {
             options.headers = options.headers || {};
-            options.headers['id_org'] = activeOrgId; // Жестко привязываем к организации
+            options.headers['id-org'] = activeOrgId; // Жестко привязываем к организации
             
             // Если мы не отправляем файлы (FormData), добавляем Content-Type JSON
             if (!(options.body instanceof FormData) && !options.headers['Content-Type']) {
