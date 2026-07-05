@@ -21,6 +21,22 @@ from fastapi.security.api_key import APIKeyHeader
 API_KEY_1C = "MasterKey@For1C_5835234"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
+# Путь, куда подключен ваш Volume согласно image_35f5ef.png
+VOLUME_DIR = "/app/uploads"
+
+# Создаем подпапки внутри этого Volume, чтобы не сваливать всё в кучу
+STATIC_DIR = os.path.join(VOLUME_DIR, "static")
+UPLOAD_DIR = os.path.join(VOLUME_DIR, "uploads")
+
+# Создаем их при запуске, если их нет
+os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# ОЧЕНЬ ВАЖНО: 
+# Поскольку папка static теперь находится вне корня проекта, 
+# вам нужно "примонтировать" её в FastAPI, чтобы сервер мог отдавать из нее картинки:
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 app = FastAPI()
 
 # Убедись, что папка static существует
@@ -321,38 +337,6 @@ async def save_org_styles(data: dict, id_org: str = Header(...)):
         return {"success": True}
     finally: cur.close(); conn.close()
 
-@app.get("/api/get-styles/{id_org}")
-async def get_org_styles(id_org: str):
-    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT css_content FROM org_styles WHERE id_org = %s::uuid", (id_org,))
-    res = cur.fetchone()
-    cur.execute("SELECT value FROM admin_settings WHERE key = 'theme_primary_color' AND id_org = %s::uuid", (id_org,))
-    res_color = cur.fetchone()
-    cur.close(); conn.close()
-    
-    # 1. Сначала берем основной CSS из админки
-    css = res['css_content'] if res and res.get('css_content') else ""
-    
-    # 2. ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ
-    org_static_dir = os.path.join("static", id_org)
-    if os.path.exists(org_static_dir):
-        for f in os.listdir(org_static_dir):
-            file_url = f"/static/{id_org}/{f}"
-            f_lower = f.lower()
-            if "bg" in f_lower and f_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; background-attachment: fixed !important; }}"
-            elif f == "logo.png":
-                css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
-            elif f_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
-                css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
-
-    # 3. ДИНАМИЧЕСКИЙ ЦВЕТ — ВСЕГДА В КОНЦЕ
-    # Переменная --primary-color, определенная здесь, перекроет всё, что было в CSS выше
-    if res_color and res_color.get('value'):
-        css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
-                
-    return {"css": css}
-
 @app.get("/api/admin/logs")
 async def get_admin_logs(id_org: str = Header(...)):
     conn = get_db_connection()
@@ -470,20 +454,53 @@ async def admin_delete_upload(filename: str, id_org: str = Header(...)):
         return {"success": True}
     raise HTTPException(status_code=404, detail="Файл не найден")
 
+@app.get("/api/get-styles/{id_org}")
+async def get_org_styles(id_org: str):
+    conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT css_content FROM org_styles WHERE id_org = %s::uuid", (id_org,))
+    res = cur.fetchone()
+    cur.execute("SELECT value FROM admin_settings WHERE key = 'theme_primary_color' AND id_org = %s::uuid", (id_org,))
+    res_color = cur.fetchone()
+    cur.close(); conn.close()
+    
+    # 1. Сначала берем основной CSS из админки
+    css = res['css_content'] if res and res.get('css_content') else ""
+    
+    # 2. ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ
+    org_static_dir = os.path.join("static", id_org)
+    if os.path.exists(org_static_dir):
+        for f in os.listdir(org_static_dir):
+            file_url = f"/static/{id_org}/{f}"
+            f_lower = f.lower()
+            if "bg" in f_lower and f_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; background-attachment: fixed !important; }}"
+            elif f == "logo.png":
+                css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
+            elif f_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
+
+    # 3. ДИНАМИЧЕСКИЙ ЦВЕТ — ВСЕГДА В КОНЦЕ
+    # Переменная --primary-color, определенная здесь, перекроет всё, что было в CSS выше
+    if res_color and res_color.get('value'):
+        css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
+                
+    return {"css": css}
+
+# Сохранение цвета с привязкой к организации
 @app.post("/api/admin/settings")
 async def admin_save_settings(settings: dict, id_org: str = Header(...)):
     conn = get_db_connection(); cur = conn.cursor()
     try:
         for k, v in settings.items():
-            cur.execute("INSERT INTO admin_settings (key, id_org, value) VALUES (%s, %s::uuid, %s) ON CONFLICT (key, id_org) DO UPDATE SET value = EXCLUDED.value", (k, id_org, v))
+            # Добавили id_org в PRIMARY KEY таблицы admin_settings (убедитесь, что таблица создана верно)
+            cur.execute("""
+                INSERT INTO admin_settings (key, id_org, value) 
+                VALUES (%s, %s::uuid, %s) 
+                ON CONFLICT (key, id_org) DO UPDATE SET value = EXCLUDED.value
+            """, (k, id_org, v))
         conn.commit()
-        log_admin_action("Admin", f"Обновлены настройки админ-панели (цветовая схема / ссылки)", id_org)
         return {"success": True}
-    except Exception as e: 
-        conn.rollback() 
-        return {"success": False, "message": str(e)}
-    finally: 
-        cur.close(); conn.close()
+    finally: cur.close(); conn.close()
 
 @app.get("/api/admin/settings")
 async def admin_get_settings(id_org: str = Header(...)):
