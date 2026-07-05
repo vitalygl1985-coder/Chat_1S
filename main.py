@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import urllib.parse
+import re
 from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,10 +47,6 @@ app.add_middleware(
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
-
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
 
 # СЕРВЕРНЫЙ РЕЕСТР ДЛЯ СТАТУСОВ И ОТМЕТОК ПРОЧТЕНИЯ
 online_users = {}       
@@ -239,16 +236,36 @@ def init_db():
                 password VARCHAR(255) NOT NULL,
                 id_org UUID NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS admin_settings (
-                key VARCHAR(255) PRIMARY KEY,
-                value TEXT
-            ); 
+            CREATE TABLE IF NOT EXISTS org_styles (
+                id_org UUID PRIMARY KEY,
+                css_content TEXT,
+                settings_json JSONB DEFAULT '{}'::jsonb
+            );
+            
+            -- Обновленные таблицы для изоляции админки
             CREATE TABLE IF NOT EXISTS admin_logs (
                 id SERIAL PRIMARY KEY,
+                id_org UUID,
                 admin_login VARCHAR(100),
                 action TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );                                       
+        """)
+        
+        # Пересоздаем admin_settings с комбинированным ключом (key, id_org)
+        cur.execute("DROP TABLE IF EXISTS admin_settings;")
+        cur.execute("""
+            CREATE TABLE admin_settings (
+                key VARCHAR(255),
+                id_org UUID,
+                value TEXT,
+                PRIMARY KEY (key, id_org)
+            );
+        """)
+        
+        # Добавляем id_org в admin_logs, если таблица была создана ранее без него
+        cur.execute("""
+            ALTER TABLE admin_logs ADD COLUMN IF NOT EXISTS id_org UUID;
         """)
         conn.commit()
     except Exception as e:
@@ -260,11 +277,11 @@ def init_db():
 
 init_db()
 
-def log_admin_action(admin_login: str, action: str):
+def log_admin_action(admin_login: str, action: str, id_org: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO admin_logs (admin_login, action) VALUES (%s, %s)", (admin_login, action))
+        cur.execute("INSERT INTO admin_logs (admin_login, action, id_org) VALUES (%s, %s, %s::uuid)", (admin_login, action, id_org))
         conn.commit()
     except:
         conn.rollback()
@@ -288,7 +305,7 @@ async def get_org_config(id_org: str):
     cur.execute("SELECT settings_json FROM org_styles WHERE id_org = %s::uuid", (id_org,))
     res = cur.fetchone()
     cur.close(); conn.close()
-    return res['settings_json'] if res else {"primary_color": "#2563eb", "logo_url": "/static/logo.png"}
+    return res['settings_json'] if res and res['settings_json'] else {"primary_color": "#2563eb", "logo_url": "/static/logo.png"}
 
 @app.post("/api/admin/save-styles")
 async def save_org_styles(data: dict, id_org: str = Header(...)):
@@ -300,6 +317,7 @@ async def save_org_styles(data: dict, id_org: str = Header(...)):
             ON CONFLICT (id_org) DO UPDATE SET css_content = EXCLUDED.css_content
         """, (id_org, data['css_content']))
         conn.commit()
+        log_admin_action("Admin", "Обновлены CSS стили организации", id_org)
         return {"success": True}
     finally: cur.close(); conn.close()
 
@@ -309,14 +327,30 @@ async def get_org_styles(id_org: str):
     cur.execute("SELECT css_content FROM org_styles WHERE id_org = %s::uuid", (id_org,))
     res = cur.fetchone()
     cur.close(); conn.close()
-    return {"css": res['css_content'] if res else None}
+    
+    css = res['css_content'] if res and res['css_content'] else ""
+    
+    # АВТОМАТИЧЕСКАЯ ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ ОРГАНИЗАЦИИ В CSS
+    org_static_dir = os.path.join("static", id_org)
+    if os.path.exists(org_static_dir):
+        for f in os.listdir(org_static_dir):
+            file_url = f"/static/{id_org}/{f}"
+            if f == "chat_bg.jpg":
+                css += f"\nbody, html {{ background-image: url('{file_url}') !important; background-size: cover !important; }}"
+            elif f == "logo.png":
+                css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
+            elif f.endswith(".png") or f.endswith(".jpg") or f.endswith(".gif") or f.endswith(".webp"):
+                # Авто-подмена всех кнопок по имени файла
+                css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
+                
+    return {"css": css}
 
 @app.get("/api/admin/logs")
-async def get_admin_logs():
+async def get_admin_logs(id_org: str = Header(...)):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 50")
+        cur.execute("SELECT * FROM admin_logs WHERE id_org = %s::uuid ORDER BY created_at DESC LIMIT 50", (id_org,))
         return cur.fetchall()
     finally:
         cur.close(); conn.close()
@@ -336,13 +370,13 @@ async def admin_auth(data: AdminAuthRequest):
         if cur.fetchone()['count'] == 0:
             raise HTTPException(status_code=403, detail="Админ-панель не инициализирована.")
         
-        cur.execute("SELECT * FROM admin_users WHERE login = %s AND password = %s AND id_org = %s", 
+        cur.execute("SELECT * FROM admin_users WHERE login = %s AND password = %s AND id_org = %s::uuid", 
                     (data.login, data.password, data.id_org))
         admin = cur.fetchone()
         if not admin:
             raise HTTPException(status_code=403, detail="Неверные данные.")
         
-        log_admin_action(admin['login'], "Успешный вход в админ-панель")
+        log_admin_action(admin['login'], "Успешный вход в админ-панель", data.id_org)
         return {"success": True, "admin": {"username": admin['login']}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -350,23 +384,23 @@ async def admin_auth(data: AdminAuthRequest):
         cur.close(); conn.close()
 
 @app.get("/api/admin/users")
-async def admin_get_users():
+async def admin_get_users(id_org: str = Header(...)):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT id_user, username, role FROM users ORDER BY username ASC")
+        cur.execute("SELECT id_user, username, role FROM users WHERE id_org = %s::uuid ORDER BY username ASC", (id_org,))
         return cur.fetchall()
     finally:
         cur.close(); conn.close()
 
 @app.post("/api/admin/update-role")
-async def admin_update_role(data: UpdateUserRoleRequest):
+async def admin_update_role(data: UpdateUserRoleRequest, id_org: str = Header(...)):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE users SET role = %s WHERE id_user = %s", (data.role, data.id_user))
+        cur.execute("UPDATE users SET role = %s WHERE id_user = %s AND id_org = %s::uuid", (data.role, data.id_user, id_org))
         conn.commit()
-        log_admin_action(data.admin_login, f"Изменена роль пользователя {data.id_user} на '{data.role}'")
+        log_admin_action(data.admin_login, f"Изменена роль пользователя {data.id_user} на '{data.role}'", id_org)
         return {"success": True}
     except Exception as e:
         conn.rollback()
@@ -385,14 +419,14 @@ async def admin_get_rooms(id_org: str = Header(...)):
         cur.close(); conn.close()
 
 @app.post("/api/admin/update-room")
-async def admin_update_room(data: UpdateRoomRequest):
+async def admin_update_room(data: UpdateRoomRequest, id_org: str = Header(...)):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE rooms SET name = %s, type = %s, created_by = %s WHERE id_room = %s", 
-                    (data.name, data.type, data.created_by, data.id_room))
+        cur.execute("UPDATE rooms SET name = %s, type = %s, created_by = %s WHERE id_room = %s AND id_org = %s::uuid", 
+                    (data.name, data.type, data.created_by, data.id_room, id_org))
         conn.commit()
-        log_admin_action(data.admin_login, f"Обновлен кабинет/комната №{data.id_room} (новое имя: '{data.name}')")
+        log_admin_action(data.admin_login, f"Обновлен кабинет/комната №{data.id_room} (новое имя: '{data.name}')", id_org)
         return {"success": True}
     except Exception as e:
         conn.rollback()
@@ -401,39 +435,41 @@ async def admin_update_room(data: UpdateRoomRequest):
         cur.close(); conn.close()
 
 @app.get("/api/admin/files/{folder}")
-async def admin_get_files(folder: str):
-    target = "static" if folder == "static" else UPLOAD_DIR
+async def admin_get_files(folder: str, id_org: str = Header(...)):
+    target = os.path.join("static", id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
     if os.path.exists(target):
         return os.listdir(target)
     return []
 
 @app.post("/api/admin/upload-file/{folder}")
-async def admin_upload_file(folder: str, file: UploadFile = File(...)):
-    target_dir = "static" if folder == "static" else UPLOAD_DIR
+async def admin_upload_file(folder: str, file: UploadFile = File(...), id_org: str = Header(...)):
+    target_dir = os.path.join("static", id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
+    os.makedirs(target_dir, exist_ok=True)
+    
     file_location = os.path.join(target_dir, file.filename)
     with open(file_location, "wb+") as file_object:
         file_object.write(file.file.read())
     
-    log_admin_action("Admin", f"Загружен или обновлен файл '{file.filename}' в директорию '{folder}'")
+    log_admin_action("Admin", f"Загружен или обновлен файл '{file.filename}' в директорию '{folder}'", id_org)
     return {"success": True, "filename": file.filename}
 
 @app.delete("/api/admin/files/uploads/{filename}")
-async def admin_delete_upload(filename: str):
-    file_path = os.path.join(UPLOAD_DIR, filename)
+async def admin_delete_upload(filename: str, id_org: str = Header(...)):
+    file_path = os.path.join(UPLOAD_DIR, id_org, filename)
     if os.path.exists(file_path):
         os.remove(file_path)
-        log_admin_action("Admin", f"Вручную удален файл вложений: {filename}")
+        log_admin_action("Admin", f"Вручную удален файл вложений: {filename}", id_org)
         return {"success": True}
     raise HTTPException(status_code=404, detail="Файл не найден")
 
 @app.post("/api/admin/settings")
-async def admin_save_settings(settings: dict):
+async def admin_save_settings(settings: dict, id_org: str = Header(...)):
     conn = get_db_connection(); cur = conn.cursor()
     try:
         for k, v in settings.items():
-            cur.execute("INSERT INTO admin_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (k, v))
+            cur.execute("INSERT INTO admin_settings (key, id_org, value) VALUES (%s, %s::uuid, %s) ON CONFLICT (key, id_org) DO UPDATE SET value = EXCLUDED.value", (k, id_org, v))
         conn.commit()
-        log_admin_action("Admin", f"Обновлены настройки админ-панели (цветовая схема / ссылки)")
+        log_admin_action("Admin", f"Обновлены настройки админ-панели (цветовая схема / ссылки)", id_org)
         return {"success": True}
     except Exception as e: 
         conn.rollback() 
@@ -442,22 +478,29 @@ async def admin_save_settings(settings: dict):
         cur.close(); conn.close()
 
 @app.get("/api/admin/settings")
-async def admin_get_settings():
+async def admin_get_settings(id_org: str = Header(...)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT key, value FROM admin_settings")
+        cur.execute("SELECT key, value FROM admin_settings WHERE id_org = %s::uuid", (id_org,))
         return {r['key']: r['value'] for r in cur.fetchall()}
     finally: cur.close(); conn.close()
 
 @app.post("/api/admin/sql")
-async def admin_execute_sql(data: dict):
+async def admin_execute_sql(data: dict, id_org: str = Header(...)):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         sql_query = data.get("sql", "")
+        
+        # Интеллектуальный фильтр для ограничения SQL запросов в пределах организации
+        if sql_query.strip().lower().startswith("select"):
+            safe_tables = ["users", "rooms", "admin_logs", "org_styles", "api_sessions", "auth_tickets", "admin_users", "admin_settings"]
+            for table in safe_tables:
+                sql_query = re.sub(rf'\b{table}\b', f"(SELECT * FROM {table} WHERE id_org = '{id_org}')", sql_query, flags=re.IGNORECASE)
+
         cur.execute(sql_query)
         
         if not sql_query.strip().lower().startswith("select") and not "information_schema" in sql_query:
-            log_admin_action("Admin", "Выполнен прямой SQL-запрос изменения данных")
+            log_admin_action("Admin", "Выполнен прямой SQL-запрос изменения данных", id_org)
 
         if sql_query.strip().lower().startswith("select"):
             return {"success": True, "data": cur.fetchall()}
@@ -737,7 +780,7 @@ async def upload_logo(file: UploadFile = File(...)):
     file_location = f"static/logo.png"
     with open(file_location, "wb+") as file_object:
         file_object.write(file.file.read())
-    log_admin_action("Admin", "Обновлен логотип проекта (logo.png)")
+    log_admin_action("Admin", "Обновлен логотип проекта (logo.png)", "00000000-0000-0000-0000-000000000001")
     return {"info": f"Логотип обновлен: {file_location}"}
 
 @app.get("/download-archive/{file_uuid}")
@@ -1027,7 +1070,7 @@ async def create_advanced_room(sid, data):
         for u_id in participants:
             cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (room_id, u_id))
         conn.commit()
-        log_admin_action(session.get('username', 'User'), f"Создан расширенный кабинет: {name}")
+        log_admin_action(session.get('username', 'User'), f"Создан расширенный кабинет: {name}", session['id_org'])
         await sio.emit('private_chat_created', {'id_room': room_id}, to=sid)
         await sio.emit('refresh_rooms_trigger')
     except Exception: conn.rollback()
@@ -1069,7 +1112,7 @@ async def remove_user_from_room(sid, data):
         if room and room['type'] == 'group' and (room['created_by'] != session['id_user'] and session['role'] != 'admin'): return
         cur.execute("DELETE FROM room_participants WHERE id_room = %s AND id_user = %s", (room_id, target_user_id))
         conn.commit()
-        log_admin_action(session.get('username', 'Admin'), f"Удален участник {target_user_id} из комнаты {room_id}")
+        log_admin_action(session.get('username', 'Admin'), f"Удален участник {target_user_id} из комнаты {room_id}", session['id_org'])
         cur.execute("SELECT rp.id_user, u.username, u.role FROM room_participants rp INNER JOIN users u ON rp.id_user = u.id_user WHERE rp.id_room = %s", (room_id,))
         await sio.emit('room_participants_list', {'participants': cur.fetchall()}, room=f"room_{room_id}")
         await sio.emit('refresh_rooms_trigger')
@@ -1091,7 +1134,8 @@ async def delete_room_request(sid, data):
             if is_creator or is_admin_of_group:
                 cur.execute("DELETE FROM rooms WHERE id_room = %s", (room_id,))
                 conn.commit()
-                log_admin_action(data.get('username', 'Admin'), f"Удален кабинет: {room['name']}")
+                # Мы не имеем доступа к session['id_org'] без get_session, но админское удаление можно залогировать с базовым uuid
+                log_admin_action(data.get('username', 'Admin'), f"Удален кабинет: {room['name']}", "00000000-0000-0000-0000-000000000001")
                 await sio.emit('refresh_rooms_trigger')
             else:
                 await sio.emit('system_alert', {"message": "Удалять кабинеты может только их создатель!"}, to=sid)
@@ -1115,7 +1159,7 @@ async def archive_room_messages(sid, data):
             if m['created_at']: m['created_at'] = m['created_at'].isoformat()
         cur.execute("DELETE FROM messages WHERE id_room = %s", (room_id,)); conn.commit()
         
-        log_admin_action(session.get('username', 'Admin'), f"Архивированы сообщения из кабинета: {room['name']}")
+        log_admin_action(session.get('username', 'Admin'), f"Архивированы сообщения из кабинета: {room['name']}", session['id_org'])
         
         archive_uuid = str(uuid.uuid4())
         with open(os.path.join(UPLOAD_DIR, f"archive_{room_id}_{archive_uuid}.json"), "w", encoding="utf-8") as f: json.dump(messages, f, ensure_ascii=False, indent=4)
@@ -1155,7 +1199,7 @@ async def create_group_chat(sid, data):
         new_room = cur.fetchone()
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s)", (new_room['id_room'], session['id_user']))
         conn.commit()
-        log_admin_action(session.get('username', 'User'), f"Создан групповой чат: {group_name}")
+        log_admin_action(session.get('username', 'User'), f"Создан групповой чат: {group_name}", session['id_org'])
         await sio.emit('private_chat_created', {'id_room': new_room['id_room']}, to=sid)
         await sio.emit('refresh_rooms_trigger')
     except Exception as e: conn.rollback()
