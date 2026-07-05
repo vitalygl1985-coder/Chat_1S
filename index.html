@@ -405,9 +405,8 @@
     <div class="panel chat-panel">
         <div class="chat-header">
             <button class="mobile-menu-btn" id="btn-mobile-left">☰</button>
-            <a href="https://100letnik.md" target="_blank" class="logo-link">
-                <img id="chat-logo" src="/static/logo.png" alt="100ЛЕТНИК" 
-                style="height: 50px; width: 50px; margin-right: 15px; cursor: pointer;">
+            <a id="logo-link" href="#" target="_blank" class="logo-link">
+                <img id="chat-logo" src="/static/logo.png" alt="Лого" style="height: 50px; width: 50px; margin-right: 15px; cursor: pointer;">
             </a>
             <div class="chat-title-area">
                 <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
@@ -732,6 +731,9 @@
     }
 
     async function applyOrgStyles() {
+        const res = await fetch(`/api/admin/settings`, { headers: { 'id-org': currentUser.id_org } });
+        const settings = await res.json();
+
         if (!currentUser || !currentUser.id_org) return;
         try {
             const res = await fetch(`/api/get-styles/${currentUser.id_org}`);
@@ -743,6 +745,12 @@
             }
         } catch (e) {
             console.error("Не удалось загрузить стили организации", e);
+        }
+
+        if (settings.logo_url_link) {
+            document.getElementById('logo-link').href = settings.logo_url_link;
+        } else {
+            document.getElementById('logo-link').href = "https://100letnik.md"; // Дефолт
         }
     }
 

@@ -157,6 +157,11 @@
                     <input type="file" id="logo-file-input" style="margin:5px 0;">
                     <button onclick="uploadStaticFile('logo-file-input', 'logo.png')">Загрузить лого</button>
                 </div>
+                <div class="form-group">
+                    <label>Ссылка при клике на лого:</label>
+                    <input type="text" id="logo-url" placeholder="https://eurobalans.ru">
+                    <button onclick="saveLogoUrl()">Сохранить ссылку</button>
+                </div>
                 <div class="card">
                     <h3>📂 Хранилище вложений (папка uploads)</h3>
                     <table>
@@ -197,6 +202,15 @@
         let systemUsers = [];
         let activeOrgId = ""; // Изоляция: ID текущей организации
         
+        async function saveLogoUrl() {
+            const url = document.getElementById('logo-url').value;
+            await adminFetch('/api/admin/settings', {
+                method: 'POST',
+                body: JSON.stringify({ logo_url_link: url }) // Сохраняем в admin_settings
+            });
+            showToast("Ссылка сохранена!");
+        }
+
         // Умная обертка для запросов: сама добавляет ID организации
         async function adminFetch(url, options = {}) {
             options.headers = options.headers || {};
