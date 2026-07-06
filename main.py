@@ -16,22 +16,24 @@ import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi import Security, Depends
 from fastapi.security.api_key import APIKeyHeader
+from cachetools import TTLCache
+from fastapi import Depends
 
 # 1. Инициализация приложения
 app = FastAPI()
 
-# 2. Настройка путей к Volume (ОДИН РАЗ!)
+# 2. Настройка путей к Volume
 VOLUME_DIR = "/app/uploads"
 STATIC_DIR = os.path.join(VOLUME_DIR, "static")
 UPLOAD_DIR = os.path.join(VOLUME_DIR, "uploads")
-
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# 3. Монтирование папки (ОДИН РАЗ!)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Секретный ключ
+# Кэш для доменов (на 100 организаций, время жизни 5 минут)
+domain_cache = TTLCache(maxsize=100, ttl=300)
+
+# Секретный ключ 1С
 API_KEY_1C = "MasterKey@For1C_5835234"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -103,11 +105,61 @@ class UpdateRoomRequest(BaseModel):
     created_by: str 
     admin_login: Optional[str] = "Admin"
 
+def get_org_id(request: Request):
+    if not request.state.id_org:
+        raise HTTPException(status_code=403, detail="Организация не найдена для этого домена")
+    return request.state.id_org
+
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url)
+
+# Кэш на 100 организаций, время жизни 5 минут
+domain_cache = TTLCache(maxsize=100, ttl=300)
+
+async def get_org_by_domain(domain: str):
+    if domain in domain_cache:
+        return domain_cache[domain]
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id_org FROM domain_mapping WHERE domain_name = %s", (domain,))
+    res = cur.fetchone()
+    cur.close(); conn.close()
+    
+    org_id = res[0] if res else None
+    if org_id:
+        domain_cache[domain] = org_id
+    return org_id
+
+@app.middleware("http")
+async def identify_org_by_domain(request: Request, call_next):
+    # Приоритет: 1. X-Forwarded-Host, 2. Host
+    domain = request.headers.get("X-Forwarded-Host") or request.headers.get("host")
+    
+    # Очистка домена (на случай, если заголовок содержит порт)
+    if domain:
+        domain = domain.split(':')[0]
+    
+    # Проверка в кэше
+    if domain not in domain_cache:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id_org FROM organization_domains WHERE domain_name = %s", (domain,))
+        result = cur.fetchone()
+        cur.close(); conn.close()
+        domain_cache[domain] = result[0] if result else None
+    
+    request.state.id_org = domain_cache.get(domain)
+    
+    # Если домен не найден — отдаем 404
+    if not request.state.id_org:
+        return JSONResponse({"error": "Organization not found"}, status_code=404)
+        
+    response = await call_next(request)
+    return response
 
 def clean_uuid(org_id_str):
     try:
