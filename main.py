@@ -17,7 +17,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Security, Depends
 from fastapi.security.api_key import APIKeyHeader
 from cachetools import TTLCache
-from fastapi import Depends
 
 # 1. Инициализация приложения
 app = FastAPI()
@@ -105,34 +104,11 @@ class UpdateRoomRequest(BaseModel):
     created_by: str 
     admin_login: Optional[str] = "Admin"
 
-def get_org_id(request: Request):
-    if not request.state.id_org:
-        raise HTTPException(status_code=403, detail="Организация не найдена для этого домена")
-    return request.state.id_org
-
 def get_db_connection():
     url = os.getenv("DATABASE_URL")
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url)
-
-# Кэш на 100 организаций, время жизни 5 минут
-domain_cache = TTLCache(maxsize=100, ttl=300)
-
-async def get_org_by_domain(domain: str):
-    if domain in domain_cache:
-        return domain_cache[domain]
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT id_org FROM domain_mapping WHERE domain_name = %s", (domain,))
-    res = cur.fetchone()
-    cur.close(); conn.close()
-    
-    org_id = res[0] if res else None
-    if org_id:
-        domain_cache[domain] = org_id
-    return org_id
 
 @app.middleware("http")
 async def identify_org_by_domain(request: Request, call_next):
@@ -147,16 +123,21 @@ async def identify_org_by_domain(request: Request, call_next):
     if domain not in domain_cache:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT id_org FROM organization_domains WHERE domain_name = %s", (domain,))
+        # ИСПРАВЛЕНО: Теперь берет данные из domain_mapping
+        cur.execute("SELECT id_org FROM domain_mapping WHERE domain_name = %s", (domain,))
         result = cur.fetchone()
         cur.close(); conn.close()
         domain_cache[domain] = result[0] if result else None
     
     request.state.id_org = domain_cache.get(domain)
     
+    # ИСПРАВЛЕНО: Разрешаем пути, которым не нужен жесткий id_org
+    if request.url.path in ["/admin", "/", "/api/1c/auth", "/static/style.css"] or request.url.path.startswith("/static/"):
+        return await call_next(request)
+    
     # Если домен не найден — отдаем 404
     if not request.state.id_org:
-        return JSONResponse({"error": "Organization not found"}, status_code=404)
+        return JSONResponse({"error": "Organization not found for this domain"}, status_code=404)
         
     response = await call_next(request)
     return response
@@ -223,6 +204,10 @@ def init_db():
     cur = conn.cursor()
     try:
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS domain_mapping (
+                domain_name VARCHAR(255) PRIMARY KEY,
+                id_org UUID NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS organizations (
                 id_org UUID PRIMARY KEY,
                 name VARCHAR(255)
@@ -355,8 +340,10 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
-@app.get("/api/get-org-config/{id_org}")
-async def get_org_config(id_org: str):
+# ИСПРАВЛЕНО: Эндпоинты теперь используют request.state.id_org вместо Header(...)
+@app.get("/api/get-org-config")
+async def get_org_config(request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT settings_json FROM org_styles WHERE id_org = %s::uuid", (id_org,))
@@ -365,7 +352,8 @@ async def get_org_config(id_org: str):
     return res['settings_json'] if res and res['settings_json'] else {"primary_color": "#2563eb", "logo_url": "/static/logo.png"}
 
 @app.post("/api/admin/save-styles")
-async def save_org_styles(data: dict, id_org: str = Header(...)):
+async def save_org_styles(data: dict, request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection(); cur = conn.cursor()
     try:
         cur.execute("""
@@ -374,12 +362,13 @@ async def save_org_styles(data: dict, id_org: str = Header(...)):
             ON CONFLICT (id_org) DO UPDATE SET css_content = EXCLUDED.css_content
         """, (id_org, data['css_content']))
         conn.commit()
-        log_admin_action("Admin", "Обновлены CSS стили организации", id_org)
+        log_admin_action("Admin", "Обновлены CSS стили организации", str(id_org))
         return {"success": True}
     finally: cur.close(); conn.close()
 
 @app.get("/api/admin/logs")
-async def get_admin_logs(id_org: str = Header(...)):
+async def get_admin_logs(request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -417,7 +406,8 @@ async def admin_auth(data: AdminAuthRequest):
         cur.close(); conn.close()
 
 @app.get("/api/admin/users")
-async def admin_get_users(id_org: str = Header(...)):
+async def admin_get_users(request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -427,13 +417,14 @@ async def admin_get_users(id_org: str = Header(...)):
         cur.close(); conn.close()
 
 @app.post("/api/admin/update-role")
-async def admin_update_role(data: UpdateUserRoleRequest, id_org: str = Header(...)):
+async def admin_update_role(data: UpdateUserRoleRequest, request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection()
     cur = conn.cursor()
     try:
         cur.execute("UPDATE users SET role = %s WHERE id_user = %s AND id_org = %s::uuid", (data.role, data.id_user, id_org))
         conn.commit()
-        log_admin_action(data.admin_login, f"Изменена роль пользователя {data.id_user} на '{data.role}'", id_org)
+        log_admin_action(data.admin_login, f"Изменена роль пользователя {data.id_user} на '{data.role}'", str(id_org))
         return {"success": True}
     except Exception as e:
         conn.rollback()
@@ -442,7 +433,8 @@ async def admin_update_role(data: UpdateUserRoleRequest, id_org: str = Header(..
         cur.close(); conn.close()
 
 @app.get("/api/admin/rooms")
-async def admin_get_rooms(id_org: str = Header(...)):
+async def admin_get_rooms(request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -452,14 +444,15 @@ async def admin_get_rooms(id_org: str = Header(...)):
         cur.close(); conn.close()
 
 @app.post("/api/admin/update-room")
-async def admin_update_room(data: UpdateRoomRequest, id_org: str = Header(...)):
+async def admin_update_room(data: UpdateRoomRequest, request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection()
     cur = conn.cursor()
     try:
         cur.execute("UPDATE rooms SET name = %s, type = %s, created_by = %s WHERE id_room = %s AND id_org = %s::uuid", 
                     (data.name, data.type, data.created_by, data.id_room, id_org))
         conn.commit()
-        log_admin_action(data.admin_login, f"Обновлен кабинет/комната №{data.id_room} (новое имя: '{data.name}')", id_org)
+        log_admin_action(data.admin_login, f"Обновлен кабинет/комната №{data.id_room} (новое имя: '{data.name}')", str(id_org))
         return {"success": True}
     except Exception as e:
         conn.rollback()
@@ -468,33 +461,33 @@ async def admin_update_room(data: UpdateRoomRequest, id_org: str = Header(...)):
         cur.close(); conn.close()
 
 @app.get("/api/admin/files/{folder}")
-async def admin_get_files(folder: str, id_org: str = Header(...)):
-    # ИСПРАВЛЕНО: Теперь ищем файлы в папках Volume
-    target = os.path.join(STATIC_DIR, id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
+async def admin_get_files(folder: str, request: Request):
+    id_org = request.state.id_org
+    target = os.path.join(STATIC_DIR, str(id_org)) if folder == "static" else os.path.join(UPLOAD_DIR, str(id_org))
     if os.path.exists(target):
         return os.listdir(target)
     return []
 
 @app.post("/api/admin/upload-file/{folder}")
-async def admin_upload_file(folder: str, file: UploadFile = File(...), id_org: str = Header(...)):
-    # ИСПРАВЛЕНО: Сохраняем строго на Volume
-    target_dir = os.path.join(STATIC_DIR, id_org) if folder == "static" else os.path.join(UPLOAD_DIR, id_org)
+async def admin_upload_file(folder: str, file: UploadFile = File(...), request: Request = None):
+    id_org = request.state.id_org
+    target_dir = os.path.join(STATIC_DIR, str(id_org)) if folder == "static" else os.path.join(UPLOAD_DIR, str(id_org))
     os.makedirs(target_dir, exist_ok=True)
     
     file_location = os.path.join(target_dir, file.filename)
     with open(file_location, "wb+") as file_object:
         file_object.write(file.file.read())
     
-    log_admin_action("Admin", f"Загружен файл '{file.filename}' в {folder}", id_org)
+    log_admin_action("Admin", f"Загружен файл '{file.filename}' в {folder}", str(id_org))
     return {"success": True, "filename": file.filename}
 
 @app.delete("/api/admin/files/uploads/{filename}")
-async def admin_delete_upload(filename: str, id_org: str = Header(...)):
-    # ИСПРАВЛЕНО: Удаляем строго с Volume
-    file_path = os.path.join(UPLOAD_DIR, id_org, filename)
+async def admin_delete_upload(filename: str, request: Request):
+    id_org = request.state.id_org
+    file_path = os.path.join(UPLOAD_DIR, str(id_org), filename)
     if os.path.exists(file_path):
         os.remove(file_path)
-        log_admin_action("Admin", f"Удален файл: {filename}", id_org)
+        log_admin_action("Admin", f"Удален файл: {filename}", str(id_org))
         return {"success": True}
     raise HTTPException(status_code=404, detail="Файл не найден")
 
@@ -540,7 +533,8 @@ async def get_org_styles(id_org: str):
 
 # Сохранение цвета с привязкой к организации
 @app.post("/api/admin/settings")
-async def admin_save_settings(settings: dict, id_org: str = Header(...)):
+async def admin_save_settings(settings: dict, request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection(); cur = conn.cursor()
     try:
         for k, v in settings.items():
@@ -555,7 +549,8 @@ async def admin_save_settings(settings: dict, id_org: str = Header(...)):
     finally: cur.close(); conn.close()
 
 @app.get("/api/admin/settings")
-async def admin_get_settings(id_org: str = Header(...)):
+async def admin_get_settings(request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT key, value FROM admin_settings WHERE id_org = %s::uuid", (id_org,))
@@ -563,7 +558,8 @@ async def admin_get_settings(id_org: str = Header(...)):
     finally: cur.close(); conn.close()
 
 @app.post("/api/admin/sql")
-async def admin_execute_sql(data: dict, id_org: str = Header(...)):
+async def admin_execute_sql(data: dict, request: Request):
+    id_org = request.state.id_org
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         sql_query = data.get("sql", "")
@@ -577,7 +573,7 @@ async def admin_execute_sql(data: dict, id_org: str = Header(...)):
         cur.execute(sql_query)
         
         if not sql_query.strip().lower().startswith("select") and not "information_schema" in sql_query:
-            log_admin_action("Admin", "Выполнен прямой SQL-запрос изменения данных", id_org)
+            log_admin_action("Admin", "Выполнен прямой SQL-запрос изменения данных", str(id_org))
 
         if sql_query.strip().lower().startswith("select"):
             return {"success": True, "data": cur.fetchall()}
