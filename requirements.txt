@@ -3,3 +3,4 @@ uvicorn
 python-socketio
 psycopg2-binary
 python-multipart
+cachetools
