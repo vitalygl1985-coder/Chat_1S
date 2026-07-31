@@ -16,7 +16,6 @@
             box-shadow: 0 0 0 2px rgba(20, 184, 101, 0.3) !important;
         }
 
-        /* Перекрашиваем выбранный пункт внутри списка (работает в Firefox и частично в Chrome) */
         select option:checked, select option:hover {
             background-color: #166534 !important;
             color: white !important;
@@ -35,7 +34,6 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        /* ИСПРАВЛЕНИЕ ВЫСОТЫ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ */
         body, html { 
             height: 100%; 
             height: -webkit-fill-available; 
@@ -45,14 +43,15 @@
             overflow: hidden; 
             display: flex; 
             flex-direction: column; 
+            font-size: 16px !important; /* Увеличен шрифт на 2 пункта */
         }
 
+        /* Левая и правая панели расширены, центральный чат сужен */
         .app-container {
             display: grid;
-            grid-template-columns: 260px 1fr 280px;
+            grid-template-columns: 320px 1fr 320px;
             flex: 1;
             min-height: 0; 
-            //background: var(--bg-panel);
             overflow: hidden;
             position: relative;
         }
@@ -66,63 +65,64 @@
 
         .panel { display: flex; flex-direction: column; background: var(--bg-panel); border-right: 1px solid var(--border-color); height: 100%; overflow: hidden; }
         .panel-header { padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
-        .search-box { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; outline: none; font-size: 13px; }
+        .search-box { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; outline: none; font-size: 14px; }
         .search-box:focus { border-color: var(--primary-color); }
         .panel-scroll-area { flex: 1; overflow-y: auto; padding: 8px; }
 
-        .room-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; transition: all 0.2s ease; }
+        .room-item { padding: 10px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; transition: all 0.2s ease; }
         .room-item:hover { background: var(--bg-main); }
         .room-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }
         
         .accordion-section { margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
-        .accordion-header { font-weight: bold; color: var(--text-muted); cursor: pointer; padding: 5px; font-size: 11px; text-transform: uppercase; display: flex; justify-content: space-between; }
+        .accordion-header { font-weight: bold; color: var(--text-muted); cursor: pointer; padding: 5px; font-size: 12px; text-transform: uppercase; display: flex; justify-content: space-between; }
         .accordion-content { display: none; margin-top: 5px; }
         .accordion-content.open { display: block; }
 
-        .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; }
-        .chat-header { height: 55px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; gap: 10px; }
+        /* Центральная часть диалога сужена */
+        .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; max-width: 750px; margin: 0 auto; width: 100%; }
+        .chat-header { height: 60px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; gap: 10px; }
         
         .chat-title-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .chat-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-title { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-user-identity { font-size: 12px; color: #10b981; font-weight: bold; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-actions { display: flex; gap: 6px; }
         
-        .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: white; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px; color: white; }
         .btn-primary { background: var(--primary-color); }
         .btn-warn { background: #eab308; }
         .btn-danger { background: #ef4444; }
         .btn-success { background: #10b981; }
 
-        .messages-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .message { max-width: 75%; display: flex; flex-direction: column; margin-bottom: 2px; align-self: flex-start; }
+        .messages-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .message { max-width: 80%; display: flex; flex-direction: column; margin-bottom: 2px; align-self: flex-start; }
         .message.my { align-self: flex-end; }
-        .message-box { padding: 8px 12px; border-radius: 12px; background: var(--bg-panel); box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; }
+        .message-box { padding: 10px 14px; border-radius: 12px; background: var(--bg-panel); box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; }
         .message.my .message-box { background: #dbeafe; }
-        .msg-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; gap: 15px;}
+        .msg-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 3px; gap: 15px;}
         .msg-author { font-weight: 600; }
-        .msg-text { font-size: 13px; line-height: 1.4; word-break: break-word; }
+        .msg-text { font-size: 15px; line-height: 1.5; word-break: break-word; }
         
         .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
-        .img-download-link { display: inline-block; font-size: 11px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
+        .img-download-link { display: inline-block; font-size: 12px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
         
-        .msg-read-panel { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; border-top: 1px dashed #e5e7eb; padding-top: 4px; }
+        .msg-read-panel { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; border-top: 1px dashed #e5e7eb; padding-top: 4px; }
         .btn-read-trigger { cursor: pointer; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; user-select: none; border: 1px solid #e5e7eb; }
         .btn-read-trigger:hover { background: #e5e7eb; }
-        .read-users-list { font-style: italic; color: #6b7280; font-size: 10px; }
+        .read-users-list { font-style: italic; color: #6b7280; font-size: 11px; }
 
-        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
-        .msg-edit-trigger { position: absolute; right: 24px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
-        .msg-reply-trigger { position: absolute; right: 44px; top: 5px; display: none; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 12px; color: var(--text-muted); }
+        .msg-edit-trigger { position: absolute; right: 24px; top: 5px; display: none; cursor: pointer; font-size: 12px; color: var(--text-muted); }
+        .msg-reply-trigger { position: absolute; right: 44px; top: 5px; display: none; cursor: pointer; font-size: 12px; color: var(--text-muted); }
         
         .message-box:hover .msg-delete-trigger,
         .message-box:hover .msg-edit-trigger,
         .message-box:hover .msg-reply-trigger { display: block !important; }
 
-        .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
+        .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 12px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
         .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; flex-wrap: wrap; }
-        .toolbar-item { cursor: pointer; font-size: 13px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
+        .toolbar-item { cursor: pointer; font-size: 14px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
         .toolbar-item:hover { background: var(--bg-main); }
-        .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
+        .toolbar select { font-size: 12px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
         
         .emoji-picker-popover {
             position: absolute; bottom: 35px; left: 120px; background: white; border: 1px solid var(--border-color);
@@ -137,25 +137,24 @@
         .emoji-picker-item:hover { background: #e5e7eb; }
 
         .controls-row { display: flex; gap: 8px; align-items: center; }
-        .input-msg-div { flex: 1; min-height: 36px; max-height: 80px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; outline: none; background: #fff; font-size: 13px; }
+        .input-msg-div { flex: 1; min-height: 40px; max-height: 90px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; outline: none; background: #fff; font-size: 15px; }
 
         .mention-popup { position: absolute; bottom: 100%; left: 15px; width: 220px; background: #fff; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); display: none; max-height: 120px; overflow-y: auto; z-index: 1000; }
-        .mention-item { padding: 6px 10px; cursor: pointer; font-size: 12px; }
+        .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ */
         .right-panel { border-right: none; }
-        .section-title { font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
-        .user-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .section-title { font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
+        .user-row { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 14px; }
         .user-row:hover { background: var(--bg-main); }
         
-        .avatar-container { position: relative; width: 28px; height: 28px; flex-shrink: 0; }
-        .avatar { width: 28px; height: 28px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: #4b5563; }
-        .status-badge { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; }
+        .avatar-container { position: relative; width: 32px; height: 32px; flex-shrink: 0; }
+        .avatar { width: 32px; height: 32px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; color: #4b5563; }
+        .status-badge { position: absolute; bottom: 0; right: 0; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #fff; }
         .status-badge.online { background: var(--online-color); }
         .status-badge.offline { background: var(--offline-color); }
         .user-info-meta { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .user-role { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .view-pane { display: none; }
         .view-pane.active { display: block; }
@@ -165,15 +164,15 @@
         .modal-window { width: 380px; max-width: 90vw; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
         .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
-        .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 13px; }
+        .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 14px; }
         .modal-user-item:hover { background: var(--bg-main); }
         .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; max-width: 90vw; }
-        .modal-row { margin-bottom: 8px; font-size: 13px; }
+        .modal-row { margin-bottom: 8px; font-size: 14px; }
         .modal-label { font-weight: bold; }
-        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
+        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 11px; font-weight: bold; margin-left: auto; }
         .participant-checkbox { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
         
-        .btn-remove-participant { border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+        .btn-remove-participant { border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
         .btn-remove-participant:hover { background: #ffeeeb; }
 
         .screenshot-modal-window { width: 85vw; height: 85vh; max-width: 1000px; background: white; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; }
@@ -181,10 +180,9 @@
         .canvas-wrapper { position: relative; max-width: 100%; max-height: 100%; overflow: auto; padding: 10px; }
         canvas { background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: block; cursor: crosshair; }
         .editor-toolbar { padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
+        .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
         .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
 
-        /* === КРАСИВЫЙ БАННЕР ЗВОНКА === */
         .call-banner {
             position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
             background: #1f2937; color: #fff; padding: 12px 20px; border-radius: 20px;
@@ -194,14 +192,8 @@
         }
         .call-banner.visible { top: 20px; }
         .call-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .call-name { 
-            font-weight: bold; 
-            font-size: 14px; 
-            white-space: normal;
-            word-wrap: break-word; 
-            line-height: 1.3;
-        }
-        .call-status { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+        .call-name { font-weight: bold; font-size: 15px; white-space: normal; word-wrap: break-word; line-height: 1.3; }
+        .call-status { font-size: 13px; color: #9ca3af; margin-top: 2px; }
         .call-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
         
         .call-btn {
@@ -220,14 +212,12 @@
             100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
 
-        /* --- МОБИЛЬНАЯ АДАПТАЦИЯ --- */
         .mobile-overlay-panel { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 90; }
         .mobile-overlay-panel.active { display: block; }
         .mobile-menu-btn { display: none; background: transparent; border: none; font-size: 24px; cursor: pointer; color: var(--primary-color); padding: 5px; flex-shrink: 0; }
 
         @media (max-width: 768px) {
             .app-container { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; }
-            
             .system-footer-links { display: none !important; }
 
             .left-panel, .right-panel {
@@ -241,24 +231,14 @@
             
             .chat-panel { width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
             .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
-            
             .chat-header { padding: 0 10px; }
             .chat-header .logo-link { display: none; } 
-            
             .chat-actions img { width: 30px !important; height: 30px !important; }
-            
             .input-area { padding: 8px 10px; }
-            .input-msg-div { 
-                min-height: 50px; 
-                max-height: 120px; 
-                font-size: 16px; 
-                padding: 14px 12px;
-                border-radius: 12px;
-            } 
+            .input-msg-div { min-height: 50px; max-height: 120px; font-size: 16px; padding: 14px 12px; border-radius: 12px; } 
             .controls-row { align-items: flex-end; }
             #btn-send-message { height: 50px; padding: 0 16px; border-radius: 12px; }
             #btn-attach-file img, #record-btn img { width: 44px !important; height: 44px !important; }
-            
             .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
             .message { max-width: 90%; }
         }
@@ -274,8 +254,7 @@
         <span class="call-name" id="call-name">Сотрудник</span>
         <span class="call-status" id="call-status">Входящий вызов...</span>
     </div>
-    <div class="call-actions" id="call-actions-container">
-        </div>
+    <div class="call-actions" id="call-actions-container"></div>
 </div>
 
 <div class="modal-overlay" id="secret-prompt-modal">
@@ -496,7 +475,7 @@
     </div>
 
     <div class="panel right-panel">
-        <div class="panel-header">
+        <div class="panel-header" id="right-panel-header-controls">
             <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
         </div>
         <div class="panel-scroll-area">
@@ -521,13 +500,9 @@
 <script>
     window.onerror = function() { return true; };
     console.log("СКРИПТЫ ЗАГРУЖЕНЫ");
-    window.onerror = function(msg, url, line) {
-        console.error("JS Error:", msg, "at", line);
-        return true;
-    };
 
     let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
-    let isFileMode = false; // Включен ли сейчас фильтр только по файлам
+    let isFileMode = false;
     let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
     let onlineUsersCache = {}, messageReadsMap = {}; 
     let isSecretMode = false, userSecretKey = "";
@@ -538,14 +513,13 @@
     let audioChunks = [];
     let isRecording = false;
     
-    let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
+    let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '14px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
 
     let localStream;
     let peerConnection;
     let iceCandidateQueue = []; 
 
-    // Переменные для контроля звонка (UI-баннер)
     let incomingCallData = null;
     let currentCallTargetSid = null;
     let currentCallName = "";
@@ -594,39 +568,27 @@
 
     function initMicrophone() {
         const recordBtn = document.getElementById('record-btn');
-        if (!recordBtn) {
-            console.warn("Кнопка record-btn не найдена в DOM.");
-            return;
-        }
-
+        if (!recordBtn) return;
         recordBtn.oncontextmenu = (e) => e.preventDefault();
 
         const startRec = async (e) => {
             if (e) e.preventDefault();
             if (isRecording) return;
-
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert("Микрофон недоступен (нужен HTTPS).");
                 return;
             }
-
             try {
                 audioChunks = [];
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
-
-                mediaRecorder.ondataavailable = event => {
-                    if (event.data.size > 0) audioChunks.push(event.data);
-                };
-
+                mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
                 mediaRecorder.onstop = async () => {
                     if (audioChunks.length === 0) return;
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     audioChunks = [];
-
                     const formData = new FormData();
                     formData.append('file', audioBlob, 'voice.webm');
-
                     try {
                         const response = await fetch('/upload', { method: 'POST', body: formData });
                         const result = await response.json();
@@ -636,13 +598,11 @@
                         }
                     } catch (uploadErr) { alert("Ошибка отправки."); }
                 };
-
                 mediaRecorder.start();
                 isRecording = true;
                 recordBtn.style.background = 'rgba(239, 68, 68, 0.2)';
                 recordBtn.style.borderRadius = '50%';
             } catch (err) {
-                console.error("Ошибка доступа к микрофону:", err);
                 alert("Разрешите доступ к микрофону во всплывающем окне!");
             }
         };
@@ -667,7 +627,6 @@
         try {
             const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
             const data = await res.json();
-            
             if (data.shop_name) {
                 const body = document.getElementById('modalBody');
                 body.innerHTML = `
@@ -681,16 +640,11 @@
             } else {
                 alert("Информация о магазине не заполнена.");
             }
-        } catch(e) { console.error(e); }
+        } catch(e) {}
     }
 
     function closeUserInfoModal() {
         document.getElementById('userInfoModal').style.display = 'none';
-    }
-
-    function updateLogo() {
-        const logo = document.getElementById('chat-logo');
-        logo.src = "/static/logo.png?v=" + new Date().getTime();
     }
 
     async function initApplication() {
@@ -710,10 +664,23 @@
                 sessionToken = data.token; 
                 currentUser = data.user;
                 
-                // ВЫЗЫВАЕМ ПРИМЕНЕНИЕ СТИЛЕЙ ОРГАНИЗАЦИИ
                 await applyOrgStyles(); 
 
                 document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
+                
+                if (currentUser.role !== 'admin') {
+                    const btnCreateModal = document.getElementById('btn-open-create-modal');
+                    if (btnCreateModal) btnCreateModal.style.display = 'none';
+
+                    const rightHeaderControls = document.getElementById('right-panel-header-controls');
+                    if (rightHeaderControls) rightHeaderControls.style.display = 'none';
+
+                    const panePart = document.getElementById('pane-participants');
+                    const paneComp = document.getElementById('pane-company');
+                    if (panePart) panePart.classList.remove('active');
+                    if (paneComp) paneComp.classList.add('active');
+                }
+
                 renderEmojiGrid('smile'); 
                 connectSockets(); 
                 initUIEventListeners(); 
@@ -722,18 +689,14 @@
                 initMicrophone();
             } else {
                 document.getElementById('header-user-identity').innerText = "Ошибка авторизации";
-                alert(data.detail || "Срок действия ссылки истек или она уже была использована. Пожалуйста, откройте чат заново из 1С.");
+                alert(data.detail || "Срок действия ссылки истек.");
             }
         } catch (err) { 
             document.getElementById('header-user-identity').innerText = "Ошибка подключения";
-            alert("Не удалось связаться с сервером."); 
         }
     }
 
     async function applyOrgStyles() {
-        const res = await fetch(`/api/admin/settings`, { headers: { 'id-org': currentUser.id_org } });
-        const settings = await res.json();
-
         if (!currentUser || !currentUser.id_org) return;
         try {
             const res = await fetch(`/api/get-styles/${currentUser.id_org}`);
@@ -743,32 +706,17 @@
                 style.innerHTML = data.css;
                 document.head.appendChild(style);
             }
-        } catch (e) {
-            console.error("Не удалось загрузить стили организации", e);
-        }
+        } catch (e) {}
 
-        if (settings.logo_url_link) {
-            document.getElementById('logo-link').href = settings.logo_url_link;
-        } else {
-            document.getElementById('logo-link').href = "https://100letnik.md"; // Дефолт
-        }
-    }
-
-    async function applyOrgSettings() {
-        if (!currentUser || !currentUser.id_org) return;
-        
-        const config = await fetch(`/api/get-org-config/${currentUser.id_org}`).then(r => r.json());
-        
-        // Применяем цвета через переменные CSS
-        document.documentElement.style.setProperty('--primary-color', config.primary_color);
-        
-        // Меняем логотип
-        const logo = document.getElementById('chat-logo');
-        if (logo) logo.src = config.logo_url;
-        
-        // Меняем ссылки
-        const footerLink = document.querySelector('#footer-onec-block a');
-        if (footerLink) footerLink.href = config.onec_url;
+        try {
+            const resSet = await fetch(`/api/admin/settings`, { headers: { 'id-org': currentUser.id_org } });
+            const settings = await resSet.json();
+            if (settings.logo_url_link) {
+                document.getElementById('logo-link').href = settings.logo_url_link;
+            } else {
+                document.getElementById('logo-link').href = "#";
+            }
+        } catch (e) {}
     }
 
     function renderEmojiGrid(category) {
@@ -790,7 +738,6 @@
 
     const beepingSound = new Audio('/static/beep.mp3');
 
-    // === ЛОГИКА УПРАВЛЕНИЯ UI ЗВОНКА ===
     function updateCallTimer() {
         callSeconds++;
         const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
@@ -808,7 +755,6 @@
         nameEl.innerText = name;
         avatar.innerText = name.charAt(0).toUpperCase();
         banner.classList.add('visible');
-
         actionsEl.innerHTML = '';
 
         if (state === 'incoming') {
@@ -856,12 +802,9 @@
         }
     }
 
-    // Обработчик принятия входящего звонка из баннера
     async function acceptCall() {
         if (!incomingCallData) return;
         const data = incomingCallData;
-        
-        // Разрешаем проигрывание аудио в контексте прямого клика (важно для iOS)
         const remoteAudio = document.getElementById('remote-audio');
         remoteAudio.play().catch(e => {});
         
@@ -872,7 +815,6 @@
         showCallBanner('active', currentCallName);
 
         try {
-            //iceCandidateQueue = [];
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             peerConnection = setupPeerConnection(data.from_sid);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
@@ -887,15 +829,11 @@
             await peerConnection.setLocalDescription(answer);
             socket.emit('answer', { target_sid: data.from_sid, answer: answer });
             currentCallTargetSid = data.from_sid;
-            
         } catch (err) {
-            console.error("Ошибка при принятии звонка:", err);
-            alert("Не удалось установить соединение: " + err.message);
             endCall();
         }
     }
 
-    // Обработчик сброса до ответа
     function declineCall() {
         if (incomingCallData) {
             socket.emit('end_call', { target_sid: incomingCallData.from_sid });
@@ -903,7 +841,6 @@
         hideCallBanner();
     }
 
-    // Обработчик завершения идущего звонка
     function endCall() {
         if (currentCallTargetSid) {
             socket.emit('end_call', { target_sid: currentCallTargetSid });
@@ -915,7 +852,6 @@
     function setupPeerConnection(targetSid) {
         if (peerConnection) peerConnection.close();
         const pc = new RTCPeerConnection(config);
-        
         pc.onicecandidate = (e) => {
             if (e.candidate) socket.emit('ice_candidate', { target_sid: targetSid, candidate: e.candidate });
         };
@@ -923,7 +859,7 @@
             const remoteAudio = document.getElementById('remote-audio');
             if (remoteAudio.srcObject !== e.streams[0]) {
                 remoteAudio.srcObject = e.streams[0];
-                remoteAudio.play().catch(err => console.log('Audio error:', err));
+                remoteAudio.play().catch(err => {});
             }
         };
         return pc;
@@ -952,22 +888,18 @@
             
             socket.emit('offer', { target_sid: targetSid, offer: offer, caller_name: currentUser.username });
         } catch (err) {
-            console.error("Ошибка при создании звонка:", err);
             alert("Не удалось начать звонок: проверьте доступ к микрофону.");
             hideCallBanner();
         }
     }
 
     function connectSockets() {
-        let callerSid = null;
         const socketUrl = window.location.protocol + '//' + window.location.host;
         socket = io(socketUrl, { path: '/socket.io', transports: ['polling', 'websocket'], query: { id_user: currentUser.id_user, id_org: currentUser.id_org, username: currentUser.username, role: currentUser.role } });
 
         socket.on('connect', () => { 
             refreshRoomsAndLists(); 
             socket.emit('get_users_list'); 
-            
-            // Восстановление комнаты при выходе из спящего режима телефона
             if (currentRoomId) {
                 socket.emit('join_room_pool', { room_id: currentRoomId });
                 socket.emit('get_room_history', { room_id: currentRoomId });
@@ -978,20 +910,17 @@
         
         socket.on('offer', async (data) => {
             if (peerConnection && peerConnection.connectionState === 'connected') {
-                // Если мы уже говорим с кем-то, отправляем отбой звонящему
                 socket.emit('end_call', { target_sid: data.from_sid });
                 return;
             }
-
             incomingCallData = data;
             currentCallTargetSid = data.from_sid;
             currentCallName = data.caller_name || 'Коллега';
-            
             showCallBanner('incoming', currentCallName);
 
             if (typeof beepingSound !== 'undefined') {
                 beepingSound.loop = true;
-                beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+                beepingSound.play().catch(e => {});
             }
         });
 
@@ -999,7 +928,6 @@
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
                 showCallBanner('active', currentCallName);
-                
                 while (iceCandidateQueue.length > 0) {
                     try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
                 }
@@ -1026,45 +954,7 @@
                 } else {
                     if (msg.id_user_from !== currentUser.id_user) {
                         unreadRooms[String(msg.id_room)] = true;
-                        if (typeof filterAndRenderRooms === 'function') {
-                            filterAndRenderRooms();
-                        }
-                    }
-                }
-
-                if (msg.id_user_from !== currentUser.id_user) {
-                    if (typeof beepingSound !== 'undefined' && document.getElementById('call-banner').className.indexOf('visible') === -1) {
-                        beepingSound.loop = false;
-                        beepingSound.play().catch(e => console.log("Ошибка звука:", e));
-                    }
-
-                    if (Notification.permission === "granted") {
-                        const room = latestRoomsListCache.find(r => r.id_room === msg.id_room);
-                        const roomTitle = room ? (room.name.includes(' ⇄ ') ? room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim() : room.name) : "Чат";
-
-                        const notification = new Notification(`Новое сообщение в кабинете: ${roomTitle}`, {
-                            body: `${msg.username || 'Коллега'}: ${msg.encrypted_text.startsWith('/download/') ? '[Вложение]' : msg.encrypted_text.substring(0, 40)}`,
-                            icon: '/static/logo.png'
-                        });
-
-                        notification.onclick = function() {
-                            window.focus();
-                            if (room) {
-                                selectRoomById(room.id_room, room.name, room.type, room.created_by);
-                            } else {
-                                selectRoomById(msg.id_room);
-                            }
-                            
-                            setTimeout(() => {
-                                const targetMsg = document.querySelector(`[data-msg-id="${msg.id_message}"]`);
-                                if (targetMsg) {
-                                    targetMsg.scrollIntoView({ behavior: 'smooth' });
-                                    targetMsg.style.transition = "background 1s";
-                                    targetMsg.style.background = "#eff6ff";
-                                    setTimeout(() => targetMsg.style.background = "transparent", 2000);
-                                }
-                            }, 300);
-                        };
+                        filterAndRenderRooms();
                     }
                 }
             }
@@ -1074,9 +964,6 @@
             const textContainer = document.getElementById(`text-container-${data.id_message}`);
             if (textContainer) {
                 renderProcessedText(textContainer, data.new_text);
-                textContainer.style.transition = "background 1s";
-                textContainer.style.background = "#fef3c7";
-                setTimeout(() => textContainer.style.background = "transparent", 2000);
             }
         });
 
@@ -1085,6 +972,7 @@
             renderCompanyUsers(globalUsersCache);
             renderCurrentRoomParticipants(roomParticipantsCache);
         });
+
         socket.on('download_archive_file', (data) => {
             const link = document.createElement('a');
             link.href = data.url;
@@ -1092,8 +980,9 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            alert("Архивация завершена! Файл скачивается.");
+            alert("Архивация завершена!");
         });
+
         socket.on('message_read_update', (data) => {
             messageReadsMap[data.message_id] = data.users_list;
             const targetList = document.getElementById(`read-users-${data.message_id}`);
@@ -1107,27 +996,15 @@
 
         socket.on('room_history', (data) => {
             messagesStream.innerHTML = ""; 
-            
             if (data && data.messages) {
                 if (data.messages.length === 0) {
-                    messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>В эту дату сообщений не было</div>";
+                    messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:14px;'>В эту дату сообщений не было</div>";
                     return;
                 }
-                
                 data.messages.forEach(msg => {
                     if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
                     displayMessage(msg, true);
                 });
-
-                if (data.messages.length > 0) {
-                    const lastMsg = data.messages[data.messages.length - 1];
-                    const isRead = lastMsg.reads && lastMsg.reads.includes(currentUser.username);
-                    
-                    if (lastMsg.id_user_from !== currentUser.id_user && !isRead) {
-                        unreadRooms[lastMsg.id_room] = true;
-                        if (typeof filterAndRenderRooms === 'function') filterAndRenderRooms();
-                    }
-                }
             }
         });
 
@@ -1144,50 +1021,15 @@
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
 
-        //socket.on('files_history_response', (data) => {
-        //    messagesStream.innerHTML = "";         
-        //    if (!data.messages || data.messages.length === 0) {
-        //        messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>📎 В данном разрезе файлы не найдены</div>";
-        //        return;
-        //    }    
-        //    data.messages.forEach(msg => {
-        //        if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;        
-        //        // Рендерим стандартное сообщение чата
-        //        displayMessage(msg, true);        
-        //        // Если комната не была выбрана (глобальный просмотр), дописываем к автору имя кабинета, откуда файл
-        //        if (!data.room_id) {
-        //            const lastMessageNode = messagesStream.lastChild;
-        //            if (lastMessageNode) {
-        //                const authorElement = lastMessageNode.querySelector('.msg-author');
-        //                if (authorElement && msg.room_name) {
-        //                    authorElement.innerHTML += ` <span style="font-weight:normal; color:var(--primary-color); font-size:11px; margin-left:5px;">[Кабинет: ${msg.room_name}]</span>`;
-        //                }
-        //            }
-        //        }
-        //    });
-        //});
-
         socket.on('files_history_response', (data) => {
             messagesStream.innerHTML = "";
-            
-            // 1. Создаем темный оливковый баннер с ярко-зеленой кнопкой
             const banner = document.createElement('div');
-            banner.style = `
-                background: #59745E; 
-                color: white; 
-                padding: 15px; /* Уменьшили высоту в 2 раза */
-                border-radius: 12px; 
-                text-align: center; 
-                margin-bottom: 15px; 
-                box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            `;
+            banner.style = `background: #59745E; color: white; padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);`;
             banner.innerHTML = `
                 <div style="font-size: 34px; margin-bottom: 5px;">📁</div>
                 <h2 style="text-transform: uppercase; font-size: 20px; margin-bottom: 5px;">Режим файлов</h2>
                 <p style="font-size: 12px; opacity: 0.9; margin-bottom: 15px;">Просмотр и фильтрация вложений</p>
-                <div id="file-upload-card" style="background: #166534; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-block; transition: all 0.2s;" 
-                    onmouseover="this.style.background='#22c55e'; this.style.transform='scale(1.02)';" 
-                    onmouseout="this.style.background='#166534'; this.style.transform='scale(1)';">
+                <div id="file-upload-card" style="background: #166534; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-block;">
                     ЗАГРУЗИТЬ НОВЫЙ ФАЙЛ <span style="font-size:16px; margin-left:5px;">+</span>
                 </div>
             `;
@@ -1226,14 +1068,11 @@
                 }
 
                 let ext = fileName.split('.').pop().toLowerCase();
-                
-                // --- ДОБАВЛЕНО: Форматирование даты и времени ---
                 let dateStr = "";
                 if (msg.created_at) {
                     const d = new Date(msg.created_at + 'Z');
                     dateStr = d.toLocaleDateString('ru-RU') + ' в ' + d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
                 }
-                // ------------------------------------------------
                 
                 let icon = "📄"; let iconBg = "#64748b";
                 if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { icon = "🖼️"; iconBg = "#6495ED"; }
@@ -1243,41 +1082,24 @@
                 else if (['zip', 'rar', '7z'].includes(ext)) { icon = "📦"; iconBg = "#d97706"; }
 
                 const fileRow = document.createElement('div');
-                fileRow.style = `
-                    display: flex; 
-                    align-items: center; 
-                    gap: 15px; 
-                    background: var(--bg-panel); 
-                    padding: 14px; 
-                    border-radius: 10px; 
-                    border: 1px solid var(--border-color);
-                `;
-                
-                // --- ИЗМЕНЕНО: Вывод переменной dateStr ---
+                fileRow.style = `display: flex; align-items: center; gap: 15px; background: var(--bg-panel); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);`;
                 fileRow.innerHTML = `
-                    <div style="background: ${iconBg}; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0;">
-                        ${icon}
-                    </div>
+                    <div style="background: ${iconBg}; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0;">${icon}</div>
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 600; font-size: 14px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             <a href="${fileUrl}" target="_blank" style="color: inherit; text-decoration: none;">${fileName}</a>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; font-weight: 500;">
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px; font-weight: 500;">
                             Отправитель: ${author}${roomNameInfo} <span style="margin-left: 8px; color: var(--primary-color);">🕒 ${dateStr}</span>
                         </div>
                     </div>
-                    <a href="${fileUrl}" target="_blank" style="background: var(--bg-main); padding: 8px 16px; border-radius: 6px; color: var(--text-main); text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.15s;" 
-                    onmouseover="this.style.background='#3a5a46'" onmouseout="this.style.background='var(--bg-main)'">
-                        Открыть
-                    </a>
+                    <a href="${fileUrl}" target="_blank" style="background: var(--bg-main); padding: 8px 16px; border-radius: 6px; color: var(--text-main); text-decoration: none; font-size: 13px; font-weight: 600;">Открыть</a>
                 `;
                 listContainer.appendChild(fileRow);
             });
-            
             messagesStream.appendChild(listContainer);
             messagesStream.scrollTop = 0;
         });
-
     }
 
     function refreshRoomsAndLists() { if (socket) socket.emit('get_rooms_again'); }
@@ -1293,7 +1115,6 @@
         const inactiveCountElem = document.getElementById('inactive-count');
 
         if (!Array.isArray(allRooms)) return;
-        
         if (activeContainer) activeContainer.innerHTML = ""; 
         if (inactiveContainer) inactiveContainer.innerHTML = ""; 
         let inactiveCount = 0;
@@ -1301,13 +1122,11 @@
         allRooms.forEach(room => {
             try {
                 if (!room || typeof room !== 'object') return;
-
                 const div = document.createElement('div'); 
                 div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
                 
                 const rType = room.type ? room.type.trim() : 'group';
                 const rName = room.name || 'Без названия';
-                
                 let icon = rType === 'private' ? '💬 ' : (rType === 'admin_group' ? '👑 ' : '👥 ');
                 
                 const labelSpan = document.createElement('span'); 
@@ -1317,23 +1136,15 @@
                 div.addEventListener('click', () => selectRoomById(room.id_room, rName, rType, room.created_by));
                 
                 const participants = parseInt(room.participants_count) || 0;
-                
                 if (participants < 2 && rType !== 'admin_group') { 
-                    if (inactiveContainer) {
-                        inactiveContainer.appendChild(div); 
-                        inactiveCount++; 
-                    }
+                    if (inactiveContainer) { inactiveContainer.appendChild(div); inactiveCount++; }
                 } else { 
-                    if (activeContainer) {
-                        activeContainer.appendChild(div); 
-                    }
+                    if (activeContainer) { activeContainer.appendChild(div); }
                 }
             } catch (err) {}
         });
         
-        if (inactiveCountElem) {
-            inactiveCountElem.innerText = `(${inactiveCount}) ▼`;
-        }
+        if (inactiveCountElem) inactiveCountElem.innerText = `(${inactiveCount}) ▼`;
     }
 
     function selectRoomById(roomId, name, type, createdBy) {
@@ -1362,21 +1173,14 @@
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId }); 
 
-        const bounds = getDateBounds(); // ВСЕГДА берем актуальный диапазон из календаря
-        
+        const bounds = getDateBounds();
         if (isFileMode) {
             requestFilesHistory();
         } else {
-            socket.emit('get_room_history', { 
-                room_id: roomId, 
-                date_from: bounds.date_from, 
-                date_to: bounds.date_to 
-            }); 
+            socket.emit('get_room_history', { room_id: roomId, date_from: bounds.date_from, date_to: bounds.date_to }); 
         }
-
         socket.emit('get_room_participants', { room_id: roomId });
 
-        // Авто-закрытие меню на мобильных после выбора комнаты
         if (window.innerWidth <= 768) {
             document.querySelector('.left-panel').classList.remove('open');
             document.querySelector('.right-panel').classList.remove('open');
@@ -1395,11 +1199,9 @@
         const author = msg.username || "Сотрудник";
         const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleString('ru-RU', {day: '2-digit', month:'2-digit', year:'2-digit', hour: '2-digit', minute:'2-digit'}) : "";
 
-        // Создаем message-box
         const msgBox = document.createElement('div');
         msgBox.className = 'message-box';
 
-        // БЕЗОПАСНОЕ СОЗДАНИЕ КНОПОК
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
             const delBtn = document.createElement('span');
             delBtn.className = 'msg-delete-trigger';
@@ -1411,7 +1213,7 @@
             editBtn.className = 'msg-edit-trigger';
             editBtn.style.display = 'none';
             editBtn.textContent = '✏️';
-            editBtn.onclick = () => requestEditMessage(msgId, rawText); // Данные уходят напрямую в функцию JS
+            editBtn.onclick = () => requestEditMessage(msgId, rawText);
             msgBox.appendChild(editBtn);
         }
 
@@ -1422,26 +1224,22 @@
         replyBtn.onclick = () => triggerReply(msgId, author, rawText);
         msgBox.appendChild(replyBtn);
 
-        // Мета-данные
         const meta = document.createElement('div');
         meta.className = 'msg-meta';
         meta.innerHTML = `<span class="msg-author">${author}</span><span>${timeStr}</span>`;
         msgBox.appendChild(meta);
 
-        // Цитата (если есть)
         if (msg.reply_to && msg.reply_text) {
             let preview = msg.reply_text.startsWith('/download/') ? '[Вложение]' : msg.reply_text;
             const quote = document.createElement('div');
-            quote.style.cssText = "border-left: 2px solid #2563eb; background: rgba(37, 99, 235, 0.05); padding: 4px 8px; margin-bottom: 6px; font-size: 11px; border-radius: 2px;";
+            quote.style.cssText = "border-left: 2px solid #2563eb; background: rgba(37, 99, 235, 0.05); padding: 4px 8px; margin-bottom: 6px; font-size: 12px; border-radius: 2px;";
             quote.innerHTML = `<div style="font-weight: bold; color: #2563eb;">↪️ ${msg.reply_author || 'Сотрудник'}</div><div style="color: #4b5563;">${preview.substring(0, 45)}</div>`;
             msgBox.appendChild(quote);
         }
 
-        // Текстовый контейнер
         const textDiv = document.createElement('div');
         textDiv.className = 'msg-text';
         textDiv.id = `text-container-${msgId}`;
-        // Применяем стили динамически
         try {
             const styles = typeof msg.ui_styles === 'string' ? JSON.parse(msg.ui_styles || '{}') : msg.ui_styles;
             Object.assign(textDiv.style, { fontFamily: styles.fontFamily, fontSize: styles.fontSize, color: styles.color, backgroundColor: styles.background });
@@ -1450,7 +1248,6 @@
         } catch(e) {}
         msgBox.appendChild(textDiv);
 
-        // Панель прочтения
         const readPanel = document.createElement('div');
         readPanel.className = 'msg-read-panel';
         const readsList = messageReadsMap[msgId] || [];
@@ -1466,10 +1263,8 @@
         div.appendChild(msgBox);
         messagesStream.appendChild(div);
 
-        // Рендеринг текста
         if (msg.is_user_encrypted) {
-            textDiv.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:12px;">🔒 Зашифрованное сообщение</span>`;
-            // ... (ваша логика кнопок дешифровки через createElement)
+            textDiv.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:13px;">🔒 Зашифрованное сообщение</span>`;
         } else {
             renderProcessedText(textDiv, rawText);
         }
@@ -1477,20 +1272,12 @@
     }
 
     let editingMsgId = null;
-
     document.getElementById('btn-close-edit-modal').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
     document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
-
-    window.handleEditClick = function(element) {
-        const msgId = element.getAttribute('data-msg-id');
-        const text = JSON.parse(element.getAttribute('data-text'));
-        requestEditMessage(msgId, text);
-    };
 
     window.requestEditMessage = function(msgId, currentText) {
         editingMsgId = msgId;
         const textarea = document.getElementById('edit-msg-textarea');
-        // currentText теперь приходит уже как чистая строка, ничего менять не надо
         textarea.value = currentText; 
         document.getElementById('edit-message-modal').classList.add('open');
         textarea.focus();
@@ -1499,7 +1286,6 @@
     document.getElementById('btn-confirm-edit').onclick = function() {
         const textarea = document.getElementById('edit-msg-textarea');
         let newText = textarea.value.trim();
-        
         if (newText && editingMsgId) {
             if (isSecretMode && userSecretKey) {
                 newText = CryptoJS.AES.encrypt(newText, userSecretKey).toString();
@@ -1522,37 +1308,22 @@
         document.getElementById('reply-panel').style.display = 'none';
     };
 
-    
     function showCustomPrompt() {
         return new Promise((resolve) => {
             const modal = document.getElementById('secret-prompt-modal');
             const input = document.getElementById('prompt-input');
-            
             modal.classList.add('open');
             input.value = '';
             input.focus();
 
-            const handleConfirm = () => {
-                const val = input.value;
-                closeModal();
-                resolve(val);
-            };
-
-            const closeModal = () => {
-                modal.classList.remove('open');
-                cleanup();
-            };
-
+            const handleConfirm = () => { const val = input.value; closeModal(); resolve(val); };
+            const closeModal = () => { modal.classList.remove('open'); cleanup(); };
             const cleanup = () => {
                 document.getElementById('btn-confirm-prompt').removeEventListener('click', handleConfirm);
                 document.getElementById('btn-cancel-prompt').removeEventListener('click', handleCancel);
                 document.getElementById('btn-close-prompt').removeEventListener('click', closeModal);
             };
-
-            const handleCancel = () => {
-                closeModal();
-                resolve(null);
-            };
+            const handleCancel = () => { closeModal(); resolve(null); };
 
             document.getElementById('btn-confirm-prompt').addEventListener('click', handleConfirm);
             document.getElementById('btn-cancel-prompt').addEventListener('click', handleCancel);
@@ -1588,9 +1359,12 @@
     function initUIEventListeners() {
         document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
 
-        document.getElementById('btn-open-create-modal').addEventListener('click', () => {
-            createRoomModal.classList.add('open'); renderCreateRoomUsers(globalUsersCache);
-        });
+        const btnCreateModal = document.getElementById('btn-open-create-modal');
+        if (btnCreateModal) {
+            btnCreateModal.addEventListener('click', () => {
+                createRoomModal.classList.add('open'); renderCreateRoomUsers(globalUsersCache);
+            });
+        }
         document.getElementById('btn-close-room-modal').addEventListener('click', () => createRoomModal.classList.remove('open'));
         document.getElementById('btn-cancel-room-creation').addEventListener('click', () => createRoomModal.classList.remove('open'));
         
@@ -1598,14 +1372,17 @@
             const rName = document.getElementById('new-room-name').value.trim();
             const checkedBoxes = document.querySelectorAll('.participant-checkbox:checked');
             if(!rName) { alert("Укажите название создаваемой комнаты!"); return; }
-            if(checkedBoxes.length === 0) { alert("Необходимо выбрать хотя бы одного участника для создания комнаты!"); return; }
+            if(checkedBoxes.length === 0) { alert("Необходимо выбрать хотя бы одного участника!"); return; }
             const participantsArray = []; checkedBoxes.forEach(cb => participantsArray.push(cb.value));
             socket.emit('create_advanced_room', { name: rName, participants: participantsArray });
             document.getElementById('new-room-name').value = ""; createRoomModal.classList.remove('open');
         });
 
         const modal = document.getElementById('add-user-modal');
-        document.getElementById('btn-add-user-modal').addEventListener('click', () => { if (!currentRoomId) return; modal.classList.add('open'); renderModalUsers(globalUsersCache); });
+        const addUserBtn = document.getElementById('btn-add-user-modal');
+        if (addUserBtn) {
+            addUserBtn.addEventListener('click', () => { if (!currentRoomId) return; modal.classList.add('open'); renderModalUsers(globalUsersCache); });
+        }
         document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
         document.getElementById('search-modal-users').addEventListener('input', function() { renderModalUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim()))); });
 
@@ -1672,43 +1449,32 @@
         document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId }); });
         document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
 
-        // --- ЛОГИКА ДЛЯ МОБИЛЬНОГО МЕНЮ ---
         const leftPanel = document.querySelector('.left-panel');
         const rightPanel = document.querySelector('.right-panel');
         const mobileOverlayPanel = document.getElementById('mobile-overlay-panel');
 
         document.getElementById('btn-mobile-left').addEventListener('click', () => {
-            leftPanel.classList.add('open');
-            mobileOverlayPanel.classList.add('active');
+            leftPanel.classList.add('open'); mobileOverlayPanel.classList.add('active');
         });
-
         document.getElementById('btn-mobile-right').addEventListener('click', () => {
-            rightPanel.classList.add('open');
-            mobileOverlayPanel.classList.add('active');
+            rightPanel.classList.add('open'); mobileOverlayPanel.classList.add('active');
         });
-
         mobileOverlayPanel.addEventListener('click', () => {
-            leftPanel.classList.remove('open');
-            rightPanel.classList.remove('open');
-            mobileOverlayPanel.classList.remove('active');
+            leftPanel.classList.remove('open'); rightPanel.classList.remove('open'); mobileOverlayPanel.classList.remove('active');
         });
 
-        // Логика кнопки фильтрации файлов
         const btnFilterFiles = document.getElementById('btn-filter-files');
         const fileExtSelect = document.getElementById('file-ext-select');
 
         btnFilterFiles.addEventListener('click', function() {
             isFileMode = !isFileMode;
-            
             if (isFileMode) {
-                btnFilterFiles.style.background = '#dbeafe'; // Подсветка активного состояния
+                btnFilterFiles.style.background = '#dbeafe';
                 fileExtSelect.style.display = 'inline-block';
                 requestFilesHistory();
             } else {
                 btnFilterFiles.style.background = 'transparent';
                 fileExtSelect.style.display = 'none';
-                
-                // Возвращаем обычное поведение чата
                 if (currentRoomId) {
                     const activeRoom = latestRoomsListCache.find(r => r.id_room == currentRoomId);
                     selectRoomById(currentRoomId, activeRoom ? activeRoom.name : "Кабинет", activeRoom ? activeRoom.type : "group", activeRoom ? activeRoom.created_by : null);
@@ -1719,12 +1485,7 @@
             }
         });
 
-        // Смена расширения в выпадающем списке
-        fileExtSelect.addEventListener('change', function() {
-            if (isFileMode) {
-                requestFilesHistory();
-            }
-        });
+        fileExtSelect.addEventListener('change', function() { if (isFileMode) requestFilesHistory(); });
 
         const dateFilterInput = document.getElementById('date-filter-input');
         const btnClearDate = document.getElementById('btn-clear-date');
@@ -1733,23 +1494,16 @@
             btnClearDate.style.display = this.value ? 'inline-block' : 'none';
             reloadCurrentView();
         });
-
         btnClearDate.addEventListener('click', function() {
-            dateFilterInput.value = '';
-            this.style.display = 'none';
-            reloadCurrentView();
+            dateFilterInput.value = ''; this.style.display = 'none'; reloadCurrentView();
         });
     }
 
-    // НОВАЯ ФУНКЦИЯ: Высчитывает начало и конец дня в формате UTC
     function getDateBounds() {
         const val = document.getElementById('date-filter-input').value;
         if (!val) return { date_from: "", date_to: "" };
-        
-        // Создаем локальные даты начала и конца выбранного дня
         const d1 = new Date(val + 'T00:00:00');
         const d2 = new Date(val + 'T23:59:59.999');
-        
         return {
             date_from: d1.toISOString().slice(0, 19).replace('T', ' '),
             date_to: d2.toISOString().slice(0, 19).replace('T', ' ')
@@ -1761,31 +1515,18 @@
             requestFilesHistory();
         } else if (currentRoomId) {
             messagesStream.innerHTML = "";
-            const bounds = getDateBounds(); // Получаем точный диапазон
-            socket.emit('get_room_history', { 
-                room_id: currentRoomId, 
-                date_from: bounds.date_from, 
-                date_to: bounds.date_to 
-            });
+            const bounds = getDateBounds();
+            socket.emit('get_room_history', { room_id: currentRoomId, date_from: bounds.date_from, date_to: bounds.date_to });
         }
     }
 
     function requestFilesHistory() {
         if (!socket) return;
         const selectedExt = document.getElementById('file-ext-select').value;
-        const bounds = getDateBounds(); // Получаем точный диапазон
+        const bounds = getDateBounds();
         messagesStream.innerHTML = "";
-        
-        if (!currentRoomId) {
-            document.getElementById('current-chat-title').innerText = "Все доступные файлы (Общий фильтр)";
-        }
-        
-        socket.emit('get_files_history', { 
-            room_id: currentRoomId, 
-            extension: selectedExt,
-            date_from: bounds.date_from,
-            date_to: bounds.date_to
-        });
+        if (!currentRoomId) document.getElementById('current-chat-title').innerText = "Все доступные файлы (Общий фильтр)";
+        socket.emit('get_files_history', { room_id: currentRoomId, extension: selectedExt, date_from: bounds.date_from, date_to: bounds.date_to });
     }
 
     function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; userSecretKey = ""; }
@@ -1795,20 +1536,14 @@
         if (isSecretMode && userSecretKey) { text = CryptoJS.AES.encrypt(inputMsg.innerText.trim(), userSecretKey).toString(); }
         
         socket.emit('send_message', { 
-            room_id: currentRoomId, 
-            text: text, 
-            is_secret: isSecretMode, 
-            ui_styles: JSON.stringify(currentTextStyles),
-            reply_to: currentReplyMessageId
+            room_id: currentRoomId, text: text, is_secret: isSecretMode, 
+            ui_styles: JSON.stringify(currentTextStyles), reply_to: currentReplyMessageId
         });
         
         inputMsg.innerHTML = ""; 
         isSecretMode = false; 
         resetSecretToggleUI(document.getElementById('btn-secret-toggle'));
-        
-        if (typeof cancelReply === 'function') {
-            cancelReply();
-        }
+        if (typeof cancelReply === 'function') cancelReply();
     }
 
     function initScreenshotEditorLogic() {
@@ -1863,7 +1598,7 @@
         users.forEach(u => {
             if (roomParticipantsCache.some(p => p.id_user === u.id_user)) return;
             const div = document.createElement('div'); div.className = 'modal-user-item';
-            div.innerHTML = `<span><b>${u.username}</b></span><button class="btn btn-primary" style="padding: 3px 8px; font-size: 11px;">Добавить</button>`;
+            div.innerHTML = `<span><b>${u.username}</b></span><button class="btn btn-primary" style="padding: 3px 8px; font-size: 12px;">Добавить</button>`;
             div.querySelector('button').addEventListener('click', () => {
                 socket.emit('add_user_to_room', { room_id: parseInt(currentRoomId), user_id: u.id_user });
                 document.getElementById('add-user-modal').classList.remove('open');
@@ -1914,9 +1649,7 @@
         });
     }
 
-    function requestCall(targetUserId) {
-        startCall(targetUserId);
-    }
+    function requestCall(targetUserId) { startCall(targetUserId); }
 
     function initMentionLogic() {
         const mentionMenu = document.getElementById('mention-menu');
@@ -1948,27 +1681,10 @@
         const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
-    // ИНИЦИАЛИЗАЦИЯ
     if ('Notification' in window && Notification.permission === "default") {
         Notification.requestPermission();
     }
     document.addEventListener("DOMContentLoaded", initApplication);
-
-    fetch('/api/admin/settings')
-    .then(res => res.json())
-    .then(settings => {
-        const color = settings.theme_primary_color;
-        if (color) {
-            const styleSheet = document.createElement("style");
-            styleSheet.type = "text/css";
-            styleSheet.innerText = `
-                button, .btn, .sidebar, header, .active {
-                    background-color: ${color} !important;
-                }
-            `;
-            document.head.appendChild(styleSheet);
-        }
-    }).catch(console.error);
 </script>
 <div id="userInfoModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
