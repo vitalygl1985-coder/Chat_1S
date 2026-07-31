@@ -764,29 +764,18 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Для обычных пользователей возвращаем пустые списки комнат
-        if session['role'] != 'admin':
-            return {"active": [], "inactive_text_group": []}
-
+        # Теперь и админам, и пользователям отдаем их комнаты, но сортируем правильно (private всегда ниже)
         query = """
-            SELECT id_room, name, type, created_by, 
-                   (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
-            FROM rooms
-            WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
-            
-            UNION
-            
             SELECT r.id_room, r.name, r.type, r.created_by,
                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
             FROM rooms r
             INNER JOIN room_participants rp ON r.id_room = rp.id_room
             WHERE r.id_org = %s::uuid AND rp.id_user = %s
-            
             ORDER BY 
-                CASE WHEN type = 'private' THEN 1 ELSE 0 END ASC, 
-                name ASC
+                CASE WHEN r.type = 'private' THEN 1 ELSE 0 END ASC, 
+                r.name ASC
         """
-        cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
+        cur.execute(query, (str(session['id_org']), session['id_user']))
         all_rooms = cur.fetchall()
     
         return {
@@ -876,10 +865,6 @@ async def get_rooms_again(sid):
     session = await sio.get_session(sid)
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        if session.get('role') != 'admin':
-            await sio.emit('rooms_list', [], to=sid)
-            return
-
         query = """
             SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
@@ -891,7 +876,6 @@ async def get_rooms_again(sid):
                 r.name ASC
         """
         cur.execute(query, (str(session['id_org']), session['id_user']))
-            
         await sio.emit('rooms_list', cur.fetchall(), to=sid)
     except Exception as e: 
         print(f"Ошибка в get_rooms_again: {e}")

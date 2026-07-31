@@ -669,8 +669,13 @@
                 document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
                 
                 if (currentUser.role !== 'admin') {
+                    // Скрываем кнопку создания кабинета слева для обычных пользователей
                     const btnCreateModal = document.getElementById('btn-open-create-modal');
                     if (btnCreateModal) btnCreateModal.style.display = 'none';
+
+                    // Скрываем кнопку добавления участников (+) в правом меню
+                    const btnAddUserModal = document.getElementById('btn-add-user-modal');
+                    if (btnAddUserModal) btnAddUserModal.style.display = 'none';
 
                     const rightHeaderControls = document.getElementById('right-panel-header-controls');
                     if (rightHeaderControls) rightHeaderControls.style.display = 'none';
@@ -1608,15 +1613,32 @@
     }
 
     function renderCurrentRoomParticipants(list) {
-        const container = document.getElementById('current-room-participants'); container.innerHTML = "";
+        const container = document.getElementById('current-room-participants'); 
+        container.innerHTML = "";
+        
         list.forEach(p => {
-            const div = document.createElement('div'); div.className = 'user-row'; div.style.cursor = 'default';
+            const div = document.createElement('div'); 
+            div.className = 'user-row'; 
+            div.style.cursor = 'default';
             const isOnline = !!onlineUsersCache[p.id_user];
+            
             let removeActionHtml = "";
-            if ((currentUser.role === 'admin' || roomCreatorId == currentUser.id_user) && p.id_user !== currentUser.id_user) {
+            // Кнопка удаления участника доступна только админу или создателю комнаты (если роль admin)
+            if (currentUser.role === 'admin' && (currentUser.role === 'admin' || roomCreatorId == currentUser.id_user) && p.id_user !== currentUser.id_user) {
                 removeActionHtml = `<button class="btn-remove-participant" onclick="event.stopPropagation(); requestRemoveUser('${p.id_user}')">❌</button>`;
             }
-            div.innerHTML = `<div class="avatar-container"><div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${p.username}</span><span class="user-role">${p.role}</span></div>${removeActionHtml}`;
+            
+            div.innerHTML = `
+                <div class="avatar-container">
+                    <div class="avatar" style="background:#2563eb; color:#fff;">${p.username.charAt(0).toUpperCase()}</div>
+                    <div class="status-badge ${isOnline ? 'online' : 'offline'}"></div>
+                </div>
+                <div class="user-info-meta">
+                    <span style="font-weight:600;">${p.username}</span>
+                    <span class="user-role">${p.role}</span>
+                </div>
+                ${removeActionHtml}
+            `;
             container.appendChild(div);
         });
     }
