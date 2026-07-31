@@ -2,13 +2,26 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Корпоративный чат 1С</title>
     <link rel="stylesheet" href="/static/style.css?v=1">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
+        /* Убираем синюю обводку при клике на выпадающий список */
+        select:focus {
+            outline: none !important;
+            border-color: #14b865 !important;
+            box-shadow: 0 0 0 2px rgba(20, 184, 101, 0.3) !important;
+        }
+
+        /* Перекрашиваем выбранный пункт внутри списка (работает в Firefox и частично в Chrome) */
+        select option:checked, select option:hover {
+            background-color: #166534 !important;
+            color: white !important;
+        }
+
         :root {
             --primary-color: #2563eb;
             --bg-main: #f3f4f6;
@@ -21,15 +34,27 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body, html { height: 100vh; max-height: 100vh; background: var(--bg-main); color: var(--text-main); overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* ИСПРАВЛЕНИЕ ВЫСОТЫ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ */
+        body, html { 
+            height: 100%; 
+            height: -webkit-fill-available; 
+            height: 100dvh; 
+            background: var(--bg-main); 
+            color: var(--text-main); 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+        }
 
         .app-container {
             display: grid;
             grid-template-columns: 260px 1fr 280px;
             flex: 1;
-            max-height: calc(100vh - 25px);
-            background: var(--bg-panel);
+            min-height: 0; 
+            //background: var(--bg-panel);
             overflow: hidden;
+            position: relative;
         }
 
         .system-footer-links {
@@ -55,11 +80,11 @@
         .accordion-content.open { display: block; }
 
         .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; }
-        .chat-header { height: 55px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; }
+        .chat-header { height: 55px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; gap: 10px; }
         
-        .chat-title-area { display: flex; flex-direction: column; }
-        .chat-title { font-weight: 600; font-size: 15px; }
-        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; }
+        .chat-title-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .chat-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-user-identity { font-size: 11px; color: #10b981; font-weight: bold; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-actions { display: flex; gap: 6px; }
         
         .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: white; }
@@ -94,7 +119,7 @@
         .message-box:hover .msg-reply-trigger { display: block !important; }
 
         .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 10px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
-        .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; }
+        .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; flex-wrap: wrap; }
         .toolbar-item { cursor: pointer; font-size: 13px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
         .toolbar-item:hover { background: var(--bg-main); }
         .toolbar select { font-size: 11px; padding: 2px; border: 1px solid var(--border-color); border-radius: 3px; outline: none; }
@@ -124,26 +149,29 @@
         .user-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
         .user-row:hover { background: var(--bg-main); }
         
-        .avatar-container { position: relative; width: 28px; height: 28px; }
+        .avatar-container { position: relative; width: 28px; height: 28px; flex-shrink: 0; }
         .avatar { width: 28px; height: 28px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: #4b5563; }
         .status-badge { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; }
         .status-badge.online { background: var(--online-color); }
         .status-badge.offline { background: var(--offline-color); }
-        .user-info-meta { flex: 1; display: flex; flex-direction: column; }
-        .user-role { font-size: 10px; color: var(--text-muted); }
+        .user-info-meta { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .user-role { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .view-pane { display: none; }
         .view-pane.active { display: block; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000; }
         .modal-overlay.open { display: flex; }
-        .modal-window { width: 380px; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
+        .modal-window { width: 380px; max-width: 90vw; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
         .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
         .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 13px; }
         .modal-user-item:hover { background: var(--bg-main); }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; max-width: 90vw; }
+        .modal-row { margin-bottom: 8px; font-size: 13px; }
+        .modal-label { font-weight: bold; }
         .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; font-weight: bold; margin-left: auto; }
-        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; }
+        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
         
         .btn-remove-participant { border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
         .btn-remove-participant:hover { background: #ffeeeb; }
@@ -155,9 +183,100 @@
         .editor-toolbar { padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
         .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
+
+        /* === КРАСИВЫЙ БАННЕР ЗВОНКА === */
+        .call-banner {
+            position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
+            background: #1f2937; color: #fff; padding: 12px 20px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 15px;
+            z-index: 10000; transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: 1px solid rgba(255,255,255,0.1); width: 95%; max-width: 400px;
+        }
+        .call-banner.visible { top: 20px; }
+        .call-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .call-name { 
+            font-weight: bold; 
+            font-size: 14px; 
+            white-space: normal;
+            word-wrap: break-word; 
+            line-height: 1.3;
+        }
+        .call-status { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+        .call-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+        
+        .call-btn {
+            width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s;
+            font-size: 18px; flex-shrink: 0;
+        }
+        .call-btn:hover { transform: scale(1.1); }
+        .call-btn.accept { background: #10b981; animation: pulse-green 1.5s infinite; }
+        .call-btn.decline, .call-btn.end { background: #ef4444; }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* --- МОБИЛЬНАЯ АДАПТАЦИЯ --- */
+        .mobile-overlay-panel { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 90; }
+        .mobile-overlay-panel.active { display: block; }
+        .mobile-menu-btn { display: none; background: transparent; border: none; font-size: 24px; cursor: pointer; color: var(--primary-color); padding: 5px; flex-shrink: 0; }
+
+        @media (max-width: 768px) {
+            .app-container { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; }
+            
+            .system-footer-links { display: none !important; }
+
+            .left-panel, .right-panel {
+                position: absolute; top: 0; height: 100%; z-index: 100;
+                width: 85%; max-width: 320px; transition: transform 0.3s ease;
+                background: var(--bg-panel);
+            }
+            .left-panel { left: 0; transform: translateX(-100%); border-right: 1px solid var(--border-color); }
+            .right-panel { right: 0; transform: translateX(100%); border-left: 1px solid var(--border-color); }
+            .left-panel.open, .right-panel.open { transform: translateX(0); box-shadow: 0 0 20px rgba(0,0,0,0.3); }
+            
+            .chat-panel { width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+            .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+            
+            .chat-header { padding: 0 10px; }
+            .chat-header .logo-link { display: none; } 
+            
+            .chat-actions img { width: 30px !important; height: 30px !important; }
+            
+            .input-area { padding: 8px 10px; }
+            .input-msg-div { 
+                min-height: 50px; 
+                max-height: 120px; 
+                font-size: 16px; 
+                padding: 14px 12px;
+                border-radius: 12px;
+            } 
+            .controls-row { align-items: flex-end; }
+            #btn-send-message { height: 50px; padding: 0 16px; border-radius: 12px; }
+            #btn-attach-file img, #record-btn img { width: 44px !important; height: 44px !important; }
+            
+            .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
+            .message { max-width: 90%; }
+        }
     </style>
 </head>
 <body>
+
+<audio id="remote-audio" autoplay playsinline style="display:none;"></audio>
+
+<div class="call-banner" id="call-banner">
+    <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; flex-shrink: 0;" id="call-avatar"></div>
+    <div class="call-info">
+        <span class="call-name" id="call-name">Сотрудник</span>
+        <span class="call-status" id="call-status">Входящий вызов...</span>
+    </div>
+    <div class="call-actions" id="call-actions-container">
+        </div>
+</div>
 
 <div class="modal-overlay" id="secret-prompt-modal">
     <div class="modal-window" style="width: 380px;">
@@ -263,6 +382,8 @@
 </div>
 
 <div class="app-container">
+    <div class="mobile-overlay-panel" id="mobile-overlay-panel"></div>
+
     <div class="panel left-panel">
         <div class="panel-header">
             <h3 style="font-size: 14px;">Кабинеты</h3>
@@ -283,16 +404,15 @@
 
     <div class="panel chat-panel">
         <div class="chat-header">
-            <a href="https://100letnik.md" target="_blank">
-                <img id="chat-logo" src="/static/logo.png" alt="100ЛЕТНИК" 
-                style="height: 50px; width: 50px; margin-right: 15px; cursor: pointer;">
+            <button class="mobile-menu-btn" id="btn-mobile-left">☰</button>
+            <a id="logo-link" href="#" target="_blank" class="logo-link">
+                <img id="chat-logo" src="/static/logo.png" alt="Лого" style="height: 50px; width: 50px; margin-right: 15px; cursor: pointer;">
             </a>
             <div class="chat-title-area">
                 <div class="chat-title" id="current-chat-title">Выберите чат для начала общения</div>
                 <div class="chat-user-identity" id="header-user-identity">Загрузка сессии...</div>
             </div>
-            <div class="chat-actions" id="chat-management-controls" 
-                style="display: none; align-items: center; gap: 10px;">
+            <div class="chat-actions" id="chat-management-controls" style="display: none; align-items: center; gap: 10px;">
                 <img src="/static/archive_btn.png" id="btn-archive-room" 
                     style="cursor:pointer; height:45px; width:45px; object-fit:contain;" 
                     title="Архивация сообщений" alt="Архив">            
@@ -300,6 +420,7 @@
                     style="cursor:pointer; height:65px; width:65px; object-fit:contain;" 
                     title="Удаление комнаты" alt="Удалить">
             </div>
+            <button class="mobile-menu-btn" id="btn-mobile-right">👥</button>
         </div>
              
         <div class="messages-container" id="messages-stream"></div>
@@ -340,6 +461,18 @@
                 <input type="color" id="text-bg-picker" title="Маркер выделения" style="width:16px; height:16px; border:none; cursor:pointer;" value="#ffffff">
                 <div style="border-left: 1px solid var(--border-color); height: 16px; margin: 0 4px;"></div>
                 <div class="toolbar-item" id="btn-secret-toggle" title="Шифрование сообщения" style="font-size: 12px;">🔓 Открыто</div>
+                <img src="/static/LoadFile.png" id="btn-filter-files" title="Режим просмотра файлов" 
+                    style="cursor:pointer; height:32px; width:32px; object-fit:contain; margin-left: 10px; vertical-align: middle; padding: 4px; border-radius: 6px; transition: background 0.2s;"
+                    onmouseover="this.style.background='rgba(63, 98, 68, 0.15)'" onmouseout="this.style.background='transparent'">
+                <select id="file-ext-select" style="display:none; font-size: 11px; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 6px; margin-left: 8px; vertical-align: middle; background: var(--bg-panel); color: var(--text-main); font-weight: 500; outline: none;">
+                    <option value="all">ФИЛЬТР: Все вложения</option>
+                    <option value="image">ИЗОБРАЖЕНИЯ (PNG, JPG)</option>
+                    <option value="doc">ДОКУМЕНТЫ (PDF, WORD)</option>
+                    <option value="excel">ТАБЛИЦЫ (EXCEL)</option>
+                    <option value="archive">АРХИВЫ (ZIP, RAR)</option>
+                </select>
+                <input type="date" id="date-filter-input" style="font-size: 11px; padding: 3px 6px; border: 1px solid var(--border-color); border-radius: 6px; margin-left: 8px; vertical-align: middle; background: var(--bg-panel); color: var(--text-main); outline: none;" title="Фильтр по дате">
+                <button id="btn-clear-date" style="display:none; background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; vertical-align:middle; margin-left:2px;" title="Сбросить дату">✖</button>
             </div>
 
             <div class="controls-row">
@@ -351,9 +484,13 @@
                 </button>
                 <div class="input-msg-div" 
                     id="input-msg" contenteditable="true" 
-                    placeholder="Сделайте скриншот (через Win+Shift+S или Ножницы) и нажмите Ctrl+V внутри чата для открытия графического редактора">
+                    placeholder="Сообщение...">
                 </div>
-                <button class="btn btn-primary" id="btn-send-message" style="padding: 10px 20px;">Отправить</button>
+
+                <button id="record-btn" class="btn" style="background: transparent !important; padding: 4px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; margin-right: 5px;" title="Удерживайте для записи">
+                    <img src="/static/mic_btn.png" id="mic-icon-img" alt="Микрофон" style="width: 36px; height: 36px; object-fit: contain; pointer-events: none;">
+                </button>
+                <button class="btn btn-primary" id="btn-send-message">Отправить</button>
             </div>
         </div>
     </div>
@@ -383,18 +520,39 @@
 
 <script>
     window.onerror = function() { return true; };
+    console.log("СКРИПТЫ ЗАГРУЖЕНЫ");
+    window.onerror = function(msg, url, line) {
+        console.error("JS Error:", msg, "at", line);
+        return true;
+    };
 
     let socket = null, currentRoomId = null, currentUser = null, sessionToken = null;
+    let isFileMode = false; // Включен ли сейчас фильтр только по файлам
     let globalUsersCache = [], roomParticipantsCache = [], latestRoomsListCache = [];
     let onlineUsersCache = {}, messageReadsMap = {}; 
     let isSecretMode = false, userSecretKey = "";
     let roomCreatorId = null, roomSystemType = "";
     let unreadRooms = {};
     let currentReplyMessageId = null;
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
     
     let currentTextStyles = { fontFamily: 'Segoe UI', fontSize: '13px', isBold: false, isItalic: false, color: '#1f2937', background: '#ffffff' };
     let currentEditorTool = 'draw', isDrawing = false, lastX = 0, lastY = 0, baseImageObj = null;
 
+    let localStream;
+    let peerConnection;
+    let iceCandidateQueue = []; 
+
+    // Переменные для контроля звонка (UI-баннер)
+    let incomingCallData = null;
+    let currentCallTargetSid = null;
+    let currentCallName = "";
+    let callTimerInterval = null;
+    let callSeconds = 0;
+
+    const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
     const inputMsg = document.getElementById('input-msg');
     const messagesStream = document.getElementById('messages-stream');
     const createRoomModal = document.getElementById('create-room-modal');
@@ -434,6 +592,77 @@
         }
     });
 
+    function initMicrophone() {
+        const recordBtn = document.getElementById('record-btn');
+        if (!recordBtn) {
+            console.warn("Кнопка record-btn не найдена в DOM.");
+            return;
+        }
+
+        recordBtn.oncontextmenu = (e) => e.preventDefault();
+
+        const startRec = async (e) => {
+            if (e) e.preventDefault();
+            if (isRecording) return;
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Микрофон недоступен (нужен HTTPS).");
+                return;
+            }
+
+            try {
+                audioChunks = [];
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    if (audioChunks.length === 0) return;
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioChunks = [];
+
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'voice.webm');
+
+                    try {
+                        const response = await fetch('/upload', { method: 'POST', body: formData });
+                        const result = await response.json();
+                        if (result.url) {
+                            const audioMessage = `<audio controls src="${result.url}" style="height: 40px;"></audio>`;
+                            socket.emit('send_message', { room_id: currentRoomId, text: audioMessage });
+                        }
+                    } catch (uploadErr) { alert("Ошибка отправки."); }
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                recordBtn.style.borderRadius = '50%';
+            } catch (err) {
+                console.error("Ошибка доступа к микрофону:", err);
+                alert("Разрешите доступ к микрофону во всплывающем окне!");
+            }
+        };
+
+        const stopRec = (e) => {
+            if (isRecording && mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                recordBtn.style.background = 'transparent';
+                recordBtn.style.borderRadius = '0';
+            }
+        };
+
+        recordBtn.addEventListener('mousedown', startRec);
+        window.addEventListener('mouseup', stopRec);
+        recordBtn.addEventListener('touchstart', startRec, { passive: false });
+        window.addEventListener('touchend', stopRec);
+    }
+
     async function showUserInfo(userId) {
         try {
             const res = await fetch(`/api/web/user-info/${userId}`, { headers: {'x-token': sessionToken} });
@@ -467,17 +696,79 @@
     async function initApplication() {
         const urlParams = new URLSearchParams(window.location.search);
         const ticket = urlParams.get('ticket');
-        if (!ticket) { alert("Ошибка безопасности: Отсутствует токен авторизации 1С."); return; }
+        
+        if (!ticket) { 
+            document.getElementById('header-user-identity').innerText = "Ошибка: Нет билета";
+            alert("Ошибка безопасности: Отсутствует токен авторизации 1С."); 
+            return; 
+        }
 
         try {
             const response = await fetch('/api/web/exchange-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: ticket }) });
             const data = await response.json();
             if (data.success) {
-                sessionToken = data.token; currentUser = data.user;
+                sessionToken = data.token; 
+                currentUser = data.user;
+                
+                // ВЫЗЫВАЕМ ПРИМЕНЕНИЕ СТИЛЕЙ ОРГАНИЗАЦИИ
+                await applyOrgStyles(); 
+
                 document.getElementById('header-user-identity').innerText = `Сотрудник: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
-                renderEmojiGrid('smile'); connectSockets(); initUIEventListeners(); initMentionLogic(); initScreenshotEditorLogic();
+                renderEmojiGrid('smile'); 
+                connectSockets(); 
+                initUIEventListeners(); 
+                initMentionLogic(); 
+                initScreenshotEditorLogic();
+                initMicrophone();
+            } else {
+                document.getElementById('header-user-identity').innerText = "Ошибка авторизации";
+                alert(data.detail || "Срок действия ссылки истек или она уже была использована. Пожалуйста, откройте чат заново из 1С.");
             }
-        } catch (err) { alert("Не удалось связаться с сервером."); }
+        } catch (err) { 
+            document.getElementById('header-user-identity').innerText = "Ошибка подключения";
+            alert("Не удалось связаться с сервером."); 
+        }
+    }
+
+    async function applyOrgStyles() {
+        const res = await fetch(`/api/admin/settings`, { headers: { 'id-org': currentUser.id_org } });
+        const settings = await res.json();
+
+        if (!currentUser || !currentUser.id_org) return;
+        try {
+            const res = await fetch(`/api/get-styles/${currentUser.id_org}`);
+            const data = await res.json();
+            if (data.css) {
+                const style = document.createElement('style');
+                style.innerHTML = data.css;
+                document.head.appendChild(style);
+            }
+        } catch (e) {
+            console.error("Не удалось загрузить стили организации", e);
+        }
+
+        if (settings.logo_url_link) {
+            document.getElementById('logo-link').href = settings.logo_url_link;
+        } else {
+            document.getElementById('logo-link').href = "https://100letnik.md"; // Дефолт
+        }
+    }
+
+    async function applyOrgSettings() {
+        if (!currentUser || !currentUser.id_org) return;
+        
+        const config = await fetch(`/api/get-org-config/${currentUser.id_org}`).then(r => r.json());
+        
+        // Применяем цвета через переменные CSS
+        document.documentElement.style.setProperty('--primary-color', config.primary_color);
+        
+        // Меняем логотип
+        const logo = document.getElementById('chat-logo');
+        if (logo) logo.src = config.logo_url;
+        
+        // Меняем ссылки
+        const footerLink = document.querySelector('#footer-onec-block a');
+        if (footerLink) footerLink.href = config.onec_url;
     }
 
     function renderEmojiGrid(category) {
@@ -499,14 +790,235 @@
 
     const beepingSound = new Audio('/static/beep.mp3');
 
+    // === ЛОГИКА УПРАВЛЕНИЯ UI ЗВОНКА ===
+    function updateCallTimer() {
+        callSeconds++;
+        const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const s = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('call-status').innerText = `${m}:${s}`;
+    }
+
+    function showCallBanner(state, name) {
+        const banner = document.getElementById('call-banner');
+        const avatar = document.getElementById('call-avatar');
+        const nameEl = document.getElementById('call-name');
+        const statusEl = document.getElementById('call-status');
+        const actionsEl = document.getElementById('call-actions-container');
+
+        nameEl.innerText = name;
+        avatar.innerText = name.charAt(0).toUpperCase();
+        banner.classList.add('visible');
+
+        actionsEl.innerHTML = '';
+
+        if (state === 'incoming') {
+            statusEl.innerText = 'Входящий аудиозвонок...';
+            actionsEl.innerHTML = `
+                <button class="call-btn accept" onclick="acceptCall()" title="Принять">📞</button>
+                <button class="call-btn decline" onclick="declineCall()" title="Отклонить">❌</button>
+            `;
+        } else if (state === 'outgoing') {
+            statusEl.innerText = 'Звоним...';
+            actionsEl.innerHTML = `
+                <button class="call-btn end" onclick="endCall()" title="Завершить">❌</button>
+            `;
+        } else if (state === 'active') {
+            callSeconds = 0;
+            if (callTimerInterval) clearInterval(callTimerInterval);
+            callTimerInterval = setInterval(updateCallTimer, 1000);
+            statusEl.innerText = '00:00';
+            actionsEl.innerHTML = `
+                <button class="call-btn end" onclick="endCall()" title="Завершить">❌</button>
+            `;
+        }
+    }
+
+    function hideCallBanner() {
+        document.getElementById('call-banner').classList.remove('visible');
+        if (callTimerInterval) clearInterval(callTimerInterval);
+        if (typeof beepingSound !== 'undefined') {
+            beepingSound.pause();
+            beepingSound.currentTime = 0;
+        }
+        incomingCallData = null;
+        currentCallTargetSid = null;
+        callSeconds = 0;
+    }
+
+    function stopMediaTracks() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+    }
+
+    // Обработчик принятия входящего звонка из баннера
+    async function acceptCall() {
+        if (!incomingCallData) return;
+        const data = incomingCallData;
+        
+        // Разрешаем проигрывание аудио в контексте прямого клика (важно для iOS)
+        const remoteAudio = document.getElementById('remote-audio');
+        remoteAudio.play().catch(e => {});
+        
+        if (typeof beepingSound !== 'undefined') {
+            beepingSound.pause();
+            beepingSound.currentTime = 0;
+        }
+        showCallBanner('active', currentCallName);
+
+        try {
+            //iceCandidateQueue = [];
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = setupPeerConnection(data.from_sid);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            
+            while (iceCandidateQueue.length > 0) {
+                try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
+            }
+            
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', { target_sid: data.from_sid, answer: answer });
+            currentCallTargetSid = data.from_sid;
+            
+        } catch (err) {
+            console.error("Ошибка при принятии звонка:", err);
+            alert("Не удалось установить соединение: " + err.message);
+            endCall();
+        }
+    }
+
+    // Обработчик сброса до ответа
+    function declineCall() {
+        if (incomingCallData) {
+            socket.emit('end_call', { target_sid: incomingCallData.from_sid });
+        }
+        hideCallBanner();
+    }
+
+    // Обработчик завершения идущего звонка
+    function endCall() {
+        if (currentCallTargetSid) {
+            socket.emit('end_call', { target_sid: currentCallTargetSid });
+        }
+        stopMediaTracks();
+        hideCallBanner();
+    }
+
+    function setupPeerConnection(targetSid) {
+        if (peerConnection) peerConnection.close();
+        const pc = new RTCPeerConnection(config);
+        
+        pc.onicecandidate = (e) => {
+            if (e.candidate) socket.emit('ice_candidate', { target_sid: targetSid, candidate: e.candidate });
+        };
+        pc.ontrack = (e) => {
+            const remoteAudio = document.getElementById('remote-audio');
+            if (remoteAudio.srcObject !== e.streams[0]) {
+                remoteAudio.srcObject = e.streams[0];
+                remoteAudio.play().catch(err => console.log('Audio error:', err));
+            }
+        };
+        return pc;
+    }
+
+    async function startCall(targetUserId) {
+        const targetSid = await new Promise((resolve) => {
+            socket.emit('get_sid_by_user', { user_id: targetUserId }, (sid) => resolve(sid));
+        });
+        if (!targetSid) { alert("Пользователь не в сети!"); return; }
+
+        const targetUser = globalUsersCache.find(u => u.id_user === targetUserId);
+        currentCallName = targetUser ? targetUser.username : 'Коллега';
+        currentCallTargetSid = targetSid;
+        
+        showCallBanner('outgoing', currentCallName);
+
+        try {
+            iceCandidateQueue = []; 
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = setupPeerConnection(targetSid);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            socket.emit('offer', { target_sid: targetSid, offer: offer, caller_name: currentUser.username });
+        } catch (err) {
+            console.error("Ошибка при создании звонка:", err);
+            alert("Не удалось начать звонок: проверьте доступ к микрофону.");
+            hideCallBanner();
+        }
+    }
+
     function connectSockets() {
+        let callerSid = null;
         const socketUrl = window.location.protocol + '//' + window.location.host;
         socket = io(socketUrl, { path: '/socket.io', transports: ['polling', 'websocket'], query: { id_user: currentUser.id_user, id_org: currentUser.id_org, username: currentUser.username, role: currentUser.role } });
 
-        socket.on('connect', () => { refreshRoomsAndLists(); socket.emit('get_users_list'); });
+        socket.on('connect', () => { 
+            refreshRoomsAndLists(); 
+            socket.emit('get_users_list'); 
+            
+            // Восстановление комнаты при выходе из спящего режима телефона
+            if (currentRoomId) {
+                socket.emit('join_room_pool', { room_id: currentRoomId });
+                socket.emit('get_room_history', { room_id: currentRoomId });
+            }
+        });
         socket.on('rooms_list', (rooms) => { latestRoomsListCache = rooms; filterAndRenderRooms(); });
         socket.on('users_list', (users) => { globalUsersCache = users; renderCompanyUsers(users); });
         
+        socket.on('offer', async (data) => {
+            if (peerConnection && peerConnection.connectionState === 'connected') {
+                // Если мы уже говорим с кем-то, отправляем отбой звонящему
+                socket.emit('end_call', { target_sid: data.from_sid });
+                return;
+            }
+
+            incomingCallData = data;
+            currentCallTargetSid = data.from_sid;
+            currentCallName = data.caller_name || 'Коллега';
+            
+            showCallBanner('incoming', currentCallName);
+
+            if (typeof beepingSound !== 'undefined') {
+                beepingSound.loop = true;
+                beepingSound.play().catch(e => console.log("Ошибка звука:", e));
+            }
+        });
+
+        socket.on('answer', async (data) => {
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                showCallBanner('active', currentCallName);
+                
+                while (iceCandidateQueue.length > 0) {
+                    try { await peerConnection.addIceCandidate(iceCandidateQueue.shift()); } catch(e) {}
+                }
+            }
+        });
+
+        socket.on('ice_candidate', async (data) => {
+            if (peerConnection && peerConnection.remoteDescription) {
+                try { await peerConnection.addIceCandidate(data.candidate); } catch(e) {}
+            } else {
+                iceCandidateQueue.push(data.candidate);
+            }
+        });
+
+        socket.on('call_ended', (data) => {
+            stopMediaTracks();
+            hideCallBanner();
+        });
+                
         socket.on('new_message', (msg) => { 
             if (msg) {
                 if (msg.id_room == currentRoomId) {
@@ -521,7 +1033,8 @@
                 }
 
                 if (msg.id_user_from !== currentUser.id_user) {
-                    if (typeof beepingSound !== 'undefined') {
+                    if (typeof beepingSound !== 'undefined' && document.getElementById('call-banner').className.indexOf('visible') === -1) {
+                        beepingSound.loop = false;
                         beepingSound.play().catch(e => console.log("Ошибка звука:", e));
                     }
 
@@ -558,15 +1071,12 @@
         });
 
         socket.on('message_edited', (data) => {
-            console.log("Пришло изменение для id:", data.id_message, "Текст:", data.new_text);
             const textContainer = document.getElementById(`text-container-${data.id_message}`);
             if (textContainer) {
                 renderProcessedText(textContainer, data.new_text);
                 textContainer.style.transition = "background 1s";
                 textContainer.style.background = "#fef3c7";
                 setTimeout(() => textContainer.style.background = "transparent", 2000);
-            } else {
-                console.log("Не найден контейнер для", `text-container-${data.id_message}`);
             }
         });
 
@@ -593,9 +1103,17 @@
         socket.on('room_participants_list', (data) => { 
             roomParticipantsCache = data.participants || []; 
             renderCurrentRoomParticipants(roomParticipantsCache); 
-        });        
+        });  
+
         socket.on('room_history', (data) => {
+            messagesStream.innerHTML = ""; 
+            
             if (data && data.messages) {
+                if (data.messages.length === 0) {
+                    messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>В эту дату сообщений не было</div>";
+                    return;
+                }
+                
                 data.messages.forEach(msg => {
                     if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;
                     displayMessage(msg, true);
@@ -625,6 +1143,141 @@
 
         socket.on('private_chat_created', (data) => { if (data && data.id_room) selectRoomById(data.id_room); });
         socket.on('refresh_rooms_trigger', () => { refreshRoomsAndLists(); });
+
+        //socket.on('files_history_response', (data) => {
+        //    messagesStream.innerHTML = "";         
+        //    if (!data.messages || data.messages.length === 0) {
+        //        messagesStream.innerHTML = "<div style='text-align:center; color:var(--text-muted); margin-top:30px; font-size:13px;'>📎 В данном разрезе файлы не найдены</div>";
+        //        return;
+        //    }    
+        //    data.messages.forEach(msg => {
+        //        if (msg.reads) messageReadsMap[msg.id_message] = msg.reads;        
+        //        // Рендерим стандартное сообщение чата
+        //        displayMessage(msg, true);        
+        //        // Если комната не была выбрана (глобальный просмотр), дописываем к автору имя кабинета, откуда файл
+        //        if (!data.room_id) {
+        //            const lastMessageNode = messagesStream.lastChild;
+        //            if (lastMessageNode) {
+        //                const authorElement = lastMessageNode.querySelector('.msg-author');
+        //                if (authorElement && msg.room_name) {
+        //                    authorElement.innerHTML += ` <span style="font-weight:normal; color:var(--primary-color); font-size:11px; margin-left:5px;">[Кабинет: ${msg.room_name}]</span>`;
+        //                }
+        //            }
+        //        }
+        //    });
+        //});
+
+        socket.on('files_history_response', (data) => {
+            messagesStream.innerHTML = "";
+            
+            // 1. Создаем темный оливковый баннер с ярко-зеленой кнопкой
+            const banner = document.createElement('div');
+            banner.style = `
+                background: #59745E; 
+                color: white; 
+                padding: 15px; /* Уменьшили высоту в 2 раза */
+                border-radius: 12px; 
+                text-align: center; 
+                margin-bottom: 15px; 
+                box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 34px; margin-bottom: 5px;">📁</div>
+                <h2 style="text-transform: uppercase; font-size: 20px; margin-bottom: 5px;">Режим файлов</h2>
+                <p style="font-size: 12px; opacity: 0.9; margin-bottom: 15px;">Просмотр и фильтрация вложений</p>
+                <div id="file-upload-card" style="background: #166534; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-block; transition: all 0.2s;" 
+                    onmouseover="this.style.background='#22c55e'; this.style.transform='scale(1.02)';" 
+                    onmouseout="this.style.background='#166534'; this.style.transform='scale(1)';">
+                    ЗАГРУЗИТЬ НОВЫЙ ФАЙЛ <span style="font-size:16px; margin-left:5px;">+</span>
+                </div>
+            `;
+            messagesStream.appendChild(banner);
+
+            document.getElementById('file-upload-card').addEventListener('click', () => {
+                document.getElementById('global-file-input').click();
+            });
+
+            if (!data.messages || data.messages.length === 0) {
+                const noFiles = document.createElement('div');
+                noFiles.style = 'text-align:center; color:var(--text-muted); margin: 40px 0; font-size:14px; font-weight:500;';
+                noFiles.innerText = '📎 В данном разрезе файлы не найдены';
+                messagesStream.appendChild(noFiles);
+                return;
+            }
+
+            const listContainer = document.createElement('div');
+            listContainer.style = 'display: flex; flex-direction: column; gap: 10px; padding: 2px;';
+            
+            data.messages.forEach(msg => {
+                let rawText = msg.encrypted_text || msg.text || "";
+                if (!rawText.startsWith('/download/')) return;
+
+                const author = msg.username || "Сотрудник";
+                const roomNameInfo = !data.room_id && msg.room_name ? ` • [Кабинет: ${msg.room_name}]` : "";
+                
+                let fileUrl = rawText;
+                let fileName = "Файл";
+                if (rawText.includes('|')) {
+                    const parts = rawText.split('|');
+                    fileUrl = parts[0];
+                    fileName = parts[1];
+                } else {
+                    fileName = rawText.substring(rawText.lastIndexOf('/') + 1);
+                }
+
+                let ext = fileName.split('.').pop().toLowerCase();
+                
+                // --- ДОБАВЛЕНО: Форматирование даты и времени ---
+                let dateStr = "";
+                if (msg.created_at) {
+                    const d = new Date(msg.created_at + 'Z');
+                    dateStr = d.toLocaleDateString('ru-RU') + ' в ' + d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                }
+                // ------------------------------------------------
+                
+                let icon = "📄"; let iconBg = "#64748b";
+                if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { icon = "🖼️"; iconBg = "#6495ED"; }
+                else if (ext === 'pdf') { icon = "📕"; iconBg = "#e11d48"; }
+                else if (['xlsx', 'xls'].includes(ext)) { icon = "📊"; iconBg = "#10b981"; }
+                else if (['docx', 'doc'].includes(ext)) { icon = "📝"; iconBg = "#3b82f6"; }
+                else if (['zip', 'rar', '7z'].includes(ext)) { icon = "📦"; iconBg = "#d97706"; }
+
+                const fileRow = document.createElement('div');
+                fileRow.style = `
+                    display: flex; 
+                    align-items: center; 
+                    gap: 15px; 
+                    background: var(--bg-panel); 
+                    padding: 14px; 
+                    border-radius: 10px; 
+                    border: 1px solid var(--border-color);
+                `;
+                
+                // --- ИЗМЕНЕНО: Вывод переменной dateStr ---
+                fileRow.innerHTML = `
+                    <div style="background: ${iconBg}; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0;">
+                        ${icon}
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; font-size: 14px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <a href="${fileUrl}" target="_blank" style="color: inherit; text-decoration: none;">${fileName}</a>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; font-weight: 500;">
+                            Отправитель: ${author}${roomNameInfo} <span style="margin-left: 8px; color: var(--primary-color);">🕒 ${dateStr}</span>
+                        </div>
+                    </div>
+                    <a href="${fileUrl}" target="_blank" style="background: var(--bg-main); padding: 8px 16px; border-radius: 6px; color: var(--text-main); text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.15s;" 
+                    onmouseover="this.style.background='#3a5a46'" onmouseout="this.style.background='var(--bg-main)'">
+                        Открыть
+                    </a>
+                `;
+                listContainer.appendChild(fileRow);
+            });
+            
+            messagesStream.appendChild(listContainer);
+            messagesStream.scrollTop = 0;
+        });
+
     }
 
     function refreshRoomsAndLists() { if (socket) socket.emit('get_rooms_again'); }
@@ -635,41 +1288,53 @@
     }
 
     function processRoomsDivision(allRooms) {
-        const activeContainer = document.getElementById('active-rooms-list'), inactiveContainer = document.getElementById('inactive-rooms-list');
-        activeContainer.innerHTML = ""; inactiveContainer.innerHTML = ""; let inactiveCount = 0;
+        const activeContainer = document.getElementById('active-rooms-list');
+        const inactiveContainer = document.getElementById('inactive-rooms-list');
+        const inactiveCountElem = document.getElementById('inactive-count');
+
+        if (!Array.isArray(allRooms)) return;
         
+        if (activeContainer) activeContainer.innerHTML = ""; 
+        if (inactiveContainer) inactiveContainer.innerHTML = ""; 
+        let inactiveCount = 0;
+
         allRooms.forEach(room => {
-            const div = document.createElement('div'); 
-            div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
-            let icon = room.type === 'private' ? '💬 ' : (room.type === 'admin_group' ? '👑 ' : '👥 ');
-            
-            let displayName = room.name;
-            if (room.type === 'private' && room.name.includes(' ⇄ ')) {
-                displayName = room.name.replace(currentUser.username, '').replace(' ⇄ ', '').trim();
-            }
+            try {
+                if (!room || typeof room !== 'object') return;
 
-            if (unreadRooms[String(room.id_room)]) {
-                div.style.background = "#fee2e2";
-                div.style.borderLeft = "4px solid #ef4444";
-            }
-
-            const labelSpan = document.createElement('span'); labelSpan.innerText = icon + displayName; div.appendChild(labelSpan);
-            div.addEventListener('click', () => selectRoomById(room.id_room, room.name, room.type, room.created_by));
-            
-            if (room.participants_count < 2) { 
-                inactiveContainer.appendChild(div); inactiveCount++; 
-            } else { 
-                activeContainer.appendChild(div); 
-            }
+                const div = document.createElement('div'); 
+                div.className = `room-item ${room.id_room == currentRoomId ? 'active' : ''}`;
+                
+                const rType = room.type ? room.type.trim() : 'group';
+                const rName = room.name || 'Без названия';
+                
+                let icon = rType === 'private' ? '💬 ' : (rType === 'admin_group' ? '👑 ' : '👥 ');
+                
+                const labelSpan = document.createElement('span'); 
+                labelSpan.innerText = icon + rName; 
+                div.appendChild(labelSpan);
+                
+                div.addEventListener('click', () => selectRoomById(room.id_room, rName, rType, room.created_by));
+                
+                const participants = parseInt(room.participants_count) || 0;
+                
+                if (participants < 2 && rType !== 'admin_group') { 
+                    if (inactiveContainer) {
+                        inactiveContainer.appendChild(div); 
+                        inactiveCount++; 
+                    }
+                } else { 
+                    if (activeContainer) {
+                        activeContainer.appendChild(div); 
+                    }
+                }
+            } catch (err) {}
         });
-        document.getElementById('inactive-count').innerText = `(${inactiveCount}) ▼`;
+        
+        if (inactiveCountElem) {
+            inactiveCountElem.innerText = `(${inactiveCount}) ▼`;
+        }
     }
-
-    //*document.getElementById('inactive-accordion-trigger').addEventListener('click', function() {
-    //*    var content = document.getElementById('inactive-rooms-list');
-    //*    content.classList.toggle('open');
-    //*    this.querySelector('span:last-child').innerText = content.classList.contains('open') ? '▲' : '▼';
-    //*});
 
     function selectRoomById(roomId, name, type, createdBy) {
         currentRoomId = roomId; 
@@ -696,105 +1361,137 @@
 
         messagesStream.innerHTML = "";
         socket.emit('join_room_pool', { room_id: roomId }); 
-        socket.emit('get_room_history', { room_id: roomId }); 
+
+        const bounds = getDateBounds(); // ВСЕГДА берем актуальный диапазон из календаря
+        
+        if (isFileMode) {
+            requestFilesHistory();
+        } else {
+            socket.emit('get_room_history', { 
+                room_id: roomId, 
+                date_from: bounds.date_from, 
+                date_to: bounds.date_to 
+            }); 
+        }
+
         socket.emit('get_room_participants', { room_id: roomId });
+
+        // Авто-закрытие меню на мобильных после выбора комнаты
+        if (window.innerWidth <= 768) {
+            document.querySelector('.left-panel').classList.remove('open');
+            document.querySelector('.right-panel').classList.remove('open');
+            document.getElementById('mobile-overlay-panel').classList.remove('active');
+        }
     }
 
     function displayMessage(msg, isBulkLoad) {
         const isMyMessage = (msg.id_user_from == currentUser.id_user);
-        const div = document.createElement('div'); div.className = `message ${isMyMessage ? 'my' : ''}`;
-        const msgId = msg.id_message || msg.id; div.setAttribute('data-msg-id', msgId);
+        const div = document.createElement('div'); 
+        div.className = `message ${isMyMessage ? 'my' : ''}`;
+        const msgId = msg.id_message || msg.id; 
+        div.setAttribute('data-msg-id', msgId);
 
         let rawText = msg.encrypted_text || msg.text || "";
         const author = msg.username || "Сотрудник";
-        const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
-        
-        let customStyleCSS = "";
-        try {
-            const styles = typeof msg.ui_styles === 'string' ? JSON.parse(msg.ui_styles || '{}') : msg.ui_styles;
-            if (styles && styles.fontFamily) {
-                customStyleCSS = `font-family:${styles.fontFamily}; font-size:${styles.fontSize}; color:${styles.color}; background-color:${styles.background};`;
-                if (styles.isBold) customStyleCSS += "font-weight:bold;"; if (styles.isItalic) customStyleCSS += "font-style:italic;";
-            }
-        } catch(e) {}
+        const timeStr = msg.created_at ? new Date(msg.created_at + 'Z').toLocaleString('ru-RU', {day: '2-digit', month:'2-digit', year:'2-digit', hour: '2-digit', minute:'2-digit'}) : "";
 
-        const escapedText = rawText.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
+        // Создаем message-box
+        const msgBox = document.createElement('div');
+        msgBox.className = 'message-box';
 
-        let deleteBtnHtml = "";
-        let editBtnHtml = "";
+        // БЕЗОПАСНОЕ СОЗДАНИЕ КНОПОК
         if (String(msg.id_user_from) === String(currentUser.id_user)) {
-            deleteBtnHtml = `<span class="msg-delete-trigger" onclick="requestDeleteMessage(${msgId})">❌</span>`;
-            editBtnHtml = `<span class="msg-edit-trigger" style="display: none;" onclick="requestEditMessage(${msgId}, '${escapedText}')" title="Изменить">✏️</span>`;
+            const delBtn = document.createElement('span');
+            delBtn.className = 'msg-delete-trigger';
+            delBtn.textContent = '❌';
+            delBtn.onclick = () => requestDeleteMessage(msgId);
+            msgBox.appendChild(delBtn);
+
+            const editBtn = document.createElement('span');
+            editBtn.className = 'msg-edit-trigger';
+            editBtn.style.display = 'none';
+            editBtn.textContent = '✏️';
+            editBtn.onclick = () => requestEditMessage(msgId, rawText); // Данные уходят напрямую в функцию JS
+            msgBox.appendChild(editBtn);
         }
 
-        let replyBtnHtml = `<span class="msg-reply-trigger" style="display: none;" onclick="triggerReply('${msgId}', '${author}', '${escapedText}')" title="Ответить">↩️</span>`;
-        
-        let replyQuoteHtml = "";
+        const replyBtn = document.createElement('span');
+        replyBtn.className = 'msg-reply-trigger';
+        replyBtn.style.display = 'none';
+        replyBtn.textContent = '↩️';
+        replyBtn.onclick = () => triggerReply(msgId, author, rawText);
+        msgBox.appendChild(replyBtn);
+
+        // Мета-данные
+        const meta = document.createElement('div');
+        meta.className = 'msg-meta';
+        meta.innerHTML = `<span class="msg-author">${author}</span><span>${timeStr}</span>`;
+        msgBox.appendChild(meta);
+
+        // Цитата (если есть)
         if (msg.reply_to && msg.reply_text) {
             let preview = msg.reply_text.startsWith('/download/') ? '[Вложение]' : msg.reply_text;
-            if (preview.length > 45) preview = preview.substring(0, 45) + '...';
-            replyQuoteHtml = `
-                <div style="border-left: 2px solid #2563eb; background: rgba(37, 99, 235, 0.05); padding: 4px 8px; margin-bottom: 6px; font-size: 11px; border-radius: 2px;">
-                    <div style="font-weight: bold; color: #2563eb;">↪️ ${msg.reply_author || 'Сотрудник'}</div>
-                    <div style="color: #4b5563;">${preview}</div>
-                </div>
-            `;
+            const quote = document.createElement('div');
+            quote.style.cssText = "border-left: 2px solid #2563eb; background: rgba(37, 99, 235, 0.05); padding: 4px 8px; margin-bottom: 6px; font-size: 11px; border-radius: 2px;";
+            quote.innerHTML = `<div style="font-weight: bold; color: #2563eb;">↪️ ${msg.reply_author || 'Сотрудник'}</div><div style="color: #4b5563;">${preview.substring(0, 45)}</div>`;
+            msgBox.appendChild(quote);
         }
 
+        // Текстовый контейнер
+        const textDiv = document.createElement('div');
+        textDiv.className = 'msg-text';
+        textDiv.id = `text-container-${msgId}`;
+        // Применяем стили динамически
+        try {
+            const styles = typeof msg.ui_styles === 'string' ? JSON.parse(msg.ui_styles || '{}') : msg.ui_styles;
+            Object.assign(textDiv.style, { fontFamily: styles.fontFamily, fontSize: styles.fontSize, color: styles.color, backgroundColor: styles.background });
+            if (styles.isBold) textDiv.style.fontWeight = 'bold';
+            if (styles.isItalic) textDiv.style.fontStyle = 'italic';
+        } catch(e) {}
+        msgBox.appendChild(textDiv);
+
+        // Панель прочтения
+        const readPanel = document.createElement('div');
+        readPanel.className = 'msg-read-panel';
         const readsList = messageReadsMap[msgId] || [];
+        readPanel.innerHTML = `<span class="btn-read-trigger" onclick="markMessageAsRead(${msgId})">👁️ Прочитано</span><span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>`;
+        
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'btn-info-user';
+        infoBtn.onclick = (e) => { e.stopPropagation(); showUserInfo(msg.id_user_from); };
+        infoBtn.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="10" fill="none" stroke="#ff6600" stroke-width="2"/><path d="M12 16v-4M12 8h.01" stroke="#ff6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        readPanel.appendChild(infoBtn);
+        msgBox.appendChild(readPanel);
 
-        div.innerHTML = `
-            <div class="message-box">
-                ${deleteBtnHtml}
-                ${editBtnHtml}
-                ${replyBtnHtml}
-                <div class="msg-meta"><span class="msg-author">${author}</span><span>${timeStr}</span></div>
-                ${replyQuoteHtml}
-                <div class="msg-text" id="text-container-${msgId}" style="${customStyleCSS}"></div>
-                <div class="msg-read-panel">
-                <span class="btn-read-trigger" onclick="markMessageAsRead(${msgId})">👁️ Прочитано</span>
-                <span class="read-users-list" id="read-users-${msgId}">${readsList.join(', ')}</span>    
-                <button class="btn-info-user" onclick="event.stopPropagation(); showUserInfo('${msg.id_user_from}')">
-                    <svg viewBox="0 0 24 24" width="24" height="24">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="#ff6600" stroke-width="2"/>
-                        <path d="M12 16v-4M12 8h.01" stroke="#ff6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
-            </div>
-        `;
+        div.appendChild(msgBox);
         messagesStream.appendChild(div);
-        const textBlock = document.getElementById(`text-container-${msgId}`);
 
-       if (msg.is_user_encrypted) {
-            textBlock.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:12px;">🔒 Зашифрованное сообщение</span>`;
-            const decryptBtn = document.createElement('button'); decryptBtn.className = 'btn-decrypt-inline'; decryptBtn.innerText = '🔑 Ввести код';
-            
-            decryptBtn.onclick = async function() {
-                let inputKey = await showCustomPrompt();
-                if (inputKey && inputKey.trim() !== "") {
-                    try {
-                        let decryptedText = CryptoJS.AES.decrypt(rawText, inputKey.trim()).toString(CryptoJS.enc.Utf8);
-                        if (decryptedText) { renderProcessedText(textBlock, decryptedText); decryptBtn.remove(); }
-                        else { alert("Неверный код!"); }
-                    } catch(err) { alert("Ошибка расшифровки."); }
-                }
-            };
-            textBlock.appendChild(decryptBtn);
-        } else { renderProcessedText(textBlock, rawText); }
+        // Рендеринг текста
+        if (msg.is_user_encrypted) {
+            textDiv.innerHTML = `<span style="color:#ef4444; font-style:italic; font-size:12px;">🔒 Зашифрованное сообщение</span>`;
+            // ... (ваша логика кнопок дешифровки через createElement)
+        } else {
+            renderProcessedText(textDiv, rawText);
+        }
         messagesStream.scrollTop = messagesStream.scrollHeight;
     }
 
     let editingMsgId = null;
 
-    // Привязка закрытия модалки
     document.getElementById('btn-close-edit-modal').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
     document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('edit-message-modal').classList.remove('open');
 
-    window.requestEditMessage = async function(msgId, currentText) {
+    window.handleEditClick = function(element) {
+        const msgId = element.getAttribute('data-msg-id');
+        const text = JSON.parse(element.getAttribute('data-text'));
+        requestEditMessage(msgId, text);
+    };
+
+    window.requestEditMessage = function(msgId, currentText) {
         editingMsgId = msgId;
         const textarea = document.getElementById('edit-msg-textarea');
-        textarea.value = currentText.replace(/\\'/g, "'").replace(/\\"/g, '"');
+        // currentText теперь приходит уже как чистая строка, ничего менять не надо
+        textarea.value = currentText; 
         document.getElementById('edit-message-modal').classList.add('open');
         textarea.focus();
     };
@@ -825,6 +1522,7 @@
         document.getElementById('reply-panel').style.display = 'none';
     };
 
+    
     function showCustomPrompt() {
         return new Promise((resolve) => {
             const modal = document.getElementById('secret-prompt-modal');
@@ -874,7 +1572,9 @@
                 const parts = contentText.split('|');
                 targetElement.innerHTML = `📁 <a href="${parts[0]}" target="_blank" style="color:var(--primary-color); font-weight:600;">${parts[1] || "Скачать файл"}</a>`;
             }
-        } else { targetElement.innerHTML = contentText; }
+        } else { 
+            targetElement.innerHTML = contentText; 
+        }
     }
 
     window.requestDeleteMessage = function(msgId) { 
@@ -884,6 +1584,7 @@
         if (!currentUser) return;
         socket.emit('message_read_click', { message_id: messageId, username: currentUser.username });
     };
+
     function initUIEventListeners() {
         document.getElementById('search-rooms').addEventListener('input', filterAndRenderRooms);
 
@@ -970,6 +1671,121 @@
 
         document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId }); });
         document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
+
+        // --- ЛОГИКА ДЛЯ МОБИЛЬНОГО МЕНЮ ---
+        const leftPanel = document.querySelector('.left-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        const mobileOverlayPanel = document.getElementById('mobile-overlay-panel');
+
+        document.getElementById('btn-mobile-left').addEventListener('click', () => {
+            leftPanel.classList.add('open');
+            mobileOverlayPanel.classList.add('active');
+        });
+
+        document.getElementById('btn-mobile-right').addEventListener('click', () => {
+            rightPanel.classList.add('open');
+            mobileOverlayPanel.classList.add('active');
+        });
+
+        mobileOverlayPanel.addEventListener('click', () => {
+            leftPanel.classList.remove('open');
+            rightPanel.classList.remove('open');
+            mobileOverlayPanel.classList.remove('active');
+        });
+
+        // Логика кнопки фильтрации файлов
+        const btnFilterFiles = document.getElementById('btn-filter-files');
+        const fileExtSelect = document.getElementById('file-ext-select');
+
+        btnFilterFiles.addEventListener('click', function() {
+            isFileMode = !isFileMode;
+            
+            if (isFileMode) {
+                btnFilterFiles.style.background = '#dbeafe'; // Подсветка активного состояния
+                fileExtSelect.style.display = 'inline-block';
+                requestFilesHistory();
+            } else {
+                btnFilterFiles.style.background = 'transparent';
+                fileExtSelect.style.display = 'none';
+                
+                // Возвращаем обычное поведение чата
+                if (currentRoomId) {
+                    const activeRoom = latestRoomsListCache.find(r => r.id_room == currentRoomId);
+                    selectRoomById(currentRoomId, activeRoom ? activeRoom.name : "Кабинет", activeRoom ? activeRoom.type : "group", activeRoom ? activeRoom.created_by : null);
+                } else {
+                    messagesStream.innerHTML = "";
+                    document.getElementById('current-chat-title').innerText = "Выберите чат для начала общения";
+                }
+            }
+        });
+
+        // Смена расширения в выпадающем списке
+        fileExtSelect.addEventListener('change', function() {
+            if (isFileMode) {
+                requestFilesHistory();
+            }
+        });
+
+        const dateFilterInput = document.getElementById('date-filter-input');
+        const btnClearDate = document.getElementById('btn-clear-date');
+
+        dateFilterInput.addEventListener('change', function() {
+            btnClearDate.style.display = this.value ? 'inline-block' : 'none';
+            reloadCurrentView();
+        });
+
+        btnClearDate.addEventListener('click', function() {
+            dateFilterInput.value = '';
+            this.style.display = 'none';
+            reloadCurrentView();
+        });
+    }
+
+    // НОВАЯ ФУНКЦИЯ: Высчитывает начало и конец дня в формате UTC
+    function getDateBounds() {
+        const val = document.getElementById('date-filter-input').value;
+        if (!val) return { date_from: "", date_to: "" };
+        
+        // Создаем локальные даты начала и конца выбранного дня
+        const d1 = new Date(val + 'T00:00:00');
+        const d2 = new Date(val + 'T23:59:59.999');
+        
+        return {
+            date_from: d1.toISOString().slice(0, 19).replace('T', ' '),
+            date_to: d2.toISOString().slice(0, 19).replace('T', ' ')
+        };
+    }
+
+    function reloadCurrentView() {
+        if (isFileMode) {
+            requestFilesHistory();
+        } else if (currentRoomId) {
+            messagesStream.innerHTML = "";
+            const bounds = getDateBounds(); // Получаем точный диапазон
+            socket.emit('get_room_history', { 
+                room_id: currentRoomId, 
+                date_from: bounds.date_from, 
+                date_to: bounds.date_to 
+            });
+        }
+    }
+
+    function requestFilesHistory() {
+        if (!socket) return;
+        const selectedExt = document.getElementById('file-ext-select').value;
+        const bounds = getDateBounds(); // Получаем точный диапазон
+        messagesStream.innerHTML = "";
+        
+        if (!currentRoomId) {
+            document.getElementById('current-chat-title').innerText = "Все доступные файлы (Общий фильтр)";
+        }
+        
+        socket.emit('get_files_history', { 
+            room_id: currentRoomId, 
+            extension: selectedExt,
+            date_from: bounds.date_from,
+            date_to: bounds.date_to
+        });
     }
 
     function resetSecretToggleUI(element) { element.innerHTML = "🔓 Открыто"; element.style.background = "transparent"; userSecretKey = ""; }
@@ -1077,15 +1893,29 @@
     };
 
     function renderCompanyUsers(users) {
-        const container = document.getElementById('company-users-list'); container.innerHTML = "";
+        const container = document.getElementById('company-users-list'); 
+        container.innerHTML = "";
         users.forEach(u => {
             if (u.id_user === currentUser.id_user) return;
             const div = document.createElement('div'); div.className = "user-row";
             const isOnline = !!onlineUsersCache[u.id_user];
-            div.innerHTML = `<div class="avatar-container"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div class="status-badge ${isOnline ? 'online' : 'offline'}"></div></div><div class="user-info-meta"><span style="font-weight:600;">${u.username}</span><span class="user-role">${u.role}</span></div>`;
+            div.innerHTML = `
+                <div class="avatar-container">
+                    <div class="avatar" style="background:${isOnline ? '#10b981' : '#9ca3af'}">${u.username.charAt(0).toUpperCase()}</div>
+                </div>
+                <div class="user-info-meta">
+                    <span style="font-weight:600;">${u.username}</span>
+                    <span class="user-role">${u.role}</span>
+                </div>
+                <button class="btn btn-success" onclick="requestCall('${u.id_user}')">📞</button>
+            `;
             div.addEventListener('click', () => { socket.emit('create_private_chat', { target_user_id: u.id_user, target_username: u.username }); });
             container.appendChild(div);
         });
+    }
+
+    function requestCall(targetUserId) {
+        startCall(targetUserId);
     }
 
     function initMentionLogic() {
@@ -1118,9 +1948,27 @@
         const range = document.createRange(), sel = window.getSelection(); range.selectNodeContents(inputMsg); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
     }
 
-    if (Notification.permission === "default") Notification.requestPermission();
+    // ИНИЦИАЛИЗАЦИЯ
+    if ('Notification' in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+    document.addEventListener("DOMContentLoaded", initApplication);
 
-    window.onload = initApplication;
+    fetch('/api/admin/settings')
+    .then(res => res.json())
+    .then(settings => {
+        const color = settings.theme_primary_color;
+        if (color) {
+            const styleSheet = document.createElement("style");
+            styleSheet.type = "text/css";
+            styleSheet.innerText = `
+                button, .btn, .sidebar, header, .active {
+                    background-color: ${color} !important;
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+    }).catch(console.error);
 </script>
 <div id="userInfoModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">

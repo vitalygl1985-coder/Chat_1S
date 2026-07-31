@@ -110,20 +110,16 @@ def get_db_connection():
         url = url.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url)
 
+# ИСПРАВЛЕННЫЙ MIDDLEWARE: Работает с domain_mapping и пропускает статику/админку
 @app.middleware("http")
 async def identify_org_by_domain(request: Request, call_next):
-    # Приоритет: 1. X-Forwarded-Host, 2. Host
     domain = request.headers.get("X-Forwarded-Host") or request.headers.get("host")
-    
-    # Очистка домена (на случай, если заголовок содержит порт)
     if domain:
         domain = domain.split(':')[0]
     
-    # Проверка в кэше
     if domain not in domain_cache:
         conn = get_db_connection()
         cur = conn.cursor()
-        # ИСПРАВЛЕНО: Теперь берет данные из domain_mapping
         cur.execute("SELECT id_org FROM domain_mapping WHERE domain_name = %s", (domain,))
         result = cur.fetchone()
         cur.close(); conn.close()
@@ -131,13 +127,12 @@ async def identify_org_by_domain(request: Request, call_next):
     
     request.state.id_org = domain_cache.get(domain)
     
-    # ИСПРАВЛЕНО: Разрешаем пути, которым не нужен жесткий id_org
+    # Разрешаем системные пути и статику без жесткой привязки к id_org
     if request.url.path in ["/admin", "/", "/api/1c/auth", "/static/style.css"] or request.url.path.startswith("/static/"):
         return await call_next(request)
     
-    # Если домен не найден — отдаем 404
     if not request.state.id_org:
-        return JSONResponse({"error": "Organization not found for this domain"}, status_code=404)
+        return JSONResponse({"error": f"Organization not found for domain: {domain}"}, status_code=404)
         
     response = await call_next(request)
     return response
@@ -149,7 +144,6 @@ def clean_uuid(org_id_str):
         return "00000000-0000-0000-0000-000000000001"
 
 def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=None):
-    # 1. ОБЩИЙ
     cur.execute(
         "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'ОБЩИЙ' LIMIT 1", 
         (id_org,)
@@ -165,7 +159,6 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
     general_room_id = room_general['id_room'] if isinstance(room_general, dict) else room_general[0]
     cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (general_room_id, user_id))
 
-    # 2. АДМИН
     if user_role == 'admin':
         cur.execute(
             "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND UPPER(name) = 'АДМИН' LIMIT 1", 
@@ -182,7 +175,6 @@ def check_and_create_global_rooms(cur, id_org, user_id, user_role, shop_name=Non
         admin_room_id = room_admin['id_room'] if isinstance(room_admin, dict) else room_admin[0]
         cur.execute("INSERT INTO room_participants (id_room, id_user) VALUES (%s, %s) ON CONFLICT DO NOTHING", (admin_room_id, user_id))
 
-    # 3. МАГАЗИН
     if shop_name and shop_name.strip() != "":
         cur.execute(
             "SELECT id_room FROM rooms WHERE id_org = %s::uuid AND name = %s LIMIT 1", 
@@ -283,8 +275,6 @@ def init_db():
                 css_content TEXT,
                 settings_json JSONB DEFAULT '{}'::jsonb
             );
-            
-            -- Обновленные таблицы для изоляции админки
             CREATE TABLE IF NOT EXISTS admin_logs (
                 id SERIAL PRIMARY KEY,
                 id_org UUID,
@@ -293,8 +283,6 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );                                       
         """)
-        
-        # Пересоздаем admin_settings с комбинированным ключом (key, id_org)
         cur.execute("DROP TABLE IF EXISTS admin_settings;")
         cur.execute("""
             CREATE TABLE admin_settings (
@@ -304,8 +292,6 @@ def init_db():
                 PRIMARY KEY (key, id_org)
             );
         """)
-        
-        # Добавляем id_org в admin_logs, если таблица была создана ранее без него
         cur.execute("""
             ALTER TABLE admin_logs ADD COLUMN IF NOT EXISTS id_org UUID;
         """)
@@ -340,7 +326,6 @@ def get_session_by_token(token: str):
     except Exception: return None
     finally: cur.close(); conn.close()
 
-# ИСПРАВЛЕНО: Эндпоинты теперь используют request.state.id_org вместо Header(...)
 @app.get("/api/get-org-config")
 async def get_org_config(request: Request):
     id_org = request.state.id_org
@@ -500,45 +485,33 @@ async def get_org_styles(id_org: str):
     res_color = cur.fetchone()
     cur.close(); conn.close()
     
-    # 1. Основной CSS из админки
     css = res['css_content'] if res and res.get('css_content') else ""
-    
-    # Инициализируем переменную фона пустым значением
     bg_url_variable = "none"
 
-    # 2. ИНЪЕКЦИЯ СТАТИЧЕСКИХ ФАЙЛОВ
     org_static_dir = os.path.join(STATIC_DIR, id_org)
     if os.path.exists(org_static_dir):
         for f in os.listdir(org_static_dir):
             file_url = f"/static/{id_org}/{f}"
             f_lower = f.lower()
-            
-            # Если файл содержит "bg" в названии, сохраняем его как переменную фона
             if "bg" in f_lower and f_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
                 bg_url_variable = f"url('{file_url}')"
-            
             elif f == "logo.png":
                 css += f"\n#chat-logo {{ content: url('{file_url}') !important; }}"
             elif f_lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
                 css += f"\nimg[src*='{f}'] {{ content: url('{file_url}') !important; }}"
 
-    # Добавляем переменную фона в :root (она будет доступна во всем CSS)
     css += f"\n:root {{ --chat-bg-url: {bg_url_variable} !important; }}"
-
-    # 3. ДИНАМИЧЕСКИЙ ЦВЕТ
     if res_color and res_color.get('value'):
         css += f"\n:root {{ --primary-color: {res_color['value']} !important; }}"
                 
     return {"css": css}
 
-# Сохранение цвета с привязкой к организации
 @app.post("/api/admin/settings")
 async def admin_save_settings(settings: dict, request: Request):
     id_org = request.state.id_org
     conn = get_db_connection(); cur = conn.cursor()
     try:
         for k, v in settings.items():
-            # Добавили id_org в PRIMARY KEY таблицы admin_settings (убедитесь, что таблица создана верно)
             cur.execute("""
                 INSERT INTO admin_settings (key, id_org, value) 
                 VALUES (%s, %s::uuid, %s) 
@@ -563,15 +536,12 @@ async def admin_execute_sql(data: dict, request: Request):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         sql_query = data.get("sql", "")
-        
-        # Интеллектуальный фильтр для ограничения SQL запросов в пределах организации
         if sql_query.strip().lower().startswith("select"):
             safe_tables = ["users", "rooms", "admin_logs", "org_styles", "api_sessions", "auth_tickets", "admin_users", "admin_settings"]
             for table in safe_tables:
                 sql_query = re.sub(rf'\b{table}\b', f"(SELECT * FROM {table} WHERE id_org = '{id_org}')", sql_query, flags=re.IGNORECASE)
 
         cur.execute(sql_query)
-        
         if not sql_query.strip().lower().startswith("select") and not "information_schema" in sql_query:
             log_admin_action("Admin", "Выполнен прямой SQL-запрос изменения данных", str(id_org))
 
@@ -586,7 +556,20 @@ async def admin_execute_sql(data: dict, request: Request):
 async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(current_dir, "index.html"), "r", encoding="utf-8") as f: 
-        return f.read()
+        html_content = f.read()
+        
+        # Инъекция пользовательских стилей (шрифт крупнее на 2 пункта, центральный чат уже, боковые панели шире)
+        custom_layout_styles = """
+        <style>
+            body { font-size: 16px !important; }
+            .sidebar-left, #left-panel, .left-sidebar, aside:first-of-type { width: 300px !important; min-width: 300px !important; }
+            .sidebar-right, #right-panel, .right-sidebar, aside:last-of-type { width: 300px !important; min-width: 300px !important; }
+            .chat-container, main, .main-chat-area { max-width: 600px !important; margin: 0 auto !important; }
+        </style>
+        </head>
+        """
+        html_content = html_content.replace("</head>", custom_layout_styles)
+        return html_content
 
 @app.get("/static/style.css")
 async def get_style():
@@ -637,9 +620,6 @@ async def onec_auth(data: OneCAuthRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        print(f"--- ПОПЫТКА АВТОРИЗАЦИИ 1С ---")
-        print(f"User ID: {data.id_user}, Username: {data.username}, Role: {data.role}, Org ID: {validated_org}")
-
         cur.execute(
             "INSERT INTO organizations (id_org, name) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
             (validated_org, f"Организация {validated_org[:8]}")
@@ -773,7 +753,6 @@ async def exchange_ticket_for_session(data: WebTicketExchangeRequest):
         raise
     except Exception as e: 
         conn.rollback()
-        print(f"DEBUG ERROR: {type(e).__name__}: {str(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
     finally: 
         cur.close(); conn.close()
@@ -785,40 +764,30 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        if session['role'] == 'admin':
-            query = """
-                SELECT id_room, name, type, created_by, 
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
-                FROM rooms
-                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
-                
-                UNION
-                
-                SELECT r.id_room, r.name, r.type, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-                FROM rooms r
-                INNER JOIN room_participants rp ON r.id_room = rp.id_room
-                WHERE r.id_org = %s::uuid AND rp.id_user = %s
-                
-                ORDER BY name ASC
-            """
-            cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
+        # Для обычных пользователей возвращаем пустые списки комнат
+        if session['role'] != 'admin':
+            return {"active": [], "inactive_text_group": []}
 
-        else:
-            query = """
-                SELECT r.id_room, r.name, r.type, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-                FROM rooms r
-                INNER JOIN room_participants rp ON r.id_room = rp.id_room
-                WHERE r.id_org = %s::uuid AND rp.id_user = %s
-                ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
-            """
-            print(session['id_org'])
-            cur.execute(query, (str(session['id_org']), session['id_user']))
+        query = """
+            SELECT id_room, name, type, created_by, 
+                   (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
+            FROM rooms
+            WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
             
+            UNION
+            
+            SELECT r.id_room, r.name, r.type, r.created_by,
+                   (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+            FROM rooms r
+            INNER JOIN room_participants rp ON r.id_room = rp.id_room
+            WHERE r.id_org = %s::uuid AND rp.id_user = %s
+            
+            ORDER BY 
+                CASE WHEN type = 'private' THEN 1 ELSE 0 END ASC, 
+                name ASC
+        """
+        cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
         all_rooms = cur.fetchall()
-        
-        print(f"DEBUG: Отправляю список комнат на фронтенд: {[r['name'] for r in all_rooms]}")
     
         return {
             "active": [r for r in all_rooms if r['participants_count'] >= 2], 
@@ -889,7 +858,6 @@ async def connect(sid, environ, auth=None):
         conn.rollback()
     finally: 
         cur.close(); conn.close()
-    
         
     await sio.save_session(sid, {'id_user': id_user, 'id_org': id_org, 'username': username, 'role': user_role})
     online_users[id_user] = username
@@ -908,34 +876,21 @@ async def get_rooms_again(sid):
     session = await sio.get_session(sid)
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        if session.get('role') == 'admin':
-            query = """
-                SELECT id_room, name, type, id_org, created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = rooms.id_room) as participants_count
-                FROM rooms
-                WHERE id_org = %s::uuid AND TRIM(type) = 'admin_group'
-                
-                UNION
-                
-                SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-                FROM rooms r
-                INNER JOIN room_participants rp ON r.id_room = rp.id_room
-                WHERE r.id_org = %s::uuid AND rp.id_user = %s
-                
-                ORDER BY name ASC
-            """
-            cur.execute(query, (str(session['id_org']), str(session['id_org']), session['id_user']))
-        else:
-            query = """
-                SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
-                       (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
-                FROM rooms r
-                INNER JOIN room_participants rp ON r.id_room = rp.id_room
-                WHERE r.id_org = %s::uuid AND rp.id_user = %s
-                ORDER BY CASE WHEN UPPER(r.name)='АДМИН' THEN 1 WHEN UPPER(r.name)='ОБЩИЙ' THEN 2 ELSE 3 END, r.name ASC
-            """
-            cur.execute(query, (str(session['id_org']), session['id_user']))
+        if session.get('role') != 'admin':
+            await sio.emit('rooms_list', [], to=sid)
+            return
+
+        query = """
+            SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
+                   (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
+            FROM rooms r
+            INNER JOIN room_participants rp ON r.id_room = rp.id_room
+            WHERE r.id_org = %s::uuid AND rp.id_user = %s
+            ORDER BY 
+                CASE WHEN r.type = 'private' THEN 1 ELSE 0 END ASC, 
+                r.name ASC
+        """
+        cur.execute(query, (str(session['id_org']), session['id_user']))
             
         await sio.emit('rooms_list', cur.fetchall(), to=sid)
     except Exception as e: 
@@ -996,8 +951,7 @@ async def get_files_history(sid, data):
     date_from = data.get('date_from') 
     date_to = data.get('date_to')     
     session = await sio.get_session(sid)
-    if not session: 
-        return
+    if not session: return
 
     user_id = session['id_user']
     role = session.get('role', 'user')
@@ -1132,9 +1086,14 @@ async def get_room_participants(sid, data):
 
 @sio.event
 async def create_advanced_room(sid, data):
+    session = await sio.get_session(sid)
+    if session.get('role') != 'admin':
+        await sio.emit('system_alert', {"message": "У вас нет прав на создание комнат!"}, to=sid)
+        return
+
     name, participants = data.get('name'), data.get('participants', [])
     if not name or not participants: return
-    session = await sio.get_session(sid)
+    
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, 'group', %s, %s) RETURNING id_room", (session['id_org'], name, session['id_user']))
@@ -1207,7 +1166,6 @@ async def delete_room_request(sid, data):
             if is_creator or is_admin_of_group:
                 cur.execute("DELETE FROM rooms WHERE id_room = %s", (room_id,))
                 conn.commit()
-                # Мы не имеем доступа к session['id_org'] без get_session, но админское удаление можно залогировать с базовым uuid
                 log_admin_action(data.get('username', 'Admin'), f"Удален кабинет: {room['name']}", "00000000-0000-0000-0000-000000000001")
                 await sio.emit('refresh_rooms_trigger')
             else:
@@ -1263,9 +1221,13 @@ async def delete_message_request(sid, data):
 
 @sio.event
 async def create_group_chat(sid, data):
+    session = await sio.get_session(sid)
+    if session.get('role') != 'admin':
+        return
+
     group_name = data.get('group_name')
     if not group_name: return
-    session = await sio.get_session(sid); room_type = 'admin_group' if session['role'] == 'admin' else 'group'
+    room_type = 'admin_group' if session['role'] == 'admin' else 'group'
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("INSERT INTO rooms (id_org, type, name, created_by) VALUES (%s::uuid, %s, %s, %s) RETURNING id_room", (session['id_org'], room_type, group_name, session['id_user']))
