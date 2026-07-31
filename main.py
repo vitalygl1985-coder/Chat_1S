@@ -764,18 +764,29 @@ async def web_get_rooms(x_token: Optional[str] = Header(None)):
     
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Теперь и админам, и пользователям отдаем их комнаты, но сортируем правильно (private всегда ниже)
+        # Динамически подменяем имя для private чатов на имя собеседника
         query = """
-            SELECT r.id_room, r.name, r.type, r.created_by,
+            SELECT r.id_room, 
+                   CASE 
+                       WHEN r.type = 'private' THEN (
+                           SELECT u.username 
+                           FROM room_participants rp2 
+                           JOIN users u ON rp2.id_user = u.id_user 
+                           WHERE rp2.id_room = r.id_room AND rp2.id_user <> %s 
+                           LIMIT 1
+                       )
+                       ELSE r.name 
+                   END as name,
+                   r.type, r.created_by,
                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
             FROM rooms r
             INNER JOIN room_participants rp ON r.id_room = rp.id_room
             WHERE r.id_org = %s::uuid AND rp.id_user = %s
             ORDER BY 
                 CASE WHEN r.type = 'private' THEN 1 ELSE 0 END ASC, 
-                r.name ASC
+                name ASC
         """
-        cur.execute(query, (str(session['id_org']), session['id_user']))
+        cur.execute(query, (session['id_user'], str(session['id_org']), session['id_user']))
         all_rooms = cur.fetchall()
     
         return {
@@ -866,7 +877,18 @@ async def get_rooms_again(sid):
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         query = """
-            SELECT r.id_room, r.name, r.type, r.id_org, r.created_by,
+            SELECT r.id_room, 
+                   CASE 
+                       WHEN r.type = 'private' THEN (
+                           SELECT u.username 
+                           FROM room_participants rp2 
+                           JOIN users u ON rp2.id_user = u.id_user 
+                           WHERE rp2.id_room = r.id_room AND rp2.id_user <> %s 
+                           LIMIT 1
+                       )
+                       ELSE r.name 
+                   END as name,
+                   r.type, r.id_org, r.created_by,
                    (SELECT COUNT(*) FROM room_participants WHERE id_room = r.id_room) as participants_count
             FROM rooms r
             INNER JOIN room_participants rp ON r.id_room = rp.id_room
@@ -875,7 +897,7 @@ async def get_rooms_again(sid):
                 CASE WHEN r.type = 'private' THEN 1 ELSE 0 END ASC, 
                 r.name ASC
         """
-        cur.execute(query, (str(session['id_org']), session['id_user']))
+        cur.execute(query, (session['id_user'], str(session['id_org']), session['id_user']))
         await sio.emit('rooms_list', cur.fetchall(), to=sid)
     except Exception as e: 
         print(f"Ошибка в get_rooms_again: {e}")
