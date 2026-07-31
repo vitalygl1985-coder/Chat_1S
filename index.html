@@ -612,6 +612,8 @@
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 isRecording = false;
+                
+                // СБРАСЫВАЕМ ПОДСВЕТКУ КНОПКИ МИКРОФОНА ПОСЛЕ ОСТАНОВКИ
                 recordBtn.style.background = 'transparent';
                 recordBtn.style.borderRadius = '0';
             }
