@@ -1,6 +1,7 @@
 /* static/style.css - БАЗОВАЯ ВЕРСТКА */
 :root {
     --primary-color: #2563eb; /* Значение по умолчанию */
+    --chat-bg-url: none !important; /* Принудительно отключаем фоновую картинку */
 }
 
 /* Кнопки и элементы управления */
@@ -29,8 +30,15 @@ button.btn-info-user svg { stroke: var(--primary-color) !important; }
 .system-footer-links { background: #fff !important; border-top: 2px solid var(--primary-color) !important; }
 .system-footer-links a { color: var(--primary-color) !important; }
 
-/* Остальная верстка (оставьте тут grid, flex и размеры из вашего старого файла) */
+/* Устанавливаем сплошной светло-зеленый фон для области чата */
+.messages-container, .chat-panel {
+    background-color: #d8e5cc !important;
+    background-image: none !important;
+}
+
+/* Остальная верстка */
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-.app-container { display: grid; grid-template-columns: 260px 1fr 280px; flex: 1; min-height: 0; overflow: hidden; }
-/* ... (здесь весь ваш layout-код: .panel, .chat-panel, .message, .input-area и т.д.) ... */
+
+/* Обновленная сетка: левая и правая панели шире (320px), центр занимает оставшееся пространство */
+.app-container { display: grid; grid-template-columns: 320px 1fr 320px; flex: 1; min-height: 0; overflow: hidden; }
