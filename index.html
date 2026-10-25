@@ -242,6 +242,56 @@
             .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
             .message { max-width: 90%; }
         }
+
+        /* СЕТКА: по умолчанию правая панель не занимает место в сетке, делаем 2 колонки */
+            .app-container {
+                display: grid;
+                grid-template-columns: 320px 1fr !important;
+                position: relative;
+                overflow: hidden;
+            }
+
+            /* ПРАВАЯ ПАНЕЛЬ: по умолчанию скрыта за правым краем экрана */
+            .right-panel {
+                position: absolute !important;
+                top: 0;
+                right: 0;
+                width: 320px !important;
+                height: 100%;
+                background: var(--bg-panel);
+                z-index: 200;
+                box-shadow: -5px 0 25px rgba(0,0,0,0.15);
+                transform: translateX(100%); /* Прячем за экран */
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            /* Когда класс active добавлен — панель выплывает */
+            .right-panel.open-sidebar {
+                transform: translateX(0);
+            }
+
+            /* Кнопка вызова/скрытия панели (стрелочка) */
+            .toggle-right-sidebar-btn {
+                position: absolute;
+                left: -40px;
+                top: 15px;
+                width: 40px;
+                height: 40px;
+                background: var(--bg-panel);
+                border: 1px solid var(--border-color);
+                border-right: none;
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                box-shadow: -3px 2px 10px rgba(0,0,0,0.05);
+                z-index: 201;
+                color: var(--text-main);
+            }
+
     </style>
 </head>
 <body>
@@ -474,11 +524,15 @@
         </div>
     </div>
 
-    <div class="panel right-panel">
+    <div class="panel right-panel" id="right-side-panel">
+    <!-- Кнопка-переключатель "<<" / ">>" -->
+    <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Управление панелью">◀</button>
+
         <div class="panel-header" id="right-panel-header-controls">
             <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
         </div>
         <div class="panel-scroll-area">
+            <!-- Содержимое панели (участники / контакты) -->
             <div id="pane-participants" class="view-pane active">
                 <div class="section-title">В этом кабинете <button id="btn-add-user-modal" style="border:none; background:none; color:var(--primary-color); cursor:pointer; font-weight:bold; font-size:13px; float:right;">+</button></div>
                 <div id="current-room-participants"></div>
@@ -1708,7 +1762,27 @@
     if ('Notification' in window && Notification.permission === "default") {
         Notification.requestPermission();
     }
-    document.addEventListener("DOMContentLoaded", initApplication);
+
+    // Объединяем всё в один аккуратный DOMContentLoaded
+    document.addEventListener("DOMContentLoaded", () => {
+        initApplication();
+
+        const rightPanel = document.getElementById('right-side-panel');
+        const toggleBtn = document.getElementById('btn-toggle-sidebar');
+
+        if (toggleBtn && rightPanel) {
+            toggleBtn.addEventListener('click', () => {
+                rightPanel.classList.toggle('open-sidebar');
+                // Меняем стрелочку в зависимости от состояния панели
+                if (rightPanel.classList.contains('open-sidebar')) {
+                    toggleBtn.innerHTML = '▶'; // Если открыта, показываем вправо
+                } else {
+                    toggleBtn.innerHTML = '◀'; // Если закрыта, показываем влево
+                }
+            });
+        }
+    });
+
 </script>
 <div id="userInfoModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
