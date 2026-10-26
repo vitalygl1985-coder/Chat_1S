@@ -155,48 +155,47 @@
         .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ: Абсолютное позиционирование поверх чата справа */
-        .right-panel {
-            position: absolute !important;
-            top: 0 !important;
-            right: 0 !important;
-            width: 320px !important;
-            height: 100% !important;
-            background: var(--bg-panel, #ffffff) !important;
-            z-index: 300 !important;
-            box-shadow: -5px 0 25px rgba(0,0,0,0.15) !important;
-            transform: translateX(100%) !important;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border-left: 1px solid var(--border-color, #e5e7eb) !important;
-        }
+       /* ПРАВАЯ ПАНЕЛЬ: Абсолютное позиционирование справа, скрыта за экраном */
+    .right-panel {
+        position: absolute !important;
+        top: 0 !important;
+        right: 0 !important;
+        width: 320px !important;
+        height: 100% !important;
+        background: var(--bg-panel, #ffffff) !important;
+        z-index: 300 !important;
+        box-shadow: -5px 0 25px rgba(0,0,0,0.15) !important;
+        transform: translateX(100%) !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border-left: 1px solid var(--border-color, #e5e7eb) !important;
+    }
 
-        /* Когда класс открыт — панель выезжает */
-        .right-panel.open-sidebar {
-            transform: translateX(0) !important;
-        }
+    /* Когда панель открыта — она выезжает */
+    .right-panel.open-sidebar {
+        transform: translateX(0) !important;
+    }
 
-        /* Кнопка-стрелочка слева от панели */
-        .toggle-right-sidebar-btn {
-            position: absolute !important;
-            left: -42px !important;
-            top: 15px !important;
-            width: 42px !important;
-            height: 42px !important;
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-            border-right: none !important;
-            border-top-left-radius: 8px !important;
-            border-bottom-left-radius: 8px !important;
-            cursor: pointer !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            font-size: 16px !important;
-            box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important;
-            z-index: 301 !important;
-            color: #1f2937 !important;
-        }
-
+    /* Аккуратная кнопка-стрелочка слева от панели */
+    .toggle-right-sidebar-btn {
+        position: absolute !important;
+        left: -42px !important;
+        top: 15px !important;
+        width: 42px !important;
+        height: 42px !important;
+        background: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        border-right: none !important;
+        border-top-left-radius: 8px !important;
+        border-bottom-left-radius: 8px !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 16px !important;
+        box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important;
+        z-index: 301 !important;
+        color: #1f2937 !important;
+    }
         .section-title { font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
         .user-row { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 14px; }
         .user-row:hover { background: var(--bg-main); }
@@ -528,8 +527,10 @@
     </div>
 
     <div class="panel right-panel" id="right-side-panel">
-    <!-- Кнопка-переключатель "<<" / ">>" -->
-    <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Управление панелью">◀</button>
+        <!-- Кнопка вызова панели -->
+        <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Управление панелью">◀</button>
+        <!-- Дальше идет остальное содержимое панели... -->
+    </div>
 
         <div class="panel-header" id="right-panel-header-controls">
             <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
