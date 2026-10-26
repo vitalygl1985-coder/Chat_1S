@@ -43,17 +43,17 @@
             overflow: hidden; 
             display: flex; 
             flex-direction: column; 
-            font-size: 16px !important; /* Увеличен шрифт на 2 пункта */
+            font-size: 16px !important; 
         }
 
-        /* Левая и правая панели расширены, центральный чат сужен */
+        /* ОСНОВНАЯ СЕТКА: Ровно 2 колонки (Левое меню кабин и Центр-чат) */
         .app-container {
-            display: grid;
-            grid-template-columns: 320px 1fr 320px;
-            flex: 1;
-            min-height: 0; 
-            overflow: hidden;
-            position: relative;
+            display: grid !important;
+            grid-template-columns: 320px 1fr !important;
+            flex: 1 !important;
+            min-height: 0 !important; 
+            overflow: hidden !important;
+            position: relative !important;
         }
 
         .system-footer-links {
@@ -78,7 +78,6 @@
         .accordion-content { display: none; margin-top: 5px; }
         .accordion-content.open { display: block; }
 
-        /* Центральная часть диалога сужена */
         .chat-panel { border-right: 1px solid var(--border-color); background: #fafafa; max-width: 750px; margin: 0 auto; width: 100%; }
         .chat-header { height: 60px; padding: 0 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-panel); flex-shrink: 0; gap: 10px; }
         
@@ -143,7 +142,48 @@
         .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        .right-panel { border-right: none; }
+        /* ПРАВАЯ ПАНЕЛЬ: По умолчанию скрыта за правым краем, выплывает плавно */
+        .right-panel {
+            position: absolute !important;
+            top: 0 !important;
+            right: 0 !important;
+            width: 320px !important;
+            height: 100% !important;
+            background: var(--bg-panel, #ffffff) !important;
+            z-index: 200 !important;
+            box-shadow: -5px 0 25px rgba(0,0,0,0.15) !important;
+            transform: translateX(100%) !important;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            border-left: 1px solid var(--border-color, #e5e7eb) !important;
+        }
+
+        /* Когда класс open-sidebar добавлен — панель выезжает */
+        .right-panel.open-sidebar {
+            transform: translateX(0) !important;
+        }
+
+        /* Аккуратная кнопка-стрелочка слева от панели */
+        .toggle-right-sidebar-btn {
+            position: absolute !important;
+            left: -42px !important;
+            top: 15px !important;
+            width: 42px !important;
+            height: 42px !important;
+            background: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+            border-right: none !important;
+            border-top-left-radius: 8px !important;
+            border-bottom-left-radius: 8px !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 16px !important;
+            box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important;
+            z-index: 201 !important;
+            color: #1f2937 !important;
+        }
+
         .section-title { font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
         .user-row { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 14px; }
         .user-row:hover { background: var(--bg-main); }
@@ -242,56 +282,6 @@
             .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
             .message { max-width: 90%; }
         }
-
-        /* СЕТКА: по умолчанию правая панель не занимает место в сетке, делаем 2 колонки */
-            .app-container {
-                display: grid;
-                grid-template-columns: 320px 1fr !important;
-                position: relative;
-                overflow: hidden;
-            }
-
-            /* ПРАВАЯ ПАНЕЛЬ: по умолчанию скрыта за правым краем экрана */
-            .right-panel {
-                position: absolute !important;
-                top: 0;
-                right: 0;
-                width: 320px !important;
-                height: 100%;
-                background: var(--bg-panel);
-                z-index: 200;
-                box-shadow: -5px 0 25px rgba(0,0,0,0.15);
-                transform: translateX(100%); /* Прячем за экран */
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-
-            /* Когда класс active добавлен — панель выплывает */
-            .right-panel.open-sidebar {
-                transform: translateX(0);
-            }
-
-            /* Кнопка вызова/скрытия панели (стрелочка) */
-            .toggle-right-sidebar-btn {
-                position: absolute;
-                left: -40px;
-                top: 15px;
-                width: 40px;
-                height: 40px;
-                background: var(--bg-panel);
-                border: 1px solid var(--border-color);
-                border-right: none;
-                border-top-left-radius: 8px;
-                border-bottom-left-radius: 8px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 16px;
-                box-shadow: -3px 2px 10px rgba(0,0,0,0.05);
-                z-index: 201;
-                color: var(--text-main);
-            }
-
     </style>
 </head>
 <body>
