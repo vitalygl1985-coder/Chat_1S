@@ -46,7 +46,7 @@ button.btn-info-user svg { stroke: var(--primary-color) !important; }
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
 
-/* СЕТКА ПРИЛОЖЕНИЯ: Ровно 2 колонки, переопределенная с !important */
+/* СЕТКА ПРИЛОЖЕНИЯ: Ровно 2 колонки (Левое меню и чат) */
 .app-container { 
     display: grid !important; 
     grid-template-columns: 320px 1fr !important; 
@@ -56,7 +56,7 @@ body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: co
     position: relative !important;
 }
 
-/* ПРАВАЯ ПАНЕЛЬ (Шторка): Скрыта по умолчанию за правым краем */
+/* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по кнопке */
 .right-panel {
     position: absolute !important; 
     top: 0 !important; 
@@ -71,12 +71,11 @@ body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: co
     border-left: 1px solid var(--border-color, #e5e7eb) !important;
 }
 
-/* Когда шторка открыта */
 .right-panel.open-sidebar { 
     transform: translateX(0) !important; 
 }
 
-/* Кнопка-стрелочка для открытия/закрытия шторки */
+/* Кнопка-стрелочка слева от шторки */
 .toggle-right-sidebar-btn {
     position: absolute !important; 
     left: -42px !important; 
