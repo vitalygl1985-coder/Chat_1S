@@ -131,25 +131,44 @@
         .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по клику */
+        /* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем */
         .right-panel {
-            position: absolute !important; top: 0 !important; right: 0 !important;
-            width: 320px !important; height: 100% !important; background: var(--bg-panel, #ffffff) !important;
-            z-index: 300 !important; box-shadow: -5px 0 25px rgba(0,0,0,0.15) !important;
-            transform: translateX(100%) !important; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            position: absolute !important; 
+            top: 0 !important; 
+            right: 0 !important;
+            width: 320px !important; 
+            height: 100% !important; 
+            background: var(--bg-panel, #ffffff) !important;
+            z-index: 300 !important; 
+            box-shadow: -5px 0 25px rgba(0,0,0,0.15) !important;
+            transform: translateX(100%) !important; 
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             border-left: 1px solid var(--border-color, #e5e7eb) !important;
         }
-        .right-panel.open-sidebar { transform: translateX(0) !important; }
+        .right-panel.open-sidebar { 
+            transform: translateX(0) !important; 
+        }
 
         /* Кнопка-стрелочка слева от шторки */
         .toggle-right-sidebar-btn {
-            position: absolute !important; left: -42px !important; top: 15px !important;
-            width: 42px !important; height: 42px !important; background: #ffffff !important;
-            border: 1px solid #e5e7eb !important; border-right: none !important;
-            border-top-left-radius: 8px !important; border-bottom-left-radius: 8px !important;
-            cursor: pointer !important; display: flex !important; align-items: center !important;
-            justify-content: center !important; font-size: 16px !important;
-            box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important; z-index: 301 !important; color: #1f2937 !important;
+            position: absolute !important; 
+            left: -42px !important; 
+            top: 15px !important;
+            width: 42px !important; 
+            height: 42px !important; 
+            background: #ffffff !important;
+            border: 1px solid #e5e7eb !important; 
+            border-right: none !important;
+            border-top-left-radius: 8px !important; 
+            border-bottom-left-radius: 8px !important;
+            cursor: pointer !important; 
+            display: flex !important; 
+            align-items: center !important;
+            justify-content: center !important; 
+            font-size: 16px !important;
+            box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important; 
+            z-index: 301 !important; 
+            color: #1f2937 !important;
         }
 
         .section-title { font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
@@ -486,6 +505,7 @@
 
     <!-- ПРАВАЯ ПАНЕЛЬ (Шторка со списком сотрудников, скрыта по умолчанию) -->
     <div class="panel right-panel" id="right-side-panel">
+        <!-- Кнопка-стрелочка для открытия/закрытия шторки -->
         <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Шторка сотрудников">◀</button>
 
         <div class="panel-header" id="right-panel-header-controls">
@@ -1393,6 +1413,136 @@
             socket.emit('create_advanced_room', { name: rName, participants: participantsArray });
             document.getElementById('new-room-name').value = ""; createRoomModal.classList.remove('open');
         });
+
+        const modal = document.getElementById('add-user-modal');
+        const addUserBtn = document.getElementById('btn-add-user-modal');
+        if (addUserBtn) {
+            addUserBtn.addEventListener('click', () => { if (!currentRoomId) return; modal.classList.add('open'); renderModalUsers(globalUsersCache); });
+        }
+        document.getElementById('btn-close-modal').addEventListener('click', () => modal.classList.remove('open'));
+        document.getElementById('search-modal-users').addEventListener('input', function() { renderModalUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim()))); });
+
+        document.getElementById('btn-send-message').addEventListener('click', sendMessageStream);
+        inputMsg.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessageStream(); } });
+
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.startsWith('image/')) { openEditorWithBlob(item.getAsFile()); }
+            }
+        });
+
+        const fileInput = document.getElementById('global-file-input');
+        document.getElementById('btn-attach-file').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', async function() {
+            if (this.files.length === 0) return;
+            const formData = new FormData(); formData.append('file', this.files[0]);
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData }); const meta = await res.json();
+                if (meta.url) {
+                    let ext = meta.filename.split('.').pop().toLowerCase();
+                    let payload = ['png','jpg','jpeg','gif','webp'].includes(ext) ? meta.url : `${meta.url}|${meta.filename}`;
+                    socket.emit('send_message', { room_id: currentRoomId, text: payload, is_secret: false, ui_styles: "{}" });
+                }
+            } catch(e) {}
+            this.value = "";
+        });
+
+        document.getElementById('btn-secret-toggle').addEventListener('click', async function() {
+            isSecretMode = !isSecretMode;
+            if (isSecretMode) {
+                let key = await showCustomPrompt(); 
+                if (key && key.trim() !== "") {
+                    userSecretKey = key.trim(); 
+                    this.innerHTML = "🔒 Зашифровано"; 
+                    this.style.background = "#fef08a"; 
+                } else { 
+                    isSecretMode = false; 
+                    resetSecretToggleUI(this); 
+                }
+            } else { 
+                resetSecretToggleUI(this); 
+            }
+        });
+
+        const emojiPopover = document.getElementById('emoji-popover');
+        document.getElementById('btn-emoji-trigger').addEventListener('click', (e) => { e.stopPropagation(); emojiPopover.style.display = emojiPopover.style.display === 'flex' ? 'none' : 'flex'; });
+        document.addEventListener('click', () => emojiPopover.style.display = 'none');
+        emojiPopover.addEventListener('click', (e) => e.stopPropagation());
+
+        document.getElementById('font-family-select').addEventListener('change', function() { currentTextStyles.fontFamily = this.value; inputMsg.style.fontFamily = this.value; });
+        document.getElementById('font-size-select').addEventListener('change', function() { currentTextStyles.fontSize = this.value; inputMsg.style.fontSize = this.value; });
+        document.getElementById('style-bold').addEventListener('click', function() { currentTextStyles.isBold = !currentTextStyles.isBold; this.style.background = currentTextStyles.isBold ? '#e5e7eb' : 'transparent'; inputMsg.style.fontWeight = currentTextStyles.isBold ? 'bold' : 'normal'; });
+        document.getElementById('style-italic').addEventListener('click', function() { currentTextStyles.isItalic = !currentTextStyles.isItalic; this.style.background = currentTextStyles.isItalic ? '#e5e7eb' : 'transparent'; inputMsg.style.fontStyle = currentTextStyles.isItalic ? 'italic' : 'normal'; });
+        document.getElementById('text-color-picker').addEventListener('input', function() { currentTextStyles.color = this.value; inputMsg.style.color = this.value; });
+        document.getElementById('text-bg-picker').addEventListener('input', function() { currentTextStyles.background = this.value; inputMsg.style.backgroundColor = this.value; });
+
+        document.getElementById('search-contacts').addEventListener('input', function() {
+            renderCompanyUsers(globalUsersCache.filter(u => u.username.toLowerCase().includes(this.value.toLowerCase().trim())));
+        });
+
+        document.getElementById('btn-archive-room').addEventListener('click', () => { if (confirm("Архивировать переписку кабинета?")) socket.emit('archive_room_messages', { room_id: currentRoomId }); });
+        document.getElementById('btn-delete-room').addEventListener('click', () => { if (confirm("Полностью удалить кабинет?")) socket.emit('delete_room_request', { room_id: currentRoomId, user_id: currentUser.id_user, role: currentUser.role }); });
+
+        const leftPanel = document.querySelector('.left-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        const mobileOverlayPanel = document.getElementById('mobile-overlay-panel');
+
+        document.getElementById('btn-mobile-left').addEventListener('click', () => {
+            leftPanel.classList.add('open'); mobileOverlayPanel.classList.add('active');
+        });
+        document.getElementById('btn-mobile-right').addEventListener('click', () => {
+            rightPanel.classList.add('open'); mobileOverlayPanel.classList.add('active');
+        });
+        mobileOverlayPanel.addEventListener('click', () => {
+            leftPanel.classList.remove('open'); rightPanel.classList.remove('open'); mobileOverlayPanel.classList.remove('active');
+        });
+
+        // ЛОГИКА ШТОРКИ ПРАВОЙ ПАНЕЛИ СО СТРЕЛОЧКОЙ
+        const toggleBtn = document.getElementById('btn-toggle-sidebar');
+        if (toggleBtn && rightPanel) {
+            toggleBtn.addEventListener('click', () => {
+                rightPanel.classList.toggle('open-sidebar');
+                toggleBtn.innerHTML = rightPanel.classList.contains('open-sidebar') ? '▶' : '◀';
+            });
+        }
+
+        const btnFilterFiles = document.getElementById('btn-filter-files');
+        const fileExtSelect = document.getElementById('file-ext-select');
+
+        btnFilterFiles.addEventListener('click', function() {
+            isFileMode = !isFileMode;
+            if (isFileMode) {
+                btnFilterFiles.style.background = '#dbeafe';
+                fileExtSelect.style.display = 'inline-block';
+                requestFilesHistory();
+            } else {
+                btnFilterFiles.style.background = 'transparent';
+                fileExtSelect.style.display = 'none';
+                if (currentRoomId) {
+                    const activeRoom = latestRoomsListCache.find(r => r.id_room == currentRoomId);
+                    selectRoomById(currentRoomId, activeRoom ? activeRoom.name : "Кабинет", activeRoom ? activeRoom.type : "group", activeRoom ? activeRoom.created_by : null);
+                } else {
+                    messagesStream.innerHTML = "";
+                    document.getElementById('current-chat-title').innerText = "Выберите чат для начала общения";
+                }
+            }
+        });
+
+        fileExtSelect.addEventListener('change', function() { if (isFileMode) requestFilesHistory(); });
+
+        const dateFilterInput = document.getElementById('date-filter-input');
+        const btnClearDate = document.getElementById('btn-clear-date');
+
+        dateFilterInput.addEventListener('change', function() {
+            btnClearDate.style.display = this.value ? 'inline-block' : 'none';
+            reloadCurrentView();
+        });
+        btnClearDate.addEventListener('click', function() {
+            dateFilterInput.value = ''; this.style.display = 'none'; reloadCurrentView();
+        });
+    }
 
         const modal = document.getElementById('add-user-modal');
         const addUserBtn = document.getElementById('btn-add-user-modal');
