@@ -38,7 +38,7 @@ button.btn-info-user svg { stroke: var(--primary-color) !important; }
 
 /* Увеличиваем размер текста во всех сообщениях чата (и ваших, и входящих) */
 .msg-text {
-    font-size: 15px !important; /* Установите желаемый размер */
+    font-size: 15px !important; 
     line-height: 1.5 !important;
 }
 
@@ -46,10 +46,7 @@ button.btn-info-user svg { stroke: var(--primary-color) !important; }
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
 
-/* Обновленная сетка: левая и правая панели шире (320px), центр занимает оставшееся пространство */
-.app-container { display: grid; grid-template-columns: 320px 1fr 320px; flex: 1; min-height: 0; overflow: hidden; }
-
-/* СЕТКА ПРИЛОЖЕНИЯ: Ровно 2 колонки (Левое меню и чат) */
+/* ИСПРАВЛЕННАЯ СЕТКА: Ровно 2 колонки (Левое меню и чат) */
 .app-container { 
     display: grid !important; 
     grid-template-columns: 320px 1fr !important; 
