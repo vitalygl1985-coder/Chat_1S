@@ -557,18 +557,6 @@ async def get_chat_page():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(current_dir, "index.html"), "r", encoding="utf-8") as f: 
         html_content = f.read()
-        
-        # Инъекция пользовательских стилей (шрифт крупнее на 2 пункта, центральный чат уже, боковые панели шире)
-        custom_layout_styles = """
-        <style>
-            body { font-size: 16px !important; }
-            .sidebar-left, #left-panel, .left-sidebar, aside:first-of-type { width: 300px !important; min-width: 300px !important; }
-            .sidebar-right, #right-panel, .right-sidebar, aside:last-of-type { width: 300px !important; min-width: 300px !important; }
-            .chat-container, main, .main-chat-area { max-width: 600px !important; margin: 0 auto !important; }
-        </style>
-        </head>
-        """
-        html_content = html_content.replace("</head>", custom_layout_styles)
         return html_content
 
 @app.get("/static/style.css")
