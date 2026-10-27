@@ -31,12 +31,14 @@
             display: flex; flex-direction: column; font-size: 16px !important; 
         }
 
-        /* ОСНОВНАЯ СЕТКА: Ровно 2 колонки (Левое меню и чат на всю оставшуюся ширину) */
+        /* ЖЕСТКАЯ СЕТКА: Ровно 2 колонки и относительное позиционирование для шторки */
         .app-container {
             display: grid !important;
             grid-template-columns: 320px 1fr !important;
-            flex: 1 !important; min-height: 0 !important; 
-            overflow: hidden !important; position: relative !important;
+            flex: 1 !important; 
+            min-height: 0 !important; 
+            overflow: hidden !important; 
+            position: relative !important;
             width: 100% !important;
         }
 
@@ -61,7 +63,6 @@
         .accordion-header { font-weight: bold; color: var(--text-muted); cursor: pointer; padding: 5px; font-size: 12px; text-transform: uppercase; display: flex; justify-content: space-between; }
         .accordion-content { display: none; margin-top: 5px; }
 
-        /* Чат на всю ширину */
         .chat-panel { 
             border-right: none !important; background: #fafafa; 
             width: 100% !important; max-width: none !important; margin: 0 !important; 
@@ -89,22 +90,6 @@
         .msg-author { font-weight: 600; }
         .msg-text { font-size: 15px; line-height: 1.5; word-break: break-word; }
         
-        .msg-text img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; margin-top: 5px; display: block; cursor: pointer; border: 1px solid var(--border-color); }
-        .img-download-link { display: inline-block; font-size: 12px; color: var(--primary-color); text-decoration: none; font-weight: 600; margin-top: 4px; }
-        
-        .msg-read-panel { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; border-top: 1px dashed #e5e7eb; padding-top: 4px; }
-        .btn-read-trigger { cursor: pointer; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; user-select: none; border: 1px solid #e5e7eb; }
-        .btn-read-trigger:hover { background: #e5e7eb; }
-        .read-users-list { font-style: italic; color: #6b7280; font-size: 11px; }
-
-        .msg-delete-trigger { position: absolute; right: 5px; top: 5px; display: none; cursor: pointer; font-size: 12px; color: var(--text-muted); }
-        .msg-edit-trigger { position: absolute; right: 24px; top: 5px; display: none; cursor: pointer; font-size: 12px; color: var(--text-muted); }
-        .msg-reply-trigger { position: absolute; right: 44px; top: 5px; display: none; cursor: pointer; font-size: 12px; color: var(--text-muted); }
-        
-        .message-box:hover .msg-delete-trigger,
-        .message-box:hover .msg-edit-trigger,
-        .message-box:hover .msg-reply-trigger { display: block !important; }
-
         .input-area { background: var(--bg-panel); border-top: 1px solid var(--border-color); padding: 12px 15px; display: flex; flex-direction: column; gap: 8px; position: relative; flex-shrink: 0; }
         .toolbar { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--bg-main); padding-bottom: 6px; position: relative; flex-wrap: wrap; }
         .toolbar-item { cursor: pointer; font-size: 14px; color: var(--text-main); user-select: none; padding: 2px 4px; border-radius: 3px; }
@@ -130,7 +115,7 @@
         .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по кнопке */
+        /* ГАРАНТИРОВАННО СКРЫТАЯ ПРАВАЯ ШТОРКА ЗА ПРАВЫМ КРАЕМ */
         .right-panel {
             position: absolute !important; 
             top: 0 !important; 
@@ -148,7 +133,7 @@
             transform: translateX(0) !important; 
         }
 
-        /* Кнопка-стрелочка слева от шторки */
+        /* КНОПКА-СТРЕЛОЧКА НА ГРАНИЦЕ ШТОРКИ */
         .toggle-right-sidebar-btn {
             position: absolute !important; 
             left: -42px !important; 
@@ -184,90 +169,6 @@
 
         .view-pane { display: none; }
         .view-pane.active { display: block; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); display: none; align-items: center; justify-content: center; z-index: 5000; }
-        .modal-overlay.open { display: flex; }
-        .modal-window { width: 380px; max-width: 90vw; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 80vh; overflow: hidden; }
-        .modal-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
-        .modal-body { padding: 10px; overflow-y: auto; flex: 1; }
-        .modal-user-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; font-size: 14px; }
-        .modal-user-item:hover { background: var(--bg-main); }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; max-width: 90vw; }
-        .modal-row { margin-bottom: 8px; font-size: 14px; }
-        .modal-label { font-weight: bold; }
-        .unread-badge { background: var(--primary-color); color: white; border-radius: 10px; padding: 2px 7px; font-size: 11px; font-weight: bold; margin-left: auto; }
-        .participant-checkbox { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
-        
-        .btn-remove-participant { border: none; background: transparent; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
-        .btn-remove-participant:hover { background: #ffeeeb; }
-
-        .screenshot-modal-window { width: 85vw; height: 85vh; max-width: 1000px; background: white; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; }
-        .editor-container { flex: 1; display: flex; background: #333; overflow: hidden; justify-content: center; align-items: center; position: relative; }
-        .canvas-wrapper { position: relative; max-width: 100%; max-height: 100%; overflow: auto; padding: 10px; }
-        canvas { background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: block; cursor: crosshair; }
-        .editor-toolbar { padding: 10px 15px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .editor-tool-btn { padding: 5px 10px; background: white; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
-        .editor-tool-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
-
-        .call-banner {
-            position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
-            background: #1f2937; color: #fff; padding: 12px 20px; border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 15px;
-            z-index: 10000; transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            border: 1px solid rgba(255,255,255,0.1); width: 95%; max-width: 400px;
-        }
-        .call-banner.visible { top: 20px; }
-        .call-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .call-name { font-weight: bold; font-size: 15px; white-space: normal; word-wrap: break-word; line-height: 1.3; }
-        .call-status { font-size: 13px; color: #9ca3af; margin-top: 2px; }
-        .call-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
-        
-        .call-btn {
-            width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; color: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s;
-            font-size: 18px; flex-shrink: 0;
-        }
-        .call-btn:hover { transform: scale(1.1); }
-        .call-btn.accept { background: #10b981; animation: pulse-green 1.5s infinite; }
-        .call-btn.decline, .call-btn.end { background: #ef4444; }
-
-        @keyframes pulse-green {
-            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
-            70% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-
-        .mobile-overlay-panel { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 90; }
-        .mobile-overlay-panel.active { display: block; }
-        .mobile-menu-btn { display: none; background: transparent; border: none; font-size: 24px; cursor: pointer; color: var(--primary-color); padding: 5px; flex-shrink: 0; }
-
-        @media (max-width: 768px) {
-            .app-container { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; }
-            .system-footer-links { display: none !important; }
-
-            .left-panel, .right-panel {
-                position: absolute; top: 0; height: 100%; z-index: 100;
-                width: 85%; max-width: 320px; transition: transform 0.3s ease;
-                background: var(--bg-panel);
-            }
-            .left-panel { left: 0; transform: translateX(-100%); border-right: 1px solid var(--border-color); }
-            .right-panel { right: 0; transform: translateX(100%); border-left: 1px solid var(--border-color); }
-            .left-panel.open, .right-panel.open { transform: translateX(0); box-shadow: 0 0 20px rgba(0,0,0,0.3); }
-            
-            .chat-panel { width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
-            .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
-            .chat-header { padding: 0 10px; }
-            .chat-header .logo-link { display: none; } 
-            .chat-actions img { width: 30px !important; height: 30px !important; }
-            .input-area { padding: 8px 10px; }
-            .input-msg-div { min-height: 50px; max-height: 120px; font-size: 16px; padding: 14px 12px; border-radius: 12px; } 
-            .controls-row { align-items: flex-end; }
-            #btn-send-message { height: 50px; padding: 0 16px; border-radius: 12px; }
-            #btn-attach-file img, #record-btn img { width: 44px !important; height: 44px !important; }
-            .emoji-picker-popover { left: 50% !important; transform: translateX(-50%); width: 90vw; }
-            .message { max-width: 90%; }
-        }
     </style>
 </head>
 <body>
