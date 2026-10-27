@@ -1,9 +1,10 @@
 /* static/style.css - БАЗОВАЯ ВЕРСТКА */
 :root {
-    --primary-color: #2563eb; 
-    --chat-bg-url: none !important; 
+    --primary-color: #2563eb; /* Значение по умолчанию */
+    --chat-bg-url: none !important; /* Принудительно отключаем фоновую картинку */
 }
 
+/* Кнопки и элементы управления */
 .btn-primary, .btn, .btn-send, .header, .pane-header { 
     background-color: var(--primary-color) !important; 
     border-color: var(--primary-color) !important; 
@@ -22,20 +23,76 @@ button.btn-info-user {
 }
 button.btn-info-user svg { stroke: var(--primary-color) !important; }
 
+/* Бабблы сообщений */
 .message.my .message-box { background: var(--primary-color) !important; opacity: 0.8; }
 
+/* Нижняя панель */
 .system-footer-links { background: #fff !important; border-top: 2px solid var(--primary-color) !important; }
 .system-footer-links a { color: var(--primary-color) !important; }
 
+/* Устанавливаем сплошной светло-зеленый фон для области чата */
 .messages-container, .chat-panel {
     background-color: #d8e5cc !important;
     background-image: none !important;
 }
 
+/* Увеличиваем размер текста во всех сообщениях чата (и ваших, и входящих) */
 .msg-text {
     font-size: 15px !important; 
     line-height: 1.5 !important;
 }
 
+/* Остальная верстка */
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* ИСПРАВЛЕННАЯ СЕТКА: Ровно 2 колонки (Левое меню и чат) */
+.app-container { 
+    display: grid !important; 
+    grid-template-columns: 320px 1fr !important; 
+    flex: 1 !important; 
+    min-height: 0 !important; 
+    overflow: hidden !important; 
+    position: relative !important;
+}
+
+/* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по кнопке */
+.right-panel {
+    position: absolute !important; 
+    top: 0 !important; 
+    right: 0 !important;
+    width: 320px !important; 
+    height: 100% !important; 
+    background: var(--bg-panel, #ffffff) !important;
+    z-index: 300 !important; 
+    box-shadow: -5px 0 25px rgba(0,0,0,0.15) !important;
+    transform: translateX(100%) !important; 
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border-left: 1px solid var(--border-color, #e5e7eb) !important;
+}
+
+.right-panel.open-sidebar { 
+    transform: translateX(0) !important; 
+}
+
+/* Кнопка-стрелочка слева от шторки */
+.toggle-right-sidebar-btn {
+    position: absolute !important; 
+    left: -42px !important; 
+    top: 15px !important;
+    width: 42px !important; 
+    height: 42px !important; 
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important; 
+    border-right: none !important;
+    border-top-left-radius: 8px !important; 
+    border-bottom-left-radius: 8px !important;
+    cursor: pointer !important; 
+    display: flex !important; 
+    align-items: center !important;
+    justify-content: center !important; 
+    font-size: 16px !important;
+    box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important; 
+    z-index: 301 !important; 
+    color: #1f2937 !important;
+}
