@@ -300,121 +300,10 @@
 
 <audio id="remote-audio" autoplay playsinline style="display:none;"></audio>
 
-<div class="call-banner" id="call-banner">
-    <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; flex-shrink: 0;" id="call-avatar"></div>
-    <div class="call-info">
-        <span class="call-name" id="call-name">Сотрудник</span>
-        <span class="call-status" id="call-status">Входящий вызов...</span>
-    </div>
-    <div class="call-actions" id="call-actions-container"></div>
-</div>
-
-<div class="modal-overlay" id="secret-prompt-modal">
-    <div class="modal-window" style="width: 380px;">
-        <div class="modal-header">
-            <span style="font-weight: 600; font-size: 14px;">🔑 Задайте секретный код</span>
-            <span id="btn-close-prompt" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
-        </div>
-        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px;">
-            <label style="font-size:12px; font-weight:600; color:var(--text-main)">Секретный код:</label>
-            <input type="text" class="search-box" id="prompt-input" placeholder="Введите код...">
-        </div>
-        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
-            <button class="btn" id="btn-cancel-prompt" style="background:#9ca3af;">Отмена</button>
-            <button class="btn btn-primary" id="btn-confirm-prompt">ОК</button>
-        </div>
-    </div>
-</div>
- 
-<div class="modal-overlay" id="edit-message-modal">
-    <div class="modal-window" style="width: 420px;">
-        <div class="modal-header">
-            <span style="font-weight: 600; font-size: 14px;">✏️ Редактирование сообщения</span>
-            <span id="btn-close-edit-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
-        </div>
-        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px; border-bottom: 1px solid var(--border-color);">
-            <textarea class="search-box" id="edit-msg-textarea" style="height: 80px; resize: none;" placeholder="Введите новый текст..."></textarea>
-        </div>
-        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
-            <button class="btn" id="btn-cancel-edit" style="background:#9ca3af;">Отмена</button>
-            <button class="btn btn-primary" id="btn-confirm-edit">Сохранить</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="create-room-modal">
-    <div class="modal-window" style="width: 420px;">
-        <div class="modal-header">
-            <span style="font-weight: 600; font-size: 14px;">🛠️ Создание нового кабинета</span>
-            <span id="btn-close-room-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
-        </div>
-        <div style="padding: 15px; display:flex; flex-direction:column; gap:12px; border-bottom: 1px solid var(--border-color);">
-            <label style="font-size:12px; font-weight:600; color:var(--text-main)">Название кабинета:</label>
-            <input type="text" class="search-box" id="new-room-name" placeholder="Введите имя комнаты...">
-        </div>
-        <div style="padding: 10px 15px 5px 15px; font-size:11px; font-weight:bold; color:var(--text-muted); text-transform:uppercase;">
-            Выберите участников (минимум 1 сотрудник):
-        </div>
-        <div class="modal-body" id="create-room-users-container" style="max-height: 250px;"></div>
-        <div class="modal-header" style="border-top:1px solid var(--border-color); justify-content: flex-end; gap:8px; padding:10px 15px;">
-            <button class="btn" id="btn-cancel-room-creation" style="background:#9ca3af;">Отмена</button>
-            <button class="btn btn-primary" id="btn-confirm-room-creation">Создать комнату</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="add-user-modal">
-    <div class="modal-window">
-        <div class="modal-header">
-            <span style="font-weight: 600; font-size: 14px;">Выберите сотрудника</span>
-            <span id="btn-close-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
-        </div>
-        <div style="padding: 10px; border-bottom: 1px solid var(--border-color);">
-            <input type="text" class="search-box" id="search-modal-users" placeholder="Поиск по имени...">
-        </div>
-        <div class="modal-body" id="modal-users-container"></div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="screenshot-modal">
-    <div class="screenshot-modal-window">
-        <div class="modal-header">
-            <span style="font-weight: 600; font-size: 14px;">🎨 Графический редактор скриншотов</span>
-            <span id="btn-close-screenshot-modal" style="cursor: pointer; font-size: 16px; color: var(--text-muted);">✕</span>
-        </div>
-        <div class="editor-toolbar">
-            <button class="editor-tool-btn active" id="tool-draw">✏️ Кисть</button>
-            <button class="editor-tool-btn" id="tool-text">🔤 Текст (Клик на холст)</button>
-            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
-                <span>Цвет:</span>
-                <input type="color" id="editor-color" value="#ef4444" style="width:24px; height:24px; border:none; cursor:pointer;">
-            </div>
-            <div style="display:flex; align-items:center; gap:5px; font-size:12px;">
-                <span>Размер:</span>
-                <select id="editor-size" style="padding:2px; font-size:12px;">
-                    <option value="3">3 px</option>
-                    <option value="5" selected>5 px</option>
-                    <option value="10">10 px</option>
-                    <option value="15">15 px</option>
-                </select>
-            </div>
-            <button class="editor-tool-btn" id="btn-editor-clear" style="margin-left:auto; background:#fca5a5; color:#7f1d1d;">🗑️ Очистить правки</button>
-        </div>
-        <div class="editor-container">
-            <div class="canvas-wrapper">
-                <canvas id="editor-canvas"></canvas>
-            </div>
-        </div>
-        <div class="modal-header" style="border-top: 1px solid var(--border-color); border-bottom:none; justify-content:flex-end; gap:10px;">
-            <button class="btn" id="btn-cancel-screenshot" style="background:#9ca3af;">Отмена</button>
-            <button class="btn btn-success" id="btn-submit-screenshot" style="padding:7px 20px;">💾 Отправить в чат</button>
-        </div>
-    </div>
-</div>
-
 <div class="app-container">
     <div class="mobile-overlay-panel" id="mobile-overlay-panel"></div>
 
+    <!-- ЛЕВАЯ ПАНЕЛЬ: Только кабинеты -->
     <div class="panel left-panel">
         <div class="panel-header">
             <h3 style="font-size: 14px;">Кабинеты</h3>
@@ -433,6 +322,7 @@
         </div>
     </div>
 
+    <!-- ЦЕНТРАЛЬНЫЙ ЧАТ -->
     <div class="panel chat-panel">
         <div class="chat-header">
             <button class="mobile-menu-btn" id="btn-mobile-left">☰</button>
@@ -526,17 +416,15 @@
         </div>
     </div>
 
+    <!-- ПРАВАЯ ПАНЕЛЬ (Шторка со списком сотрудников, скрыта по умолчанию) -->
     <div class="panel right-panel" id="right-side-panel">
-        <!-- Кнопка вызова панели -->
+        <!-- Кнопка-стрелочка для выдвижения шторки -->
         <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Управление панелью">◀</button>
-        <!-- Дальше идет остальное содержимое панели... -->
-    </div>
 
         <div class="panel-header" id="right-panel-header-controls">
             <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
         </div>
         <div class="panel-scroll-area">
-            <!-- Содержимое панели (участники / контакты) -->
             <div id="pane-participants" class="view-pane active">
                 <div class="section-title">В этом кабинете <button id="btn-add-user-modal" style="border:none; background:none; color:var(--primary-color); cursor:pointer; font-weight:bold; font-size:13px; float:right;">+</button></div>
                 <div id="current-room-participants"></div>
@@ -548,11 +436,6 @@
             </div>
         </div>
     </div>
-</div>
-
-<div class="system-footer-links">
-    <div id="footer-admin-block"><a href="/admin" target="_blank">⚙️ Панель администратора чата</a></div>
-    <div id="footer-onec-block"><a href="https://onec.company.local/trade" target="_blank">🌐 Запуск веб-клиента 1С:Предприятие</a></div>
 </div>
 
 <script>
