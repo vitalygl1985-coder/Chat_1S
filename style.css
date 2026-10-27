@@ -69,6 +69,7 @@ body, html { height: 100dvh; overflow: hidden; display: flex; flex-direction: co
     transform: translateX(100%) !important; 
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     border-left: 1px solid var(--border-color, #e5e7eb) !important;
+    overflow: visible !important; /* <-- ЧТОБЫ ЯЗЫЧОК СТРЕЛКИ НЕ ОБРЕЗАЛСЯ */
 }
 
 .right-panel.open-sidebar { 

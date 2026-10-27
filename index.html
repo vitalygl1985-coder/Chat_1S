@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Корпоративный чат 1С</title>
-    <link rel="stylesheet" href="/static/style.css?v=1">
+    <link rel="stylesheet" href="/static/style.css?v=2">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
@@ -35,8 +35,10 @@
         .app-container {
             display: grid !important;
             grid-template-columns: 320px 1fr !important;
-            flex: 1 !important; min-height: 0 !important; 
-            overflow: hidden !important; position: relative !important;
+            flex: 1 !important; 
+            min-height: 0 !important; 
+            overflow: hidden !important; 
+            position: relative !important;
             width: 100% !important;
         }
 
@@ -60,8 +62,8 @@
         .accordion-section { margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
         .accordion-header { font-weight: bold; color: var(--text-muted); cursor: pointer; padding: 5px; font-size: 12px; text-transform: uppercase; display: flex; justify-content: space-between; }
         .accordion-content { display: none; margin-top: 5px; }
+        .accordion-content.open { display: block; }
 
-        /* Чат на всю ширину */
         .chat-panel { 
             border-right: none !important; background: #fafafa; 
             width: 100% !important; max-width: none !important; margin: 0 !important; 
@@ -130,7 +132,7 @@
         .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по кнопке */
+        /* ПРАВАЯ ШТОРКА СОТРУДНИКОВ: overflow: visible критически важен, чтобы кнопку-стрелочку слева не обрезало! */
         .right-panel {
             position: absolute !important; 
             top: 0 !important; 
@@ -143,20 +145,22 @@
             transform: translateX(100%) !important; 
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             border-left: 1px solid var(--border-color, #e5e7eb) !important;
+            overflow: visible !important;
         }
         .right-panel.open-sidebar { 
             transform: translateX(0) !important; 
         }
 
-        /* Кнопка-стрелочка слева от шторки */
+        /* КНОПКА-СТРЕЛОЧКА НА ГРАНИЦЕ ШТОРКИ */
         .toggle-right-sidebar-btn {
             position: absolute !important; 
             left: -42px !important; 
-            top: 15px !important;
+            top: 70px !important;
             width: 42px !important; 
             height: 42px !important; 
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important; 
+            background: var(--primary-color, #2563eb) !important;
+            color: #ffffff !important;
+            border: 1px solid var(--border-color, #e5e7eb) !important; 
             border-right: none !important;
             border-top-left-radius: 8px !important; 
             border-bottom-left-radius: 8px !important;
@@ -164,10 +168,9 @@
             display: flex !important; 
             align-items: center !important;
             justify-content: center !important; 
-            font-size: 16px !important;
-            box-shadow: -3px 2px 10px rgba(0,0,0,0.05) !important; 
+            font-size: 18px !important;
+            box-shadow: -3px 2px 10px rgba(0,0,0,0.15) !important; 
             z-index: 301 !important; 
-            color: #1f2937 !important;
         }
 
         .section-title { font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 5px 5px; letter-spacing: 0.5px; }
@@ -505,7 +508,7 @@
     <!-- ПРАВАЯ ПАНЕЛЬ (Шторка со списком сотрудников, скрыта по умолчанию) -->
     <div class="panel right-panel" id="right-side-panel">
         <!-- Кнопка-стрелочка для открытия/закрытия шторки -->
-        <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Шторка сотрудников">◀</button>
+        <button class="toggle-right-sidebar-btn" id="btn-toggle-sidebar" title="Список сотрудников">◀</button>
 
         <div class="panel-header" id="right-panel-header-controls">
             <button class="btn btn-primary" id="btn-toggle-right-view" style="width:100%; background: #4b5563;">👥 Все сотрудники</button>
