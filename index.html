@@ -31,7 +31,7 @@
             display: flex; flex-direction: column; font-size: 16px !important; 
         }
 
-        /* ОСНОВНАЯ СЕТКА: Левое меню (320px) и чат (на всю оставшуюся ширину) */
+        /* ОСНОВНАЯ СЕТКА: Ровно 2 колонки (Левое меню и чат на всю оставшуюся ширину) */
         .app-container {
             display: grid !important;
             grid-template-columns: 320px 1fr !important;
@@ -62,7 +62,7 @@
         .accordion-content { display: none; margin-top: 5px; }
         .accordion-content.open { display: block; }
 
-        /* Центральная часть чата на всю ширину */
+        /* Чат на всю ширину */
         .chat-panel { 
             border-right: none !important; background: #fafafa; 
             width: 100% !important; max-width: none !important; margin: 0 !important; 
@@ -131,7 +131,7 @@
         .mention-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
         .mention-item:hover { background: var(--bg-main); }
 
-        /* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по клику */
+        /* ПРАВАЯ ПАНЕЛЬ (Шторка): По умолчанию скрыта за правым краем, выплывает по кнопке */
         .right-panel {
             position: absolute !important; 
             top: 0 !important; 
@@ -1499,7 +1499,7 @@
             leftPanel.classList.remove('open'); rightPanel.classList.remove('open'); mobileOverlayPanel.classList.remove('active');
         });
 
-        // ПРАВИЛЬНАЯ КНОПКА ШТОРКИ ПРАВОЙ ПАНЕЛИ
+        // ПРАВИЛЬНЫЙ ОБРАБОТЧИК КНОПКИ ШТОРКИ (ПРАВАЯ ПАНЕЛЬ)
         const toggleBtn = document.getElementById('btn-toggle-sidebar');
         if (toggleBtn && rightPanel) {
             toggleBtn.addEventListener('click', () => {
